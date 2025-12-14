@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e0e5ec;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Base styles */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  /* Improve touch targets */
+  button, a, input, select, textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better text readability */
+  body {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  /* Prevent horizontal scroll */
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  /* Improve neumorphic shadows on mobile */
+  .shadow-\[-6px_-6px_12px_\#ffffff\,6px_6px_12px_\#aeaec040\] {
+    box-shadow: -3px -3px 6px #ffffff, 3px 3px 6px #aeaec040;
+  }
+
+  .shadow-\[-10px_-10px_30px_\#ffffff\,10px_10px_30px_\#aeaec040\] {
+    box-shadow: -5px -5px 15px #ffffff, 5px 5px 15px #aeaec040;
+  }
+}
+
+/* Improve touch interactions */
+@media (hover: none) and (pointer: coarse) {
+  /* Mobile devices - remove hover effects */
+  .hover\:bg-gray-200:hover {
+    background-color: transparent;
+  }
+
+  .hover\:bg-white:hover {
+    background-color: transparent;
+  }
+
+  .hover\:shadow-md:hover {
+    box-shadow: none;
+  }
+
+  /* Active states for touch */
+  button:active, a:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Safe area for devices with notches */
+@supports (padding: max(0px)) {
+  .safe-area-top {
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+
+  .safe-area-bottom {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}

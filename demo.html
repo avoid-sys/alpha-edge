@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Edge - Trading Analytics Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .neumorphic {
+            background: #e0e5ec;
+            box-shadow: -5px -5px 10px #ffffff, 5px 5px 10px #aeaec040;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-[#e0e5ec] font-sans min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="hidden md:flex flex-col items-center py-8 pl-6 pr-2 z-20">
+            <div class="w-20 h-[92vh] neumorphic flex flex-col items-center py-8">
+                <div class="mb-12">
+                    <div class="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center text-white font-bold text-xl">
+                        T
+                    </div>
+                </div>
+                <div class="flex-1 w-full flex flex-col items-center space-y-4">
+                    <div class="w-12 h-12 neumorphic rounded-2xl flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
+                        <i data-lucide="trophy" class="text-gray-500"></i>
+                    </div>
+                    <div class="w-12 h-12 neumorphic rounded-2xl flex items-center justify-center cursor-pointer hover:scale-105 transition-transform bg-gray-800">
+                        <i data-lucide="layout-dashboard" class="text-white"></i>
+                    </div>
+                    <div class="w-12 h-12 neumorphic rounded-2xl flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
+                        <i data-lucide="wallet" class="text-gray-500"></i>
+                    </div>
+                </div>
+                <div class="mt-auto">
+                    <div class="w-12 h-12 neumorphic rounded-2xl flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
+                        <i data-lucide="log-out" class="text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto p-6 md:p-10 max-w-[1600px] mx-auto">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">Alpha Edge Trading Platform</h1>
+                <p class="text-gray-500 text-lg">Professional trading analytics and performance tracking</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <div class="neumorphic p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Total Profit</p>
+                            <p class="text-2xl font-bold text-green-600 mt-1">+12.45%</p>
+                        </div>
+                        <i data-lucide="trending-up" class="text-green-500" size="32"></i>
+                    </div>
+                </div>
+
+                <div class="neumorphic p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Win Rate</p>
+                            <p class="text-2xl font-bold text-blue-600 mt-1">68.5%</p>
+                        </div>
+                        <i data-lucide="target" class="text-blue-500" size="32"></i>
+                    </div>
+                </div>
+
+                <div class="neumorphic p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Total Trades</p>
+                            <p class="text-2xl font-bold text-gray-800 mt-1">247</p>
+                        </div>
+                        <i data-lucide="activity" class="text-gray-400" size="32"></i>
+                    </div>
+                </div>
+
+                <div class="neumorphic p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Max Drawdown</p>
+                            <p class="text-2xl font-bold text-red-500 mt-1">-8.2%</p>
+                        </div>
+                        <i data-lucide="trending-down" class="text-red-500" size="32"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Placeholder -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                <div class="neumorphic p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Equity Curve</h3>
+                    <div class="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <p class="text-gray-500">Interactive Chart Area</p>
+                    </div>
+                </div>
+
+                <div class="neumorphic p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Monthly Performance</h3>
+                    <div class="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <p class="text-gray-500">Performance Chart Area</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col md:flex-row gap-4 justify-center">
+                <button class="neumorphic px-8 py-4 text-gray-700 font-medium hover:scale-105 transition-transform">
+                    <i data-lucide="upload" class="inline mr-2"></i>
+                    Import Trades
+                </button>
+                <button class="neumorphic px-8 py-4 text-gray-700 font-medium hover:scale-105 transition-transform">
+                    <i data-lucide="trophy" class="inline mr-2"></i>
+                    View Leaderboard
+                </button>
+                <button class="neumorphic px-8 py-4 text-gray-700 font-medium hover:scale-105 transition-transform">
+                    <i data-lucide="settings" class="inline mr-2"></i>
+                    Account Settings
+                </button>
+            </div>
+
+            <!-- Installation Instructions -->
+            <div class="mt-16 neumorphic p-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">🚀 Installation Instructions</h2>
+                <div class="space-y-4 text-gray-700">
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">1. Install Node.js</h3>
+                        <p class="mb-2">Install Node.js LTS version from <a href="https://nodejs.org" class="text-blue-600 underline">nodejs.org</a> or using your package manager:</p>
+                        <div class="bg-gray-100 p-3 rounded font-mono text-sm">
+                            # Using Homebrew (macOS)<br>
+                            brew install node<br><br>
+                            # Using nvm (recommended)<br>
+                            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash<br>
+                            nvm install --lts<br>
+                            nvm use --lts
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">2. Install Dependencies</h3>
+                        <div class="bg-gray-100 p-3 rounded font-mono text-sm">
+                            npm install
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">3. Start Development Server</h3>
+                        <div class="bg-gray-100 p-3 rounded font-mono text-sm">
+                            npm run dev
+                        </div>
+                        <p class="mt-2">Then open <strong>http://localhost:3000</strong> in your browser</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
