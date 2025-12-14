@@ -1,0 +1,295 @@
+import _ from 'lodash';
+import { differenceInDays } from 'date-fns';
+
+export const calculateTradeMetrics = (trades) => {
+  if (!trades || trades.length === 0) return null;
+
+  console.log('Calculating metrics for', trades.length, 'trades');
+
+  // Sort trades by close time ascending
+  const sortedTrades = [...trades].sort((a, b) => new Date(a.close_time) - new Date(b.close_time));
+
+  const totalTrades = sortedTrades.length;
+  const profitableTrades = sortedTrades.filter(t => t.net_profit > 0);
+  const losingTrades = sortedTrades.filter(t => t.net_profit <= 0);
+  
+  const profitableTradesCount = profitableTrades.length;
+  const losingTradesCount = losingTrades.length;
+  
+  const winRate = totalTrades > 0 ? (profitableTradesCount / totalTrades) * 100 : 0;
+  
+  const totalProfit = _.sumBy(sortedTrades, 'net_profit');
+  const grossProfit = _.sumBy(profitableTrades, 'net_profit');
+  const grossLoss = Math.abs(_.sumBy(losingTrades, 'net_profit'));
+  
+  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit;
+  
+  // Calculate starting balance and profit percentage more accurately
+  let startBalance = 10000; // Default starting balance
+  let currentBalance = startBalance;
+
+  // Calculate balance progression
+  const validBalances = sortedTrades.filter(t => t.balance != null && t.balance > 0);
+  console.log('Valid balances found:', validBalances.length, 'out of', sortedTrades.length, 'trades');
+
+  if (validBalances.length > 0) {
+    // Use actual balance data from trades
+    const firstValidTrade = sortedTrades.find(t => t.balance === validBalances[0].balance);
+    startBalance = validBalances[0].balance - (firstValidTrade ? firstValidTrade.net_profit : 0);
+    currentBalance = validBalances[validBalances.length - 1].balance;
+    console.log('Using balance data: start =', startBalance, 'current =', currentBalance);
+  } else {
+    // Fallback: accumulate profits from starting balance
+    console.log('No valid balance data, using profit accumulation');
+    sortedTrades.forEach(trade => {
+      currentBalance += trade.net_profit;
+    });
+  }
+
+  // Calculate Profit Percentage based on actual balance change
+  const profitPercentage = startBalance > 0 ? ((currentBalance - startBalance) / startBalance) * 100 : 0;
+  console.log('Profit calculation:', { startBalance, currentBalance, profitPercentage, totalProfit });
+
+  // Max Drawdown
+  let peak = -Infinity;
+  let maxDrawdownAbs = 0;
+  let maxDrawdownPct = 0;
+  
+  // Reconstruct equity curve points
+  let currentEq = startBalance;
+  const equityCurve = [currentEq];
+  
+  sortedTrades.forEach(t => {
+    // If balance is present and valid in trade, use it, else reconstruct
+    if (t.balance != null && t.balance > 0) {
+        currentEq = t.balance;
+    } else {
+        currentEq += t.net_profit;
+    }
+    equityCurve.push(currentEq);
+
+    // Ensure we don't have negative equity (add minimum floor)
+    currentEq = Math.max(currentEq, 1000);
+
+    if (currentEq > peak) peak = currentEq;
+    const dd = peak - currentEq;
+    const ddPct = peak > 0 ? (dd / peak) * 100 : 0;
+
+    if (dd > maxDrawdownAbs) maxDrawdownAbs = dd;
+    if (ddPct > maxDrawdownPct) maxDrawdownPct = ddPct;
+  });
+
+  console.log('Equity curve:', {
+    points: equityCurve.length,
+    start: equityCurve[0],
+    end: equityCurve[equityCurve.length - 1],
+    peak,
+    maxDrawdown: maxDrawdownPct
+  });
+
+  // Streaks
+  let currentWinStreak = 0;
+  let maxWinStreak = 0;
+  let currentLossStreak = 0;
+  let maxLossStreak = 0;
+  
+  sortedTrades.forEach(t => {
+    if (t.net_profit > 0) {
+      currentWinStreak++;
+      currentLossStreak = 0;
+      if (currentWinStreak > maxWinStreak) maxWinStreak = currentWinStreak;
+    } else {
+      currentLossStreak++;
+      currentWinStreak = 0;
+      if (currentLossStreak > maxLossStreak) maxLossStreak = currentLossStreak;
+    }
+  });
+
+  // Days Active
+  const firstDate = new Date(sortedTrades[0].close_time);
+  const lastDate = new Date(sortedTrades[sortedTrades.length - 1].close_time);
+  const daysActive = differenceInDays(lastDate, firstDate) + 1;
+  
+  // Trading Days (unique days)
+  const uniqueDays = new Set(sortedTrades.map(t => t.close_time.split('T')[0])).size;
+
+  // --- Advanced Metrics for Score ---
+
+  // Annualized Return
+  const annualizedReturn = daysActive > 0 ? (profitPercentage / daysActive) * 365 : 0;
+
+  // Avg Risk/Reward
+  const avgWin = profitableTradesCount > 0 ? grossProfit / profitableTradesCount : 0;
+  const avgLoss = losingTradesCount > 0 ? grossLoss / losingTradesCount : 0;
+  const rrAverage = avgLoss > 0 ? avgWin / avgLoss : 0;
+
+  // Expectancy
+  const winRateDec = winRate / 100;
+  const lossRateDec = 1 - winRateDec;
+  const expectancy = (winRateDec * avgWin) - (lossRateDec * avgLoss);
+
+  // Volatility
+  const tradeReturns = sortedTrades.map((t, i) => {
+    const prevBal = i === 0 ? startBalance : (sortedTrades[i-1].balance || (t.balance - t.net_profit));
+    return prevBal > 0 ? t.net_profit / prevBal : 0;
+  });
+  const meanReturn = _.mean(tradeReturns);
+  const variance = _.mean(tradeReturns.map(r => Math.pow(r - meanReturn, 2)));
+  const volatility = Math.sqrt(variance);
+
+  // Roughness (1 - R^2)
+  const n = equityCurve.length;
+  const x = Array.from({length: n}, (_, i) => i);
+  const y = equityCurve;
+  const sumX = _.sum(x);
+  const sumY = _.sum(y);
+  const sumXY = _.sum(x.map((xi, i) => xi * y[i]));
+  const sumXX = _.sum(x.map(xi => xi * xi));
+  const sumYY = _.sum(y.map(yi => yi * yi));
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  const ssTot = sumYY - (sumY * sumY) / n;
+  const ssRes = _.sum(y.map((yi, i) => Math.pow(yi - (slope * i + intercept), 2)));
+  const rSquared = ssTot !== 0 ? 1 - (ssRes / ssTot) : 0;
+  const roughness = 1 - rSquared; 
+
+  // Monthly Positive Ratio
+  const months = {};
+  sortedTrades.forEach(t => {
+    const monthKey = t.close_time.substring(0, 7); // YYYY-MM
+    if (!months[monthKey]) months[monthKey] = 0;
+    months[monthKey] += t.net_profit;
+  });
+  const totalMonths = Object.keys(months).length;
+  const positiveMonths = Object.values(months).filter(p => p > 0).length;
+  const monthlyPositiveRatio = totalMonths > 0 ? positiveMonths / totalMonths : 0;
+
+  // Trade Frequency Std
+  const tradesPerMonth = {};
+  sortedTrades.forEach(t => {
+    const monthKey = t.close_time.substring(0, 7);
+    tradesPerMonth[monthKey] = (tradesPerMonth[monthKey] || 0) + 1;
+  });
+  const monthlyCounts = Object.values(tradesPerMonth);
+  const meanCounts = _.mean(monthlyCounts) || 0;
+  const varCounts = _.mean(monthlyCounts.map(c => Math.pow(c - meanCounts, 2))) || 0;
+  const tradeFrequencyStd = Math.sqrt(varCounts);
+
+  // Risk Per Trade - use available balance data
+  const balances = sortedTrades.map(t => t.balance).filter(b => b != null && b > 0);
+  const avgBalance = balances.length > 0 ? _.mean(balances) : startBalance;
+  const riskPerTrade = avgBalance > 0 && losingTradesCount > 0 && avgLoss !== 0
+    ? Math.abs(avgLoss / avgBalance) * 100
+    : 0;
+
+  console.log('Risk calculation:', {
+    balances: balances.length,
+    avgBalance,
+    losingTradesCount,
+    avgLoss,
+    riskPerTrade
+  });
+
+  // Long/Short stats
+  const longTrades = sortedTrades.filter(t => t.direction === 'Buy');
+  const shortTrades = sortedTrades.filter(t => t.direction === 'Sell');
+  
+  const longWinRate = longTrades.length > 0 
+    ? (longTrades.filter(t => t.net_profit > 0).length / longTrades.length) * 100 
+    : 0;
+    
+  const shortWinRate = shortTrades.length > 0 
+    ? (shortTrades.filter(t => t.net_profit > 0).length / shortTrades.length) * 100 
+    : 0;
+
+  // Scores
+  const calculateScores = () => {
+     // Performance Normalization
+    const AR_norm = Math.min(100, Math.max(0, (annualizedReturn * 100) / 50));
+    const WR_norm = winRate; 
+    const RR_norm = Math.min(100, (rrAverage / 2) * 100);
+    // E_norm refined: if AvgLoss > 0, normalize expectancy relative to AvgLoss
+    const E_norm_refined = avgLoss > 0 ? Math.min(100, Math.max(0, (expectancy / avgLoss) * 100)) : (expectancy > 0 ? 100 : 0);
+
+    // Risk Normalization
+    const MDD_norm = Math.max(0, 100 - (maxDrawdownPct / 30 * 100));
+    const VOL_norm = Math.max(0, 100 - (volatility / 0.02 * 100));
+    const RPT_norm = Math.max(0, 100 - (riskPerTrade / 2 * 100));
+
+    // Consistency Normalization
+    const CS_norm = Math.max(0, 100 - (roughness / 0.02 * 100));
+    const MPR_norm = monthlyPositiveRatio * 100;
+    const TFS_norm = Math.max(0, 100 - (tradeFrequencyStd / 5 * 100));
+
+    // Account Health (Defaults for missing data)
+    const violations_sl = 0;
+    const leverage_overuse = 0;
+    const risklimit_breach = 0;
+    const AH = Math.max(0, 100 - 20 * violations_sl - 15 * leverage_overuse - 25 * risklimit_breach);
+
+    // Longevity
+    const Longevity_norm = ((Math.min(1, daysActive / 365) + Math.min(1, totalTrades / 300)) / 2) * 100;
+
+    // Composites
+    const Performance = 0.50 * AR_norm + 0.20 * WR_norm + 0.20 * RR_norm + 0.10 * E_norm_refined;
+    const RiskControl = 0.50 * MDD_norm + 0.30 * VOL_norm + 0.20 * RPT_norm;
+    const Consistency = 0.50 * CS_norm + 0.30 * MPR_norm + 0.20 * TFS_norm;
+
+    const Score = 
+      0.40 * Performance +
+      0.30 * RiskControl +
+      0.15 * Consistency +
+      0.10 * AH +
+      0.05 * Longevity_norm;
+
+    return {
+      trader_score: parseFloat(Score.toFixed(2)),
+      performance_score: parseFloat(Performance.toFixed(2)),
+      risk_score: parseFloat(RiskControl.toFixed(2)),
+      consistency_score: parseFloat(Consistency.toFixed(2)),
+      account_health_score: parseFloat(AH.toFixed(2)),
+      longevity_score: parseFloat(Longevity_norm.toFixed(2))
+    };
+  };
+  
+  const scores = calculateScores();
+
+  return {
+    profit_percentage: parseFloat(profitPercentage.toFixed(2)),
+    win_rate: parseFloat(winRate.toFixed(2)),
+    profit_factor: parseFloat(profitFactor.toFixed(2)),
+    trading_days: uniqueDays,
+    current_win_streak: currentWinStreak,
+    current_loss_streak: currentLossStreak,
+    max_win_streak: maxWinStreak,
+    max_loss_streak: maxLossStreak,
+    total_trades: totalTrades,
+    profitable_trades_count: profitableTradesCount,
+    losing_trades_count: losingTradesCount,
+    sharpe_ratio: parseFloat((meanReturn > 0 ? meanReturn / volatility : 0).toFixed(2)),
+    sortino_ratio: parseFloat((meanReturn > 0 ? meanReturn / Math.sqrt(_.mean(tradeReturns.filter(r => r < 0).map(r => r * r)) || 0.0001) : 0).toFixed(2)),
+    max_drawdown: parseFloat(maxDrawdownPct.toFixed(2)),
+    avg_trade_duration: 0, 
+    long_win_rate: parseFloat(longWinRate.toFixed(2)),
+    short_win_rate: parseFloat(shortWinRate.toFixed(2)),
+    total_long_trades: longTrades.length,
+    total_short_trades: shortTrades.length,
+    
+    // New fields
+    annualized_return: parseFloat(annualizedReturn.toFixed(2)),
+    rr_average: parseFloat(rrAverage.toFixed(2)),
+    expectancy: parseFloat(expectancy.toFixed(2)),
+    volatility: parseFloat(volatility.toFixed(4)),
+    risk_per_trade: parseFloat(riskPerTrade.toFixed(2)),
+    roughness: parseFloat(roughness.toFixed(4)),
+    monthly_positive_ratio: parseFloat(monthlyPositiveRatio.toFixed(2)),
+    trade_frequency_std: parseFloat(tradeFrequencyStd.toFixed(2)),
+    violations_sl: 0,
+    leverage_overuse: 0,
+    risklimit_breach: 0,
+    days_active: daysActive,
+    
+    ...scores
+  };
+};

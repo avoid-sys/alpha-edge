@@ -1,0 +1,48 @@
+import React from 'react';
+
+export const NeumorphicCard = ({ children, className = "", onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`
+      bg-[#e0e5ec] 
+      rounded-[25px] 
+      shadow-[-9px_-9px_16px_rgba(255,255,255,0.8),9px_9px_16px_rgba(163,177,198,0.6)] 
+      border border-white/40
+      ${className}
+    `}
+  >
+    {children}
+  </div>
+);
+
+export const NeumorphicButton = ({ children, onClick, active, className = "", variant = "primary", disabled }) => {
+  const baseStyles = "px-6 py-3 rounded-xl font-medium transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  
+  const variants = {
+    primary: active 
+      ? "bg-[#e0e5ec] text-blue-600 shadow-[inset_6px_6px_12px_#b8b9be,inset_-6px_-6px_12px_#ffffff]" 
+      : "bg-[#e0e5ec] text-gray-700 shadow-[-6px_-6px_12px_rgba(255,255,255,0.8),6px_6px_12px_rgba(163,177,198,0.6)] hover:shadow-[-4px_-4px_8px_rgba(255,255,255,0.8),4px_4px_8px_rgba(163,177,198,0.6)]",
+    action: "bg-gray-800 text-white shadow-[6px_6px_12px_#b8b9be,-6px_-6px_12px_#ffffff] hover:bg-gray-700 hover:shadow-[4px_4px_8px_#b8b9be,-4px_-4px_8px_#ffffff]",
+  };
+
+  return (
+    <button onClick={onClick} disabled={disabled} className={`${baseStyles} ${variants[variant]} ${className}`}>
+      {children}
+    </button>
+  );
+};
+
+export const StatBox = ({ label, value, subValue, trend }) => (
+  <div className="flex flex-col">
+    <span className="text-gray-500 text-sm font-medium mb-2">{label}</span>
+    <div className="flex items-baseline gap-2">
+      <span className="text-3xl font-bold text-gray-800">{value}</span>
+      {subValue && <span className="text-sm text-gray-500">{subValue}</span>}
+    </div>
+    {trend && (
+      <div className={`text-xs mt-2 font-medium ${trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
+        {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
+      </div>
+    )}
+  </div>
+);

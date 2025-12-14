@@ -1,0 +1,185 @@
+{
+  "name": "TraderProfile",
+  "type": "object",
+  "properties": {
+    "nickname": {
+      "type": "string",
+      "description": "Display name of the trader"
+    },
+    "broker": {
+      "type": "string",
+      "description": "Connected broker name"
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "live"
+      ],
+      "default": "live",
+      "description": "Only live accounts accepted"
+    },
+    "profit_percentage": {
+      "type": "number",
+      "description": "Total profit in percentage"
+    },
+    "win_rate": {
+      "type": "number",
+      "description": "Win rate percentage (0-100)"
+    },
+    "profit_factor": {
+      "type": "number",
+      "description": "Gross Profit / Gross Loss"
+    },
+    "trading_days": {
+      "type": "number",
+      "description": "Total number of active trading days"
+    },
+    "consecutive_profitable_days": {
+      "type": "number",
+      "description": "Current streak of profitable days"
+    },
+    "consecutive_losing_days": {
+      "type": "number",
+      "description": "Current streak of losing days"
+    },
+    "consecutive_profitable_trades": {
+      "type": "number",
+      "description": "Current streak of winning trades"
+    },
+    "consecutive_losing_trades": {
+      "type": "number",
+      "description": "Current streak of losing trades"
+    },
+    "total_trades": {
+      "type": "number",
+      "description": "Total number of trades taken"
+    },
+    "profitable_trades_count": {
+      "type": "number",
+      "description": "Number of winning trades"
+    },
+    "losing_trades_count": {
+      "type": "number",
+      "description": "Number of losing trades"
+    },
+    "avatar_url": {
+      "type": "string",
+      "description": "URL to user avatar"
+    },
+    "sharpe_ratio": {
+      "type": "number",
+      "description": "Sharpe Ratio measure of risk-adjusted return"
+    },
+    "sortino_ratio": {
+      "type": "number",
+      "description": "Sortino Ratio measure of risk-adjusted return"
+    },
+    "max_drawdown": {
+      "type": "number",
+      "description": "Maximum drawdown percentage"
+    },
+    "avg_trade_duration": {
+      "type": "number",
+      "description": "Average trade duration in minutes"
+    },
+    "long_win_rate": {
+      "type": "number",
+      "description": "Win rate for long positions"
+    },
+    "short_win_rate": {
+      "type": "number",
+      "description": "Win rate for short positions"
+    },
+    "total_long_trades": {
+      "type": "number",
+      "description": "Total number of long trades"
+    },
+    "total_short_trades": {
+      "type": "number",
+      "description": "Total number of short trades"
+    },
+    "annualized_return": {
+      "type": "number",
+      "description": "Annualized return percentage"
+    },
+    "rr_average": {
+      "type": "number",
+      "description": "Average Risk/Reward ratio"
+    },
+    "expectancy": {
+      "type": "number",
+      "description": "Expectancy value"
+    },
+    "volatility": {
+      "type": "number",
+      "description": "Volatility measure"
+    },
+    "risk_per_trade": {
+      "type": "number",
+      "description": "Average risk per trade percentage"
+    },
+    "roughness": {
+      "type": "number",
+      "description": "Equity curve roughness"
+    },
+    "monthly_positive_ratio": {
+      "type": "number",
+      "description": "Ratio of positive months (0-1)"
+    },
+    "trade_frequency_std": {
+      "type": "number",
+      "description": "Standard deviation of trade frequency"
+    },
+    "violations_sl": {
+      "type": "number",
+      "description": "Number of stop loss violations"
+    },
+    "leverage_overuse": {
+      "type": "number",
+      "description": "Number of leverage overuse incidents"
+    },
+    "risklimit_breach": {
+      "type": "number",
+      "description": "Number of risk limit breaches"
+    },
+    "days_active": {
+      "type": "number",
+      "description": "Total days account has been active"
+    },
+    "trader_score": {
+      "type": "number",
+      "description": "Calculated TraderScore (0-100)"
+    },
+    "performance_score": {
+      "type": "number"
+    },
+    "risk_score": {
+      "type": "number"
+    },
+    "consistency_score": {
+      "type": "number"
+    },
+    "account_health_score": {
+      "type": "number"
+    },
+    "longevity_score": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "nickname",
+    "broker"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {},
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

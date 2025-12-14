@@ -1,0 +1,66 @@
+{
+  "name": "Trade",
+  "type": "object",
+  "properties": {
+    "trader_profile_id": {
+      "type": "string",
+      "description": "ID of the trader profile this trade belongs to"
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Trading symbol (e.g. EURUSD)"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "Buy",
+        "Sell"
+      ],
+      "description": "Trade direction"
+    },
+    "close_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the trade was closed"
+    },
+    "entry_price": {
+      "type": "number",
+      "description": "Entry price"
+    },
+    "exit_price": {
+      "type": "number",
+      "description": "Exit price"
+    },
+    "volume": {
+      "type": "number",
+      "description": "Trade volume/quantity"
+    },
+    "net_profit": {
+      "type": "number",
+      "description": "Net profit or loss in account currency"
+    },
+    "balance": {
+      "type": "number",
+      "description": "Account balance after this trade"
+    }
+  },
+  "required": [
+    "trader_profile_id",
+    "net_profit",
+    "close_time"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
