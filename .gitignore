@@ -80,8 +80,8 @@ jspm_packages/
 *.bak
 *.backup
 
-# Old directories (cleanup)
-Components/
-Pages/
-Entities/
-Edge/
+# Old directories (cleanup) - REMOVED to prevent ignoring current directories
+# Components/
+# Pages/
+# Entities/
+# Edge/
