@@ -40,28 +40,26 @@ export default function Home() {
 
   // Check authentication status on component mount
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
-        // Use synchronous localStorage access for immediate check
-        const userData = localStorage.getItem('alpha_edge_user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          if (user && user.email) {
-            console.log('User authenticated:', user.email);
-            setIsAuthenticated(true);
-            setCurrentUser(user);
-            setAuthCheckComplete(true);
-            return;
-          }
+        console.log('Checking authentication status...');
+        const user = await localDataService.getCurrentUser();
+        console.log('Auth check result:', user);
+
+        if (user && user.email) {
+          console.log('User authenticated:', user.email);
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+        } else {
+          console.log('User not authenticated');
+          setIsAuthenticated(false);
+          setCurrentUser(null);
         }
-        console.log('User not authenticated');
-        setIsAuthenticated(false);
-        setCurrentUser(null);
-        setAuthCheckComplete(true);
       } catch (error) {
         console.error('Auth check failed:', error);
         setIsAuthenticated(false);
         setCurrentUser(null);
+      } finally {
         setAuthCheckComplete(true);
       }
     };
@@ -86,18 +84,25 @@ export default function Home() {
           password: authForm.password // In production, this would be hashed
         };
 
+        console.log('Registering user:', user);
         await localDataService.setCurrentUser(user);
+        console.log('User saved to storage, updating state...');
         setIsAuthenticated(true);
         setCurrentUser(user);
         setAuthMode(null); // Close modal
+        console.log('Navigating to dashboard...');
         navigate(createPageUrl('Dashboard'));
       } else {
         // Login - in production, this would verify credentials
+        console.log('Login attempt for email:', authForm.email);
         const user = await localDataService.getCurrentUser();
+        console.log('Stored user for login:', user);
         if (user && user.email === authForm.email) {
+          console.log('Login successful, updating state...');
           setIsAuthenticated(true);
           setCurrentUser(user);
           setAuthMode(null); // Close modal
+          console.log('Navigating to dashboard after login...');
           navigate(createPageUrl('Dashboard'));
         } else {
           throw new Error('Invalid credentials');
@@ -213,12 +218,6 @@ export default function Home() {
                   <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
                     <Activity size={20} />
                     Go to Dashboard
-                  </button>
-                </Link>
-                <Link to={createPageUrl('Leaderboard')}>
-                  <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
-                    <Trophy size={20} />
-                    View Leaderboard
                   </button>
                 </Link>
                 <button
@@ -360,12 +359,6 @@ export default function Home() {
                     <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
                       <Activity size={20} />
                       Access Your Dashboard
-                    </button>
-                  </Link>
-                  <Link to={createPageUrl('Leaderboard')}>
-                    <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
-                      <Trophy size={20} />
-                      View Global Leaderboard
                     </button>
                   </Link>
                 </>
