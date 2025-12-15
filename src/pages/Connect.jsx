@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from '../utils';
-import { NeumorphicCard, NeumorphicButton } from '../components/NeumorphicUI';
+import { createPageUrl } from '@/utils';
+import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
 import { ShieldCheck, Server, AlertCircle, Upload, Zap } from 'lucide-react';
 
 export default function Connect() {

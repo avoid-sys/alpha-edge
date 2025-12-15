@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Layout from './Layout.jsx';
-import SecurityMonitor from './components/SecurityMonitor.jsx';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
@@ -30,7 +29,6 @@ function AppContent() {
           </Routes>
         </Layout>
       )}
-      <SecurityMonitor />
     </>
   );
 }

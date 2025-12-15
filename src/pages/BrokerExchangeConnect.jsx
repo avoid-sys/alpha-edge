@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { NeumorphicCard, NeumorphicButton } from '../components/NeumorphicUI';
-import { brokerIntegrationService } from '../services/brokerIntegrationService';
+import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
+import { brokerIntegrationService } from '@/services/brokerIntegrationService';
 import {
   TrendingUp,
   Bitcoin,
@@ -15,7 +15,7 @@ import {
   Globe,
   Zap
 } from 'lucide-react';
-import { createPageUrl } from '../utils';
+import { createPageUrl } from '@/utils';
 
 export default function BrokerExchangeConnect() {
   const navigate = useNavigate();

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { localDataService } from '../services/localDataService';
-import { securityService } from '../services/securityService';
-import { brokerIntegrationService } from '../services/brokerIntegrationService';
-import { createPageUrl } from '../utils';
+import { localDataService } from '@/services/localDataService';
+import { securityService } from '@/services/securityService';
+import { brokerIntegrationService } from '@/services/brokerIntegrationService';
+import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   TrendingUp,
@@ -20,7 +20,7 @@ import {
   Check,
   Bitcoin
 } from 'lucide-react';
-import { NeumorphicCard, StatBox, NeumorphicButton } from '../components/NeumorphicUI';
+import { NeumorphicCard, StatBox, NeumorphicButton } from '@/components/NeumorphicUI';
 import {
   ResponsiveContainer,
   AreaChart,

@@ -2,7 +2,6 @@
   "name": "alpha-edge",
   "version": "1.0.0",
   "description": "Trading analytics platform",
-  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "vite",

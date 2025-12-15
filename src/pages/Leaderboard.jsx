@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { localDataService } from '../services/localDataService';
-import { NeumorphicCard } from '../components/NeumorphicUI';
+import { localDataService } from '@/services/localDataService';
+import { NeumorphicCard } from '@/components/NeumorphicUI';
 import { Trophy, TrendingUp, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from '../utils';
+import { createPageUrl } from '@/utils';
 
 export default function Leaderboard() {
   const [traders, setTraders] = useState([]);

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { localDataService } from '../services/localDataService';
-import { securityService } from '../services/securityService';
-import { NeumorphicCard, NeumorphicButton } from '../components/NeumorphicUI';
+import { localDataService } from '@/services/localDataService';
+import { securityService } from '@/services/securityService';
+import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
 import { Upload, FileText, CheckCircle, AlertCircle, Shield, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from '../utils';
-import { calculateTradeMetrics } from '../components/TradeLogic';
+import { createPageUrl } from '@/utils';
+import { calculateTradeMetrics } from '@/components/TradeLogic';
 
 export default function ImportTrades() {
   const navigate = useNavigate();

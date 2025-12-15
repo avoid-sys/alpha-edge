@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { createPageUrl } from '../utils';
-import { NeumorphicCard, NeumorphicButton } from '../components/NeumorphicUI';
-import { localDataService } from '../services/localDataService';
+import { createPageUrl } from '@/utils';
+import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
+import { localDataService } from '@/services/localDataService';
 import {
   Trophy,
   TrendingUp,
@@ -119,7 +119,7 @@ export default function Home() {
           <div className="mb-8">
             <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-[#e0e5ec] p-1 shadow-[-6px_-6px_12px_#ffffff,6px_6px_12px_#aeaec040]">
               <img
-                src="/logo.png"
+                src="https://i.postimg.cc/5Nd0vd5v/ALPHA-EDGE-LOGO-black.png"
                 alt="Alpha Edge"
                 className="w-full h-full object-contain rounded-xl"
               />
@@ -392,7 +392,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <img
-              src="/logo.png"
+              src="https://i.postimg.cc/5Nd0vd5v/ALPHA-EDGE-LOGO-black.png"
               alt="Alpha Edge"
               className="w-8 h-8 object-contain"
             />

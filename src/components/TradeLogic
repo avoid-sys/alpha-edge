@@ -45,7 +45,7 @@ export const calculateTradeMetrics = (trades) => {
       currentBalance += trade.net_profit;
     });
   }
-
+  
   // Calculate Profit Percentage based on actual balance change
   const profitPercentage = startBalance > 0 ? ((currentBalance - startBalance) / startBalance) * 100 : 0;
   console.log('Profit calculation:', { startBalance, currentBalance, profitPercentage, totalProfit });
@@ -70,11 +70,11 @@ export const calculateTradeMetrics = (trades) => {
 
     // Ensure we don't have negative equity (add minimum floor)
     currentEq = Math.max(currentEq, 1000);
-
+    
     if (currentEq > peak) peak = currentEq;
     const dd = peak - currentEq;
     const ddPct = peak > 0 ? (dd / peak) * 100 : 0;
-
+    
     if (dd > maxDrawdownAbs) maxDrawdownAbs = dd;
     if (ddPct > maxDrawdownPct) maxDrawdownPct = ddPct;
   });
