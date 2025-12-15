@@ -80,7 +80,7 @@ export default function Layout({ children }) {
         <Link to={createPageUrl('Dashboard')} className="flex items-center">
           <div className="w-12 h-12 rounded-xl overflow-hidden shadow-inner">
             <img
-              src="https://i.postimg.cc/5Nd0vd5v/ALPHA-EDGE-LOGO-black.png"
+              src="/logo.png"
               alt="Alpha Edge"
               className="w-full h-full object-contain"
             />
