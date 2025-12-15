@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
@@ -25,6 +25,8 @@ import {
 
 export default function Home() {
   const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState(null); // 'login' or 'register'
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -34,6 +36,23 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Check authentication status on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = await localDataService.getCurrentUser();
+        if (user) {
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -53,11 +72,17 @@ export default function Home() {
         };
 
         await localDataService.setCurrentUser(user);
+        setIsAuthenticated(true);
+        setCurrentUser(user);
+        setAuthMode(null); // Close modal
         navigate(createPageUrl('Dashboard'));
       } else {
         // Login - in production, this would verify credentials
         const user = await localDataService.getCurrentUser();
         if (user && user.email === authForm.email) {
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+          setAuthMode(null); // Close modal
           navigate(createPageUrl('Dashboard'));
         } else {
           throw new Error('Invalid credentials');
@@ -127,30 +152,76 @@ export default function Home() {
             <h1 className="text-5xl md:text-6xl font-bold text-gray-800 mb-6">
               Alpha Edge
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              The Global Leaderboard for Elite Traders
-            </p>
-            <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
-              Join the world's most prestigious trading community. Only those who consistently prove their skills
-              will unlock capital management opportunities and access exclusive trading opportunities.
-            </p>
+            {isAuthenticated && currentUser ? (
+              <>
+                <p className="text-xl md:text-2xl text-green-600 mb-4 max-w-3xl mx-auto">
+                  Welcome back, {currentUser.full_name || currentUser.email}!
+                </p>
+                <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                  Continue your journey as an Elite Trader
+                </p>
+                <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
+                  Access your dashboard to track performance, connect new accounts, and compete on the global leaderboard.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                  The Global Leaderboard for Elite Traders
+                </p>
+                <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
+                  Join the world's most prestigious trading community. Only those who consistently prove their skills
+                  will unlock capital management opportunities and access exclusive trading opportunities.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <button
-              onClick={() => setAuthMode('register')}
-              className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
-            >
-              <UserPlus size={20} />
-              Join Elite Traders
-            </button>
-            <button
-              onClick={() => setAuthMode('login')}
-              className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
-            >
-              <LogIn size={20} />
-              Access Dashboard
-            </button>
+            {isAuthenticated ? (
+              <>
+                <Link to={createPageUrl('Dashboard')}>
+                  <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+                    <Activity size={20} />
+                    Go to Dashboard
+                  </button>
+                </Link>
+                <Link to={createPageUrl('Leaderboard')}>
+                  <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+                    <Trophy size={20} />
+                    View Leaderboard
+                  </button>
+                </Link>
+                <button
+                  onClick={async () => {
+                    await localDataService.logout();
+                    setIsAuthenticated(false);
+                    setCurrentUser(null);
+                  }}
+                  className="px-8 py-4 bg-red-50 rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-red-600 font-semibold flex items-center justify-center gap-3"
+                >
+                  <LogOut size={20} />
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setAuthMode('register')}
+                  className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
+                >
+                  <UserPlus size={20} />
+                  Join Elite Traders
+                </button>
+                <button
+                  onClick={() => setAuthMode('login')}
+                  className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
+                >
+                  <LogIn size={20} />
+                  Access Dashboard
+                </button>
+              </>
+            )}
           </div>
 
           {/* Stats */}
@@ -254,19 +325,38 @@ export default function Home() {
               Join Alpha Edge and compete for recognition, capital, and exclusive opportunities.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() => setAuthMode('register')}
-                className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
-              >
-                <Star size={20} />
-                Start Your Journey
-              </button>
-              <Link to={createPageUrl('Leaderboard')}>
-                <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
-                  <Eye size={20} />
-                  View Leaderboard
-                </button>
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link to={createPageUrl('Dashboard')}>
+                    <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+                      <Activity size={20} />
+                      Access Your Dashboard
+                    </button>
+                  </Link>
+                  <Link to={createPageUrl('Leaderboard')}>
+                    <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+                      <Trophy size={20} />
+                      View Global Leaderboard
+                    </button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setAuthMode('register')}
+                    className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
+                  >
+                    <Star size={20} />
+                    Start Your Journey
+                  </button>
+                  <Link to={createPageUrl('Leaderboard')}>
+                    <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+                      <Eye size={20} />
+                      View Leaderboard
+                    </button>
+                  </Link>
+                </>
+              )}
             </div>
           </NeumorphicCard>
         </div>
