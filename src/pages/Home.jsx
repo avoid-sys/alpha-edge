@@ -392,7 +392,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <img
-              src="https://i.postimg.cc/5Nd0vd5v/ALPHA-EDGE-LOGO-black.png"
+              src="/logo.png"
               alt="Alpha Edge"
               className="w-8 h-8 object-contain"
             />
