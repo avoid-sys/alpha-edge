@@ -1,47 +1,15 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import Layout from './Layout.jsx';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Leaderboard from './pages/Leaderboard';
-import Connect from './pages/Connect';
-import ImportTrades from './pages/ImportTrades';
-import BrokerExchangeConnect from './pages/BrokerExchangeConnect';
-import ProtectedRoute from './components/ProtectedRoute';
-
-function AppContent() {
-  const location = useLocation();
-  const isLandingPage = location.pathname === '/';
-
-  return (
-    <>
-      {isLandingPage ? (
-        <Routes>
-          <Route path="/" element={<Home />} />
-        </Routes>
-      ) : (
-        <Layout>
-          <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/leaderboard" element={
-              <ProtectedRoute>
-                <Leaderboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/connect" element={<Connect />} />
-            <Route path="/importtrades" element={<ImportTrades />} />
-            <Route path="/broker-exchange-connect" element={<BrokerExchangeConnect />} />
-          </Routes>
-        </Layout>
-      )}
-    </>
-  );
-}
 
 function App() {
   return (
     <Router>
-      <AppContent />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<div style={{padding: '20px'}}><h1>Dashboard</h1><p>Dashboard page</p></div>} />
+        <Route path="/leaderboard" element={<div style={{padding: '20px'}}><h1>Leaderboard</h1><p>Leaderboard page</p></div>} />
+      </Routes>
     </Router>
   );
 }
