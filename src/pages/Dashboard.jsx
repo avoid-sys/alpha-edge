@@ -348,14 +348,50 @@ export default function Dashboard() {
     );
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 bg-[#e0e5ec] rounded-full shadow-[-4px_-4px_8px_#ffffff,4px_4px_8px_#aeaec040] flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+          </div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no profile
+  if (!profile) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="text-center py-16">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-[#e0e5ec] p-1 shadow-[-6px_-6px_12px_#ffffff,6px_6px_12px_#a3b1c6] flex items-center justify-center">
+            <Activity className="text-gray-400" size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Welcome to Alpha Edge</h2>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            Connect your trading account to start tracking your performance and compete on the global leaderboard.
+          </p>
+          <Link to={createPageUrl('Connect')}>
+            <NeumorphicButton variant="action" className="px-8 py-3">
+              Connect Trading Account
+            </NeumorphicButton>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      
+
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6">
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#e0e5ec] p-1 shadow-[-6px_-6px_12px_#ffffff,6px_6px_12px_#a3b1c6] mx-auto sm:mx-0">
-            <img src={profile.avatar_url} alt="Avatar" className="w-full h-full rounded-xl object-cover" />
+            <img src={profile.avatar_url || '/logo.png'} alt="Avatar" className="w-full h-full rounded-xl object-cover" />
           </div>
           <div className="text-center sm:text-left">
             {isEditingName ? (
