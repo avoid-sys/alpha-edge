@@ -7,6 +7,7 @@ import Leaderboard from './pages/Leaderboard';
 import Connect from './pages/Connect';
 import ImportTrades from './pages/ImportTrades';
 import BrokerExchangeConnect from './pages/BrokerExchangeConnect';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function AppContent() {
   const location = useLocation();
@@ -22,7 +23,11 @@ function AppContent() {
         <Layout>
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/leaderboard" element={
+              <ProtectedRoute>
+                <Leaderboard />
+              </ProtectedRoute>
+            } />
             <Route path="/connect" element={<Connect />} />
             <Route path="/importtrades" element={<ImportTrades />} />
             <Route path="/broker-exchange-connect" element={<BrokerExchangeConnect />} />
