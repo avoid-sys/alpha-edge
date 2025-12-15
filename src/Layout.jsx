@@ -49,7 +49,7 @@ export default function Layout({ children }) {
             <Link to={createPageUrl('Dashboard')}>
               <div className="w-12 h-12 rounded-xl shadow-inner cursor-pointer hover:scale-105 transition-transform overflow-hidden">
                 <img
-                  src="https://i.postimg.cc/5Nd0vd5v/ALPHA-EDGE-LOGO-black.png"
+                  src="/logo.png"
                   alt="Alpha Edge"
                   className="w-full h-full object-contain"
                 />
