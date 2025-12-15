@@ -119,7 +119,7 @@ export default function Home() {
           <div className="mb-8">
             <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-[#e0e5ec] p-1 shadow-[-6px_-6px_12px_#ffffff,6px_6px_12px_#aeaec040]">
               <img
-                src="/assets/logo.png"
+                src="/logo.png"
                 alt="Alpha Edge"
                 className="w-full h-full object-contain rounded-xl"
               />
