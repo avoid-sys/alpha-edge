@@ -36,18 +36,33 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
 
   // Check authentication status on component mount
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuth = () => {
       try {
-        const user = await localDataService.getCurrentUser();
-        if (user) {
-          setIsAuthenticated(true);
-          setCurrentUser(user);
+        // Use synchronous localStorage access for immediate check
+        const userData = localStorage.getItem('alpha_edge_user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          if (user && user.email) {
+            console.log('User authenticated:', user.email);
+            setIsAuthenticated(true);
+            setCurrentUser(user);
+            setAuthCheckComplete(true);
+            return;
+          }
         }
+        console.log('User not authenticated');
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setAuthCheckComplete(true);
       } catch (error) {
         console.error('Auth check failed:', error);
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setAuthCheckComplete(true);
       }
     };
 
@@ -134,6 +149,20 @@ export default function Home() {
     { number: "$50M+", label: "Capital Managed" },
     { number: "99.9%", label: "Uptime" }
   ];
+
+  // Show loading state while checking authentication
+  if (!authCheckComplete) {
+    return (
+      <div className="min-h-screen bg-[#e0e5ec] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 bg-[#e0e5ec] rounded-full shadow-[-4px_-4px_8px_#ffffff,4px_4px_8px_#aeaec040] flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+          </div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#e0e5ec]">
