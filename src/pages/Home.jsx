@@ -32,7 +32,29 @@ export default function Home() {
       icon: <Shield className="text-green-600" size={32} />,
       title: "Verified Performance",
       description: "Only live trading accounts qualify for rankings and capital opportunities."
+    },
+    {
+      icon: <Target className="text-purple-600" size={32} />,
+      title: "Capital Access",
+      description: "Prove your skills to unlock capital management opportunities."
+    },
+    {
+      icon: <TrendingUp className="text-orange-600" size={32} />,
+      title: "Real-time Tracking",
+      description: "Monitor your performance with live updates and detailed statistics."
+    },
+    {
+      icon: <Users className="text-indigo-600" size={32} />,
+      title: "Elite Community",
+      description: "Join a community of professional traders and market experts."
     }
+  ];
+
+  const stats = [
+    { number: "14+", label: "Trading Platforms" },
+    { number: "1000+", label: "Active Traders" },
+    { number: "$50M+", label: "Capital Managed" },
+    { number: "99.9%", label: "Uptime" }
   ];
 
   return (
@@ -69,6 +91,16 @@ export default function Home() {
               </button>
             </Link>
           </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-2xl mx-auto">
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">{stat.number}</div>
+                <div className="text-sm text-gray-600">{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -79,6 +111,9 @@ export default function Home() {
             <h2 className="text-4xl font-bold text-gray-800 mb-6">
               Why Choose Alpha Edge?
             </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Our platform provides the tools and recognition that serious traders need to excel in the global markets.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -98,6 +133,94 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* How It Works Section */}
+      <section className="py-20 px-4 bg-white/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-800 mb-6">
+              How It Works
+            </h2>
+            <p className="text-xl text-gray-600">
+              Your journey to becoming a recognized elite trader
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-6 bg-[#e0e5ec] rounded-full shadow-[-4px_-4px_8px_#ffffff,4px_4px_8px_#aeaec040] flex items-center justify-center">
+                <span className="text-2xl font-bold text-gray-700">1</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">Connect Your Account</h3>
+              <p className="text-gray-600">
+                Link your live trading account through our secure API integrations or upload verified trading statements.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-6 bg-[#e0e5ec] rounded-full shadow-[-4px_-4px_8px_#ffffff,4px_4px_8px_#aeaec040] flex items-center justify-center">
+                <span className="text-2xl font-bold text-gray-700">2</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">Prove Your Skills</h3>
+              <p className="text-gray-600">
+                Demonstrate consistent performance through our comprehensive analytics and risk management metrics.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-6 bg-[#e0e5ec] rounded-full shadow-[-4px_-4px_8px_#ffffff,4px_4px_8px_#aeaec040] flex items-center justify-center">
+                <span className="text-2xl font-bold text-gray-700">3</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">Unlock Opportunities</h3>
+              <p className="text-gray-600">
+                Top performers gain access to capital management opportunities and exclusive trading opportunities.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <NeumorphicCard className="p-8 md:p-12">
+            <Globe className="mx-auto mb-6 text-blue-600" size={48} />
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-6">
+              Join the Global Elite
+            </h2>
+            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+              Are you ready to prove you're among the world's best traders?
+              Join Alpha Edge and compete for recognition, capital, and exclusive opportunities.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+                <Star size={20} />
+                Start Your Journey
+              </button>
+            </div>
+          </NeumorphicCard>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 px-4 border-t border-gray-200 bg-white/30">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <img
+              src="/logo.png"
+              alt="Alpha Edge"
+              className="w-8 h-8 object-contain"
+            />
+            <span className="font-bold text-gray-800">Alpha Edge</span>
+          </div>
+          <p className="text-gray-600 mb-4">
+            The Global Leaderboard for Elite Traders
+          </p>
+          <p className="text-sm text-gray-500">
+            © 2024 Alpha Edge. Identifying the world's best traders through verified performance.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
