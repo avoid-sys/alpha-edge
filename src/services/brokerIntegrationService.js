@@ -58,7 +58,8 @@ class BrokerIntegrationService {
         supportedAssets: ['forex', 'indices', 'commodities', 'crypto', 'stocks'],
         features: ['ECN execution', 'advanced charting', 'copy trading', 'OAuth integration'],
         oauth: {
-          authUrl: 'https://connect.spotware.com/oauth2/authorize',
+          // Per Spotware cTrader ID/Open API docs, the authorize endpoint is under /apps/authorize
+          authUrl: 'https://connect.spotware.com/apps/authorize',
           redirectUri: 'https://www.alphaedge.vc/auth/ctrader/callback',
           scope: 'profile trading' // adjust scopes as needed per Spotware docs
         }
