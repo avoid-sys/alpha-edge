@@ -7,6 +7,7 @@ import Leaderboard from './pages/Leaderboard';
 import Connect from './pages/Connect';
 import ImportTrades from './pages/ImportTrades';
 import BrokerExchangeConnect from './pages/BrokerExchangeConnect';
+import AuthCTraderCallback from './pages/AuthCTraderCallback';
 
 // Simple error boundary to avoid full white-screen crashes in production
 class ErrorBoundary extends React.Component {
@@ -66,6 +67,7 @@ function AppContent() {
             <Route path="/connect" element={<Connect />} />
             <Route path="/importtrades" element={<ImportTrades />} />
             <Route path="/broker-exchange-connect" element={<BrokerExchangeConnect />} />
+            <Route path="/auth/ctrader/callback" element={<AuthCTraderCallback />} />
           </Routes>
         </Layout>
       )}
