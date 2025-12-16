@@ -224,14 +224,23 @@ export default function Dashboard() {
       return;
     }
 
+    // We expect brokerIntegrationService to have kept the API credentials
+    const { apiKey, apiSecret } = bybit;
+    if (!apiKey || !apiSecret) {
+      alert('Bybit API credentials are missing. Please reconnect Bybit on the Connect Platforms page.');
+      return;
+    }
+
     setBybitLoading(true);
     setBybitError(null);
 
     try {
       // Example: unified account wallet balance
-      const data = await getBybitAccountData('/v5/account/wallet-balance', {
-        accountType: 'UNIFIED'
-      });
+      const data = await getBybitAccountData(
+        '/v5/account/wallet-balance',
+        { accountType: 'UNIFIED' },
+        { apiKey, apiSecret }
+      );
 
       // Try to normalize a small summary for display
       const rawList = data?.result?.list || data?.result?.balances || [];

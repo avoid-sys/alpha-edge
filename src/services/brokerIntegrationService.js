@@ -245,13 +245,20 @@ class BrokerIntegrationService {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Mock successful authentication
+    // NOTE: For this local/front-end only implementation we keep API
+    // credentials in memory and in encrypted localStorage (see saveConnections).
+    // They are NOT sent to any third-party except when explicitly used
+    // via our own backend proxy to call the exchange.
     return {
       platformId,
       type,
       status: 'connected',
       accountId: `mock_${platformId}_${Date.now()}`,
-      permissions: ['read', 'trading'],
-      authenticated: true
+      permissions: ['read'],
+      authenticated: true,
+      apiKey,
+      apiSecret,
+      passphrase: passphrase || null
     };
   }
 

@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { platform, endpoint, ...queryParams } = req.query;
+    const { platform, endpoint, apiKey: apiKeyFromQuery, apiSecret: apiSecretFromQuery, ...queryParams } = req.query;
 
     if (!platform || !endpoint) {
       res.status(400).json({ error: 'platform and endpoint are required' });
@@ -35,11 +35,15 @@ module.exports = async (req, res) => {
     // Route per platform
     switch (platform) {
       case 'bybit': {
-        const apiKey = process.env.BYBIT_API_KEY;
-        const apiSecret = process.env.BYBIT_API_SECRET;
+        // Prefer per-request credentials (multi-tenant), fall back to env vars if provided
+        const apiKey = apiKeyFromQuery || process.env.BYBIT_API_KEY;
+        const apiSecret = apiSecretFromQuery || process.env.BYBIT_API_SECRET;
 
         if (!apiKey || !apiSecret) {
-          res.status(500).json({ error: 'BYBIT_API_KEY / BYBIT_API_SECRET not configured on server' });
+          res.status(400).json({
+            error: 'Missing API credentials for Bybit',
+            details: 'Provide apiKey & apiSecret in the request or configure BYBIT_API_KEY / BYBIT_API_SECRET in the server environment.'
+          });
           return;
         }
 
