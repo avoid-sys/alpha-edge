@@ -247,7 +247,12 @@ export default function Dashboard() {
       setBybitAccount(summary);
     } catch (err) {
       console.error('Failed to load Bybit account data', err);
-      setBybitError(err?.message || 'Failed to load Bybit account data');
+      const apiMessage =
+        err?.response?.data?.error ||
+        err?.response?.data?.retMsg ||
+        err?.message ||
+        'Failed to load Bybit account data';
+      setBybitError(apiMessage);
       setBybitAccount(null);
     } finally {
       setBybitLoading(false);
