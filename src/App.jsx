@@ -4,7 +4,9 @@ import Layout from './Layout.jsx';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
-import ProtectedRoute from './components/ProtectedRoute';
+import Connect from './pages/Connect';
+import ImportTrades from './pages/ImportTrades';
+import BrokerExchangeConnect from './pages/BrokerExchangeConnect';
 
 function AppContent() {
   const location = useLocation();
@@ -20,11 +22,10 @@ function AppContent() {
         <Layout>
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/leaderboard" element={
-              <ProtectedRoute>
-                <Leaderboard />
-              </ProtectedRoute>
-            } />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/connect" element={<Connect />} />
+            <Route path="/importtrades" element={<ImportTrades />} />
+            <Route path="/broker-exchange-connect" element={<BrokerExchangeConnect />} />
           </Routes>
         </Layout>
       )}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
 import { brokerIntegrationService } from '@/services/brokerIntegrationService';
+import { getBybitAccountData } from '@/services/bybitApi';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -44,9 +45,11 @@ export default function Dashboard() {
   const [helpPopup, setHelpPopup] = useState(null); // Current help popup
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
-  const [isTwitterConnected, setIsTwitterConnected] = useState(false);
   const [connectedBrokers, setConnectedBrokers] = useState([]);
   const [connectedExchanges, setConnectedExchanges] = useState([]);
+  const [bybitAccount, setBybitAccount] = useState(null);
+  const [bybitLoading, setBybitLoading] = useState(false);
+  const [bybitError, setBybitError] = useState(null);
 
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
@@ -137,11 +140,30 @@ export default function Dashboard() {
     if (!editedName.trim()) return;
 
     try {
+      const oldName = profile.nickname;
       await localDataService.entities.TraderProfile.update(profile.id, {
         nickname: editedName.trim()
       });
       setProfile({ ...profile, nickname: editedName.trim() });
       setIsEditingName(false);
+
+      // Persist an account event so the system remembers this change
+      try {
+        const user = await localDataService.getCurrentUser();
+        await localDataService.entities.AccountEvent.create({
+          type: 'PROFILE_NAME_UPDATED',
+          user_email: user?.email || null,
+          profile_id: profile.id,
+          description: 'Trader nickname updated',
+          metadata: {
+            old_nickname: oldName,
+            new_nickname: editedName.trim()
+          }
+        });
+      } catch (e) {
+        // Non‑critical; don't block UI if logging fails
+        console.warn('Failed to record account event for name change', e);
+      }
     } catch (error) {
       console.error('Error updating name:', error);
     }
@@ -152,37 +174,41 @@ export default function Dashboard() {
     setEditedName('');
   };
 
-  // Handle X connection (placeholder for now)
-  const handleConnectX = async () => {
+  // Optional: on-demand Bybit sync using user-supplied keys (kept only in memory)
+  const handleSyncBybit = async () => {
+    const bybit = connectedExchanges.find((ex) => ex.id === 'bybit');
+    if (!bybit) {
+      alert('Bybit exchange is not connected. Please connect it in Connect Platforms.');
+      return;
+    }
+
+    setBybitLoading(true);
+    setBybitError(null);
+
     try {
-      // In a real implementation, this would initiate OAuth flow
-      // For demo purposes, simulate successful connection
-      const mockXProfile = {
-        name: 'John Trader',
-        username: 'johntrader_x',
-        avatar: 'https://pbs.twimg.com/profile_images/1540000000000000000/abc123_normal.jpg'
+      // Example: unified account wallet balance
+      const data = await getBybitAccountData('/v5/account/wallet-balance', {
+        accountType: 'UNIFIED'
+      });
+
+      // Try to normalize a small summary for display
+      const rawList = data?.result?.list || data?.result?.balances || [];
+      const first = Array.isArray(rawList) && rawList.length > 0 ? rawList[0] : null;
+
+      const summary = {
+        raw: data,
+        totalEquity: first?.totalEquity || first?.equity || null,
+        accountType: first?.accountType || 'UNIFIED',
+        coin: first?.coin?.[0]?.coin || first?.coin || null
       };
 
-      // Update profile with X data
-      await localDataService.entities.TraderProfile.update(profile.id, {
-        nickname: mockXProfile.name,
-        username: mockXProfile.username,
-        avatar_url: mockXProfile.avatar,
-        x_connected: true
-      });
-
-      // Update local state
-      setProfile({
-        ...profile,
-        nickname: mockXProfile.name,
-        username: mockXProfile.username,
-        avatar_url: mockXProfile.avatar
-      });
-      setIsTwitterConnected(true);
-
-    } catch (error) {
-      console.error('Error connecting X account:', error);
-      alert('Failed to connect X account. Please try again.');
+      setBybitAccount(summary);
+    } catch (err) {
+      console.error('Failed to load Bybit account data', err);
+      setBybitError(err?.message || 'Failed to load Bybit account data');
+      setBybitAccount(null);
+    } finally {
+      setBybitLoading(false);
     }
   };
 
@@ -348,50 +374,14 @@ export default function Dashboard() {
     );
   };
 
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-[#e0e5ec] rounded-full shadow-[-4px_-4px_8px_#ffffff,4px_4px_8px_#aeaec040] flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-          </div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show empty state if no profile
-  if (!profile) {
-    return (
-      <div className="space-y-8 animate-in fade-in duration-700">
-        <div className="text-center py-16">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-[#e0e5ec] p-1 shadow-[-6px_-6px_12px_#ffffff,6px_6px_12px_#a3b1c6] flex items-center justify-center">
-            <Activity className="text-gray-400" size={32} />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Welcome to Alpha Edge</h2>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            Connect your trading account to start tracking your performance and compete on the global leaderboard.
-          </p>
-          <Link to={createPageUrl('Connect')}>
-            <NeumorphicButton variant="action" className="px-8 py-3">
-              Connect Trading Account
-            </NeumorphicButton>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-
+      
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6">
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#e0e5ec] p-1 shadow-[-6px_-6px_12px_#ffffff,6px_6px_12px_#a3b1c6] mx-auto sm:mx-0">
-            <img src={profile.avatar_url || '/logo.png'} alt="Avatar" className="w-full h-full rounded-xl object-cover" />
+            <img src={profile.avatar_url} alt="Avatar" className="w-full h-full rounded-xl object-cover" />
           </div>
           <div className="text-center sm:text-left">
             {isEditingName ? (
@@ -432,12 +422,6 @@ export default function Dashboard() {
                   >
                     <Edit2 size={16} />
                   </button>
-                )}
-                {isTwitterConnected && (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-black rounded-lg text-white text-xs font-medium">
-                    <span className="font-bold text-sm">X</span>
-                    Verified
-                  </div>
                 )}
               </div>
             )}
@@ -480,26 +464,16 @@ export default function Dashboard() {
                 <Award size={20} />
              </div>
              <div>
-                <p className="text-xs text-gray-500 font-bold uppercase">Trader Score</p>
+                <p className="text-xs text-gray-500 font-bold uppercase">Trader ELO</p>
                 <p className="text-lg font-bold text-gray-800">{profile.trader_score}</p>
              </div>
           </NeumorphicCard>
-
-          {isOwnProfile && !isTwitterConnected && (
-            <button
-              onClick={handleConnectX}
-              className="px-4 py-3 bg-[#e0e5ec] rounded-xl shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-1px_-1px_3px_#ffffff,1px_1px_3px_#aeaec040] transition-all duration-200 text-gray-700 font-medium flex items-center gap-2"
-            >
-              <span className="w-5 h-5 bg-black rounded flex items-center justify-center text-white font-bold text-sm">X</span>
-              Connect X
-            </button>
-          )}
         </div>
       </div>
 
       {/* Connected Platforms */}
       {(connectedBrokers.length > 0 || connectedExchanges.length > 0) && (
-        <div className="mb-6">
+        <div className="mb-6 space-y-3">
           <NeumorphicCard className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700">Connected Platforms</h3>
@@ -524,6 +498,50 @@ export default function Dashboard() {
               ))}
             </div>
           </NeumorphicCard>
+
+          {/* Optional Bybit quick account summary */}
+          {connectedExchanges.some(ex => ex.id === 'bybit') && (
+            <NeumorphicCard className="p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Bybit Account
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Load live balance from Bybit (API keys used only in your browser, not stored).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSyncBybit}
+                  className="px-3 py-2 text-xs rounded-lg bg-[#e0e5ec] border border-white/60 shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-1px_-1px_3px_#ffffff,1px_1px_3px_#aeaec040] text-gray-700 font-medium transition-all"
+                  disabled={bybitLoading}
+                >
+                  {bybitLoading ? 'Syncing…' : 'Sync Bybit Data'}
+                </button>
+              </div>
+
+              {bybitError && (
+                <p className="text-xs text-red-500">
+                  {bybitError}
+                </p>
+              )}
+
+              {bybitAccount && (
+                <div className="mt-1 text-xs text-gray-700">
+                  <p>
+                    <span className="font-semibold">Account Type:</span> {bybitAccount.accountType}
+                  </p>
+                  {bybitAccount.totalEquity && (
+                    <p>
+                      <span className="font-semibold">Total Equity:</span>{' '}
+                      {bybitAccount.totalEquity} {bybitAccount.coin || ''}
+                    </p>
+                  )}
+                </div>
+              )}
+            </NeumorphicCard>
+          )}
         </div>
       )}
 

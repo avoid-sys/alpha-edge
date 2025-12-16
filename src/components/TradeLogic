@@ -22,7 +22,19 @@ export const calculateTradeMetrics = (trades) => {
   const grossProfit = _.sumBy(profitableTrades, 'net_profit');
   const grossLoss = Math.abs(_.sumBy(losingTrades, 'net_profit'));
   
-  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit;
+  // Calculate profit factor - handle edge cases
+  let profitFactor = 0;
+  if (grossLoss > 0) {
+    profitFactor = grossProfit / grossLoss;
+  } else if (grossProfit > 0) {
+    // If no losses, profit factor is infinite, but we'll cap it at a reasonable value
+    profitFactor = grossProfit > 0 ? 999 : 0;
+  }
+  
+  // Ensure profit factor is a valid number
+  if (!isFinite(profitFactor) || isNaN(profitFactor)) {
+    profitFactor = 0;
+  }
   
   // Calculate starting balance and profit percentage more accurately
   let startBalance = 10000; // Default starting balance
@@ -34,10 +46,21 @@ export const calculateTradeMetrics = (trades) => {
 
   if (validBalances.length > 0) {
     // Use actual balance data from trades
-    const firstValidTrade = sortedTrades.find(t => t.balance === validBalances[0].balance);
-    startBalance = validBalances[0].balance - (firstValidTrade ? firstValidTrade.net_profit : 0);
-    currentBalance = validBalances[validBalances.length - 1].balance;
-    console.log('Using balance data: start =', startBalance, 'current =', currentBalance);
+    // The balance in each trade row is the balance AFTER that trade
+    // So to get starting balance, we need to subtract the first trade's profit from its balance
+    const firstTradeWithBalance = sortedTrades.find(t => t.balance != null && t.balance > 0);
+    if (firstTradeWithBalance) {
+      // Starting balance = balance after first trade - profit from first trade
+      startBalance = firstTradeWithBalance.balance - firstTradeWithBalance.net_profit;
+      // Current balance is the last trade's balance
+      currentBalance = validBalances[validBalances.length - 1].balance;
+      console.log('Using balance data: start =', startBalance, 'current =', currentBalance, 
+                  'first trade profit =', firstTradeWithBalance.net_profit);
+    } else {
+      // Fallback: use first balance as starting point
+      startBalance = validBalances[0].balance;
+      currentBalance = validBalances[validBalances.length - 1].balance;
+    }
   } else {
     // Fallback: accumulate profits from starting balance
     console.log('No valid balance data, using profit accumulation');
@@ -128,10 +151,11 @@ export const calculateTradeMetrics = (trades) => {
   const lossRateDec = 1 - winRateDec;
   const expectancy = (winRateDec * avgWin) - (lossRateDec * avgLoss);
 
-  // Volatility
+  // Volatility - per-trade returns relative to equity *before* the trade
+  // We reuse the equityCurve we already built: equityCurve[i] is equity before trade i
   const tradeReturns = sortedTrades.map((t, i) => {
-    const prevBal = i === 0 ? startBalance : (sortedTrades[i-1].balance || (t.balance - t.net_profit));
-    return prevBal > 0 ? t.net_profit / prevBal : 0;
+    const prevEq = i === 0 ? startBalance : equityCurve[i];
+    return prevEq > 0 ? t.net_profit / prevEq : 0;
   });
   const meanReturn = _.mean(tradeReturns);
   const variance = _.mean(tradeReturns.map(r => Math.pow(r - meanReturn, 2)));

@@ -10,9 +10,9 @@ export default defineConfig({
     }
   },
   server: {
-    host: '127.0.0.1',
-    port: 5173,
-    open: false
+    host: '0.0.0.0',
+    port: 3000,
+    open: true
   },
   build: {
     chunkSizeWarningLimit: 2000, // Увеличен до 2000KB чтобы полностью убрать предупреждение о размере бандла

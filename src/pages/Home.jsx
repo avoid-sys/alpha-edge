@@ -1,6 +1,8 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { NeumorphicCard } from '@/components/NeumorphicUI';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
+import { localDataService } from '@/services/localDataService';
 import {
   Trophy,
   TrendingUp,
@@ -11,12 +13,63 @@ import {
   Target,
   Zap,
   Globe,
+  CheckCircle,
   Star,
+  ArrowRight,
   LogIn,
-  UserPlus
+  UserPlus,
+  Eye,
+  Lock,
+  Activity
 } from 'lucide-react';
 
 export default function Home() {
+  const navigate = useNavigate();
+  const [authMode, setAuthMode] = useState(null); // 'login' or 'register'
+  const [authForm, setAuthForm] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    fullName: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (authMode === 'register') {
+        if (authForm.password !== authForm.confirmPassword) {
+          throw new Error('Passwords do not match');
+        }
+
+        const user = {
+          email: authForm.email,
+          full_name: authForm.fullName,
+          password: authForm.password // In production, this would be hashed
+        };
+
+        await localDataService.setCurrentUser(user);
+        navigate(createPageUrl('Dashboard'));
+      } else {
+        // Login - in production, this would verify credentials
+        const user = await localDataService.getCurrentUser();
+        if (user && user.email === authForm.email) {
+          navigate(createPageUrl('Dashboard'));
+        } else {
+          throw new Error('Invalid credentials');
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const features = [
     {
       icon: <Trophy className="text-yellow-600" size={32} />,
@@ -77,19 +130,27 @@ export default function Home() {
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
               The Global Leaderboard for Elite Traders
             </p>
+            <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
+              Join the world's most prestigious trading community. Only those who consistently prove their skills
+              will unlock capital management opportunities and access exclusive trading opportunities.
+            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3 cursor-pointer">
+            <button
+              onClick={() => setAuthMode('register')}
+              className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
+            >
               <UserPlus size={20} />
               Join Elite Traders
             </button>
-            <Link to="/dashboard">
-              <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3 cursor-pointer">
-                <LogIn size={20} />
-                Access Dashboard
-              </button>
-            </Link>
+            <button
+              onClick={() => setAuthMode('login')}
+              className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
+            >
+              <LogIn size={20} />
+              Access Dashboard
+            </button>
           </div>
 
           {/* Stats */}
@@ -193,32 +254,175 @@ export default function Home() {
               Join Alpha Edge and compete for recognition, capital, and exclusive opportunities.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+              <button
+                onClick={() => setAuthMode('register')}
+                className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3"
+              >
                 <Star size={20} />
                 Start Your Journey
               </button>
+              <Link to={createPageUrl('Leaderboard')}>
+                <button className="px-8 py-4 bg-[#e0e5ec] rounded-xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] transition-all duration-200 text-gray-700 font-semibold flex items-center justify-center gap-3">
+                  <Eye size={20} />
+                  View Leaderboard
+                </button>
+              </Link>
             </div>
           </NeumorphicCard>
         </div>
       </section>
 
+      {/* Authentication Modal */}
+      {authMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <NeumorphicCard className="w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-800">
+                {authMode === 'login' ? 'Welcome Back' : 'Join Alpha Edge'}
+              </h3>
+              <button
+                onClick={() => setAuthMode(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAuth} className="space-y-4">
+              {authMode === 'register' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
+                    placeholder="Enter your full name"
+                    value={authForm.fullName}
+                    onChange={(e) => setAuthForm({...authForm, fullName: e.target.value})}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
+                  placeholder="Enter your email"
+                  value={authForm.email}
+                  onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
+                  placeholder="Enter your password"
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                />
+              </div>
+
+              {authMode === 'register' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
+                    placeholder="Confirm your password"
+                    value={authForm.confirmPassword}
+                    onChange={(e) => setAuthForm({...authForm, confirmPassword: e.target.value})}
+                  />
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <NeumorphicButton
+                type="submit"
+                variant="action"
+                className="w-full flex items-center justify-center"
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="animate-pulse">Processing...</span>
+                ) : (
+                  <>
+                    {authMode === 'login' ? <LogIn size={18} className="mr-2" /> : <UserPlus size={18} className="mr-2" />}
+                    {authMode === 'login' ? 'Sign In' : 'Create Account'}
+                  </>
+                )}
+              </NeumorphicButton>
+            </form>
+
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                {authMode === 'login'
+                  ? "Don't have an account? Sign up"
+                  : "Already have an account? Sign in"
+                }
+              </button>
+            </div>
+          </NeumorphicCard>
+        </div>
+      )}
+
       {/* Footer */}
-      <footer className="py-12 px-4 border-t border-gray-200 bg-white/30">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <img
-              src="/logo.png"
-              alt="Alpha Edge"
-              className="w-8 h-8 object-contain"
-            />
-            <span className="font-bold text-gray-800">Alpha Edge</span>
+      <footer className="py-10 px-4 border-t border-gray-200 bg-white/30">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2 mb-3">
+              <img
+                src="/logo.png"
+                alt="Alpha Edge"
+                className="w-8 h-8 object-contain"
+              />
+              <span className="font-bold text-gray-800">Alpha Edge</span>
+            </div>
+            <p className="text-gray-600 text-sm md:text-base">
+              The Global Leaderboard for Elite Traders
+            </p>
+            <p className="text-xs text-gray-500 mt-2">
+              © 2024 Alpha Edge. Identifying the world's best traders through verified performance.
+            </p>
           </div>
-          <p className="text-gray-600 mb-4">
-            The Global Leaderboard for Elite Traders
-          </p>
-          <p className="text-sm text-gray-500">
-            © 2024 Alpha Edge. Identifying the world's best traders through verified performance.
-          </p>
+
+          <div className="flex flex-col items-center md:items-end gap-2">
+            <p className="text-xs text-gray-500 text-center md:text-right max-w-xs">
+              By using this platform you agree to our standard trading rules, risk disclosures,
+              and data processing terms.
+            </p>
+            <button
+              type="button"
+              className="px-4 py-2 text-xs md:text-sm rounded-xl bg-[#e0e5ec] border border-white/60 shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-1px_-1px_3px_#ffffff,1px_1px_3px_#aeaec040] text-gray-700 font-medium transition-all"
+              onClick={() => {
+                // For now this can be replaced later with a dedicated Terms & Agreements modal/page
+                alert('Standard Rules & Agreements: \n\nThis platform is for informational and analytical purposes only and does not constitute investment advice. Trading carries risk, including the loss of capital. By continuing, you confirm you have read and agreed to the Terms, Privacy Policy, and Risk Disclosure which will be provided in the production deployment.');
+              }}
+            >
+              View Rules & Agreements
+            </button>
+          </div>
         </div>
       </footer>
     </div>

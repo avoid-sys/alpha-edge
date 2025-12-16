@@ -148,7 +148,7 @@
     },
     "trader_score": {
       "type": "number",
-      "description": "Calculated TraderScore (0-100)"
+      "description": "Calculated Trader ELO (0-100)"
     },
     "performance_score": {
       "type": "number"

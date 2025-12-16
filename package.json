@@ -5,17 +5,18 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite",
-    "serve": "npx serve dist -p 3001"
+    "start": "vite"
   },
   "dependencies": {
+    "axios": "^1.13.2",
+    "crypto-js": "^4.2.0",
     "date-fns": "^2.29.0",
-    "gapi-script": "^1.2.0",
     "lodash": "^4.17.0",
     "lucide-react": "^0.263.0",
+    "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.0",

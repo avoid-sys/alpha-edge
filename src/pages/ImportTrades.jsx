@@ -38,85 +38,224 @@ export default function ImportTrades() {
   };
 
   const parseCSV = (csvContent) => {
-    const lines = csvContent.split('\n').filter(line => line.trim());
+    const lines = csvContent.split(/\r?\n/).filter(line => line.trim());
     const trades = [];
 
     if (lines.length < 2) return trades; // Need at least header + 1 data row
 
-    // Try to detect delimiter
+    // Try to detect delimiter with better detection
     const firstLine = lines[0];
     let delimiter = ',';
-    if (firstLine.split(';').length > firstLine.split(',').length) {
+    const semicolonCount = (firstLine.match(/;/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    
+    if (semicolonCount > commaCount && semicolonCount > tabCount) {
       delimiter = ';';
-    } else if (firstLine.split('\t').length > firstLine.split(',').length) {
+    } else if (tabCount > commaCount && tabCount > semicolonCount) {
       delimiter = '\t';
     }
 
-    const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
+    // Find header row (might not be first row)
+    let headerRowIndex = 0;
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+      const testHeaders = lines[i].split(delimiter).map(h => h.trim().toLowerCase());
+      const headerKeywords = testHeaders.filter(h => 
+        /symbol|instrument|pair|direction|side|type|price|profit|balance|volume|quantity|lots|time|date/.test(h)
+      );
+      if (headerKeywords.length >= 3) {
+        headerRowIndex = i;
+        break;
+      }
+    }
 
-    console.log('CSV headers detected:', headers);
+    const headers = lines[headerRowIndex].split(delimiter).map(h => h.trim().toLowerCase());
 
-    // Map columns
+    console.log('CSV headers detected:', headers, 'at row', headerRowIndex);
+
+    // Enhanced column mapping
     const columnMap = {
-      symbol: headers.findIndex(h => h.includes('symbol') || h.includes('instrument') || h.includes('pair')),
-      direction: headers.findIndex(h => h.includes('direction') || h.includes('side') || h.includes('type') || h.includes('buy') || h.includes('sell')),
-      entryPrice: headers.findIndex(h => h.includes('entry') && h.includes('price')),
-      exitPrice: headers.findIndex(h => (h.includes('exit') || h.includes('close')) && h.includes('price')),
-      volume: headers.findIndex(h => h.includes('volume') || h.includes('quantity') || h.includes('lots')),
-      profit: headers.findIndex(h => h.includes('profit') || h.includes('p/l')),
-      balance: headers.findIndex(h => h.includes('balance') || h.includes('equity')),
-      openTime: headers.findIndex(h => h.includes('open') && (h.includes('time') || h.includes('date'))),
-      closeTime: headers.findIndex(h => h.includes('close') && (h.includes('time') || h.includes('date')))
+      symbol: headers.findIndex(h => 
+        h.includes('symbol') || h.includes('instrument') || h.includes('pair') ||
+        h.includes('currency') || h.includes('asset')
+      ),
+      direction: headers.findIndex(h => 
+        h.includes('direction') || h.includes('side') || h.includes('type') ||
+        h.includes('action') || h === 'buy' || h === 'sell'
+      ),
+      entryPrice: headers.findIndex(h => 
+        (h.includes('entry') || h.includes('open')) && (h.includes('price') || h.includes('rate'))
+      ),
+      exitPrice: headers.findIndex(h => 
+        (h.includes('exit') || h.includes('close')) && (h.includes('price') || h.includes('rate'))
+      ),
+      volume: headers.findIndex(h => 
+        h.includes('volume') || h.includes('quantity') || h.includes('lots') ||
+        h.includes('size') || h.includes('amount')
+      ),
+      profit: headers.findIndex(h => 
+        (h.includes('profit') || h.includes('pl') || h.includes('p/l')) &&
+        !h.includes('gross') && !h.includes('commission')
+      ),
+      commission: headers.findIndex(h => 
+        h.includes('commission') || h.includes('fee') || h.includes('charges')
+      ),
+      swap: headers.findIndex(h => 
+        h.includes('swap') || h.includes('interest') || h.includes('rollover')
+      ),
+      balance: headers.findIndex(h => 
+        h.includes('balance') || h.includes('equity') || h.includes('account')
+      ),
+      openTime: headers.findIndex(h => 
+        (h.includes('open') || h.includes('entry')) && (h.includes('time') || h.includes('date'))
+      ),
+      closeTime: headers.findIndex(h => 
+        (h.includes('close') || h.includes('exit') || h.includes('time') || h.includes('date')) &&
+        !h.includes('open') && !h.includes('entry')
+      )
     };
 
-    // Process data rows
-    for (let i = 1; i < lines.length; i++) {
-      const cells = lines[i].split(delimiter).map(cell => cell.trim());
-      if (cells.length < headers.length) continue;
+    // Process data rows (start after header row)
+    for (let i = headerRowIndex + 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue; // Skip empty lines
+      
+      // Handle quoted fields properly
+      const cells = [];
+      let currentCell = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if ((char === delimiter && !inQuotes) || j === line.length - 1) {
+          cells.push(currentCell.trim().replace(/^"|"$/g, ''));
+          currentCell = '';
+        } else {
+          currentCell += char;
+        }
+      }
+      if (currentCell) cells.push(currentCell.trim().replace(/^"|"$/g, ''));
+      
+      if (cells.length < 3) continue; // Need at least some data
+      
+      // Skip header-like rows or totals
+      const rowText = cells.join(' ').toLowerCase();
+      if (rowText.includes('total') || rowText.includes('sum') || 
+          rowText.includes('subtotal') || /^[\s,;]*$/.test(rowText)) continue;
 
       try {
-        const symbol = columnMap.symbol >= 0 ? cells[columnMap.symbol] :
-                      cells.find(cell => cell && !/\d/.test(cell) && cell.length <= 10) || '';
+        // Extract symbol
+        let symbol = '';
+        if (columnMap.symbol >= 0 && columnMap.symbol < cells.length) {
+          symbol = cells[columnMap.symbol];
+        } else {
+          symbol = cells.find(cell => {
+            const cleaned = cell.replace(/[^a-zA-Z0-9]/g, '');
+            return cleaned.length >= 3 && cleaned.length <= 12;
+          }) || '';
+        }
 
-        const direction = columnMap.direction >= 0 ? cells[columnMap.direction] :
-                         cells.find(cell => /buy|sell/i.test(cell)) || '';
+        // Extract direction
+        let direction = '';
+        if (columnMap.direction >= 0 && columnMap.direction < cells.length) {
+          direction = cells[columnMap.direction];
+        } else {
+          direction = cells.find(cell => /buy|sell|long|short/i.test(cell)) || '';
+        }
 
-        // Extract numeric values
-        const entryPrice = columnMap.entryPrice >= 0 ? parseFloat(cells[columnMap.entryPrice]?.replace(/[^0-9.-]/g, '')) || 0 :
-                          parseFloat(cells.find(cell => cell && /^\d+\.?\d*$/.test(cell.replace(/[^0-9.-]/g, '')))) || 0;
+        // Extract numeric values with better parsing
+        const parseNumeric = (cell) => {
+          if (!cell) return null;
+          // Remove spaces (thousand separators) and parse
+          const isNegative = cell.includes('(') || cell.trim().startsWith('-');
+          let cleaned = cell.replace(/\s/g, '').replace(/[()]/g, '').replace(/[^\d.,-]/g, '');
+          if (cleaned.startsWith('-')) cleaned = cleaned.substring(1);
+          const num = parseFloat(cleaned.replace(',', '.'));
+          if (isNaN(num)) return null;
+          return isNegative ? -num : num;
+        };
 
-        const exitPrice = columnMap.exitPrice >= 0 ? parseFloat(cells[columnMap.exitPrice]?.replace(/[^0-9.-]/g, '')) || 0 :
-                         parseFloat(cells.filter(cell => cell && /^\d+\.?\d*$/.test(cell.replace(/[^0-9.-]/g, '')))[1]) || 0;
+        const entryPrice = columnMap.entryPrice >= 0 && columnMap.entryPrice < cells.length
+          ? (parseNumeric(cells[columnMap.entryPrice]) || 0) : 0;
 
-        const volume = columnMap.volume >= 0 ? parseFloat(cells[columnMap.volume]?.replace(/[^0-9.-]/g, '')) || 0 :
-                      parseFloat(cells.filter(cell => cell && /^\d+\.?\d*$/.test(cell.replace(/[^0-9.-]/g, '')))[2]) || 0;
+        const exitPrice = columnMap.exitPrice >= 0 && columnMap.exitPrice < cells.length
+          ? (parseNumeric(cells[columnMap.exitPrice]) || 0) : 0;
 
-        const netProfit = columnMap.profit >= 0 ? parseFloat(cells[columnMap.profit]?.replace(/[^0-9.-]/g, '')) || 0 :
-                         parseFloat(cells.reverse().find(cell => cell && /[-]?\d+\.?\d*$/.test(cell.replace(/[^0-9.-]/g, '')))) || 0;
+        const volume = columnMap.volume >= 0 && columnMap.volume < cells.length
+          ? (parseNumeric(cells[columnMap.volume]) || 0) : 0;
 
-        const balance = columnMap.balance >= 0 ? parseFloat(cells[columnMap.balance]?.replace(/[^0-9.-]/g, '')) || 0 :
-                       parseFloat(cells.slice().reverse().find(cell => cell && /[-]?\d+\.?\d*$/.test(cell.replace(/[^0-9.-]/g, '')))) || 0;
+        let netProfit = columnMap.profit >= 0 && columnMap.profit < cells.length
+          ? (parseNumeric(cells[columnMap.profit]) || 0) : 0;
 
-        const closeTimeStr = columnMap.closeTime >= 0 ? cells[columnMap.closeTime] :
-                             cells.find(cell => /\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2}/.test(cell)) || '';
+        const commission = columnMap.commission >= 0 && columnMap.commission < cells.length
+          ? (parseNumeric(cells[columnMap.commission]) || 0) : 0;
+
+        const swap = columnMap.swap >= 0 && columnMap.swap < cells.length
+          ? (parseNumeric(cells[columnMap.swap]) || 0) : 0;
+
+        // Adjust net profit if commission/swap are separate
+        if (commission !== 0 || swap !== 0) {
+          netProfit = netProfit - commission - swap;
+        }
+
+        const balance = columnMap.balance >= 0 && columnMap.balance < cells.length
+          ? (parseNumeric(cells[columnMap.balance]) || 0) : 0;
+
+        const closeTimeStr = columnMap.closeTime >= 0 && columnMap.closeTime < cells.length
+          ? cells[columnMap.closeTime] : '';
+
+        const openTimeStr = columnMap.openTime >= 0 && columnMap.openTime < cells.length
+          ? cells[columnMap.openTime] : '';
 
         // Normalize direction
         let normalizedDirection = '';
-        if (/buy/i.test(direction)) {
+        const dirLower = direction.toLowerCase();
+        if (/buy|long/i.test(dirLower)) {
           normalizedDirection = 'Buy';
-        } else if (/sell/i.test(direction)) {
+        } else if (/sell|short/i.test(dirLower)) {
           normalizedDirection = 'Sell';
         }
 
-        if (symbol && normalizedDirection && !isNaN(netProfit)) {
+        // Validate trade data
+        const hasValidSymbol = symbol && symbol.replace(/[^a-zA-Z0-9]/g, '').length >= 3;
+        const hasValidDirection = normalizedDirection !== '';
+        const hasValidProfit = !isNaN(netProfit);
+
+        if (hasValidSymbol && hasValidDirection && hasValidProfit) {
+          // Parse dates with improved handling
           let closeDate;
           try {
-            if (closeTimeStr.includes('/')) {
-              const [datePart, timePart] = closeTimeStr.split(' ');
-              const [day, month, year] = datePart.split('/');
-              closeDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart || '00:00:00'}`);
-            } else if (closeTimeStr.includes('-')) {
-              closeDate = new Date(closeTimeStr);
+            if (closeTimeStr) {
+              // Try multiple date formats (same as HTML parser)
+              const dateFormats = [
+                /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):?(\d{2})?/,
+                /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+                /(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):?(\d{2})?/,
+                /(\d{4})-(\d{2})-(\d{2})/,
+                /(\d{1,2})-(\d{1,2})-(\d{4})/,
+              ];
+
+              let matched = false;
+              for (const format of dateFormats) {
+                const match = closeTimeStr.match(format);
+                if (match) {
+                  if (format === dateFormats[0] || format === dateFormats[2]) {
+                        const [, d1, m1, y1, h, min, sec] = match;
+                        closeDate = new Date(`${y1}-${m1.padStart(2, '0')}-${d1.padStart(2, '0')}T${h.padStart(2, '0')}:${min.padStart(2, '0')}:${(sec || '00').padStart(2, '0')}`);
+                      } else {
+                        const [, d1, m1, y1] = match;
+                        closeDate = new Date(`${y1}-${m1.padStart(2, '0')}-${d1.padStart(2, '0')}T00:00:00`);
+                      }
+                      matched = true;
+                      break;
+                    }
+                  }
+
+              if (!matched) {
+                closeDate = new Date(closeTimeStr);
+              }
             } else {
               closeDate = new Date();
             }
@@ -125,19 +264,35 @@ export default function ImportTrades() {
               closeDate = new Date();
             }
           } catch (e) {
+            console.warn('Date parsing error:', e, closeTimeStr);
             closeDate = new Date();
           }
 
+          // Parse open date if available
+          let openDate = null;
+          if (openTimeStr) {
+            try {
+              openDate = new Date(openTimeStr);
+              if (isNaN(openDate.getTime())) {
+                openDate = null;
+              }
+            } catch (e) {
+              openDate = null;
+            }
+          }
+
+          const cleanedSymbol = symbol.replace(/[^a-zA-Z0-9\/]/g, '').toUpperCase();
+
           const tradeData = {
-            symbol: symbol.replace(/[^a-zA-Z0-9]/g, ''),
+            symbol: cleanedSymbol,
             direction: normalizedDirection,
             close_time: closeDate.toISOString(),
-            entry_price: entryPrice,
-            exit_price: exitPrice,
-            volume: volume,
+            entry_price: entryPrice || 0,
+            exit_price: exitPrice || 0,
+            volume: volume || 0,
             net_profit: netProfit,
             balance: balance || 0,
-            open_time: null
+            open_time: openDate ? openDate.toISOString() : null
           };
 
           console.log('Parsed CSV trade:', tradeData);
@@ -156,33 +311,39 @@ export default function ImportTrades() {
     const doc = parser.parseFromString(htmlContent, 'text/html');
 
     // Look for all tables in the document
-    const tables = Array.from(doc.querySelectorAll('table'));
+    const allTables = Array.from(doc.querySelectorAll('table'));
     const trades = [];
 
-    console.log('Found', tables.length, 'tables in HTML');
+    console.log('Found', allTables.length, 'tables in HTML');
 
     // Try to find trade data in each table
-    for (const table of tables) {
+    for (const table of allTables) {
       const rows = Array.from(table.querySelectorAll('tr'));
       console.log('Processing table with', rows.length, 'rows');
 
       // Skip tables with too few rows (likely not trade tables)
-      if (rows.length < 3) continue;
+      if (rows.length < 2) continue;
 
       // Look for header row to identify column structure
-      let headerRow = rows[0];
-      let dataStartIndex = 1;
+      let headerRow = null;
+      let dataStartIndex = 0;
 
-      // Sometimes headers are in the second row
-      if (rows.length > 1) {
-        const firstRowText = headerRow.innerText.toLowerCase();
-        const secondRowText = rows[1].innerText.toLowerCase();
-
-        // If first row looks like data and second looks like headers, swap them
-        if (firstRowText.match(/\d/) && secondRowText.match(/symbol|direction|price|profit/i)) {
-          headerRow = rows[1];
-          dataStartIndex = 2;
+      // Find the header row by looking for common trade-related headers
+      for (let i = 0; i < Math.min(5, rows.length); i++) {
+        const rowText = rows[i].innerText.toLowerCase();
+        const headerCount = (rowText.match(/symbol|instrument|pair|direction|side|type|price|profit|balance|volume|quantity|lots|time|date/gi) || []).length;
+        
+        if (headerCount >= 3) {
+          headerRow = rows[i];
+          dataStartIndex = i + 1;
+          break;
         }
+      }
+
+      // Fallback to first row if no header found
+      if (!headerRow) {
+        headerRow = rows[0];
+        dataStartIndex = 1;
       }
 
       // Analyze header to understand column structure
@@ -191,17 +352,71 @@ export default function ImportTrades() {
 
       console.log('Detected headers:', headers);
 
-      // Map column indices based on headers
+      // --- SPECIAL HANDLING: cTrader History statement table ---
+      // The user specifically wants the parser to use this table structure:
+      // Balance USD / Balance $, Symbol, Opening direction, Closing time (UTC+7),
+      // Entry price, Closing price, Closing Quantity, Net USD / Net $
+      const hasCTraderHistoryHeaders =
+        headers.some(h => h.includes('balance usd') || h.includes('balance $')) &&
+        headers.some(h => h.includes('symbol')) &&
+        headers.some(h => h.includes('opening direction')) &&
+        headers.some(h => h.includes('closing time')) &&
+        headers.some(h => h.includes('entry price')) &&
+        headers.some(h => h.includes('closing price')) &&
+        headers.some(h => h.includes('closing quantity')) &&
+        headers.some(h => h.includes('net usd') || h.includes('net $'));
+
+      // If this table does not look like the cTrader History table, skip it
+      // This prevents us from accidentally parsing Positions/Orders/Transactions tables
+      if (!hasCTraderHistoryHeaders) {
+        console.log('Skipping non-History table');
+        continue;
+      }
+
+      // Enhanced column mapping with more variations (including cTrader specific)
       const columnMap = {
-        symbol: headers.findIndex(h => h.includes('symbol') || h.includes('instrument') || h.includes('pair')),
-        direction: headers.findIndex(h => h.includes('direction') || h.includes('side') || h.includes('type')),
-        entryPrice: headers.findIndex(h => h.includes('entry') && h.includes('price')),
-        exitPrice: headers.findIndex(h => h.includes('exit') && h.includes('price') || h.includes('close') && h.includes('price')),
-        volume: headers.findIndex(h => h.includes('volume') || h.includes('quantity') || h.includes('lots')),
-        profit: headers.findIndex(h => h.includes('profit') && !h.includes('gross')),
-        balance: headers.findIndex(h => h.includes('balance') || h.includes('equity')),
-        openTime: headers.findIndex(h => h.includes('open') && (h.includes('time') || h.includes('date'))),
-        closeTime: headers.findIndex(h => h.includes('close') && (h.includes('time') || h.includes('date')))
+        symbol: headers.findIndex(h => 
+          h.includes('symbol') || h.includes('instrument') || h.includes('pair') || 
+          h.includes('currency') || h.includes('asset')
+        ),
+        direction: headers.findIndex(h => 
+          h.includes('direction') || h.includes('side') || h.includes('type') ||
+          h.includes('action') || h.includes('opening direction') || h === 'buy' || h === 'sell'
+        ),
+        entryPrice: headers.findIndex(h => 
+          (h.includes('entry') || h.includes('open')) && (h.includes('price') || h.includes('rate'))
+        ),
+        exitPrice: headers.findIndex(h => 
+          (h.includes('exit') || h.includes('close') || h.includes('closing')) && 
+          (h.includes('price') || h.includes('rate')) && !h.includes('time')
+        ),
+        volume: headers.findIndex(h => 
+          h.includes('volume') || h.includes('quantity') || h.includes('lots') || 
+          h.includes('size') || h.includes('amount') || h.includes('closing quantity')
+        ),
+        profit: headers.findIndex(h => 
+          (h.includes('profit') || h.includes('pl') || h.includes('p/l') || h.includes('net usd') || h.includes('net')) && 
+          !h.includes('gross') && !h.includes('commission') && !h.includes('unrealised')
+        ),
+        commission: headers.findIndex(h => 
+          h.includes('commission') || h.includes('fee') || h.includes('charges')
+        ),
+        swap: headers.findIndex(h => 
+          h.includes('swap') || h.includes('interest') || h.includes('rollover')
+        ),
+        balance: headers.findIndex(h => 
+          (h.includes('balance') && (h.includes('usd') || h.includes('currency') || h.length < 20)) || 
+          h.includes('equity') || (h.includes('account') && h.includes('balance'))
+        ),
+        openTime: headers.findIndex(h => 
+          (h.includes('open') || h.includes('entry') || h.includes('created')) && 
+          (h.includes('time') || h.includes('date'))
+        ),
+        closeTime: headers.findIndex(h => 
+          (h.includes('close') || h.includes('exit') || h.includes('closing time')) && 
+          (h.includes('time') || h.includes('date')) &&
+          !h.includes('open') && !h.includes('entry')
+        )
       };
 
       console.log('Column mapping:', columnMap);
@@ -210,91 +425,226 @@ export default function ImportTrades() {
       for (let i = dataStartIndex; i < rows.length; i++) {
         const row = rows[i];
         const cells = Array.from(row.querySelectorAll('td'));
-        const cellTexts = cells.map(cell => (cell.innerText || '').trim());
+        const cellTexts = cells.map(cell => (cell.innerText || cell.textContent || '').trim());
 
         // Skip rows that don't have enough cells or are headers/totals
-        if (cells.length < 5) continue;
-        if (cellTexts.some(text => text.toLowerCase().includes('total') || text.toLowerCase().includes('sum'))) continue;
+        if (cells.length < 3) continue;
+        const rowTextLower = cellTexts.join(' ').toLowerCase();
+        if (rowTextLower.includes('total') || rowTextLower.includes('sum') || 
+            rowTextLower.includes('subtotal') || rowTextLower === '') continue;
 
         try {
           // Extract data using column mapping or fallback to pattern recognition
-          const symbol = columnMap.symbol >= 0 ? cellTexts[columnMap.symbol] :
-                        cellTexts.find(text => text && !/\d/.test(text) && text.length <= 10) || '';
+          let symbol = '';
+          if (columnMap.symbol >= 0 && columnMap.symbol < cellTexts.length) {
+            symbol = cellTexts[columnMap.symbol];
+          } else {
+            // Fallback: find text that looks like a trading pair
+            symbol = cellTexts.find(text => {
+              const cleaned = text.replace(/[^a-zA-Z0-9]/g, '');
+              return cleaned.length >= 3 && cleaned.length <= 12 && 
+                     /^[A-Z]{3,6}[A-Z0-9]{0,6}$/i.test(cleaned);
+            }) || '';
+          }
 
-          const direction = columnMap.direction >= 0 ? cellTexts[columnMap.direction] :
-                           cellTexts.find(text => /buy|sell/i.test(text)) || '';
+          let direction = '';
+          if (columnMap.direction >= 0 && columnMap.direction < cellTexts.length) {
+            direction = cellTexts[columnMap.direction];
+          } else {
+            direction = cellTexts.find(text => /buy|sell|long|short/i.test(text)) || '';
+          }
 
-          // Extract numeric values from all cells
-          const numericValues = cellTexts.map(text => {
-            const cleaned = text.replace(/[^0-9.-]/g, '');
-            return parseFloat(cleaned);
-          }).filter(num => !isNaN(num));
+          // Extract numeric values from all cells with better parsing
+          const numericValues = cellTexts.map((text, idx) => {
+            if (!text) return null;
+            
+            // Remove spaces (thousand separators), currency symbols, and other non-numeric chars except digits, dots, commas, and minus
+            let cleaned = text.replace(/\s/g, '').replace(/[^\d.,-]/g, '');
+            
+            // Handle negative numbers (might be at start or end)
+            const isNegative = cleaned.startsWith('-') || text.includes('(');
+            cleaned = cleaned.replace(/[()]/g, '').replace(/^-/, '');
+            
+            // Try parsing with dot as decimal separator
+            let num = parseFloat(cleaned);
+            if (isNaN(num)) {
+              // Try with comma as decimal separator
+              cleaned = cleaned.replace(',', '.');
+              num = parseFloat(cleaned);
+            }
+            
+            if (!isNaN(num)) {
+              return { value: isNegative ? -num : num, index: idx, original: text };
+            }
+            
+            return null;
+          }).filter(item => item !== null && !isNaN(item.value));
 
-          // Smart assignment based on available data
+          // Smart assignment based on available data and column mapping
           let entryPrice = 0, exitPrice = 0, volume = 0, netProfit = 0, balance = 0;
+          let commission = 0, swap = 0;
 
-          if (columnMap.entryPrice >= 0 && !isNaN(parseFloat(cellTexts[columnMap.entryPrice]?.replace(/[^0-9.-]/g, '')))) {
-            entryPrice = parseFloat(cellTexts[columnMap.entryPrice].replace(/[^0-9.-]/g, ''));
-          } else if (numericValues.length >= 1) {
-            entryPrice = numericValues[0];
+          // Extract entry price
+          if (columnMap.entryPrice >= 0 && columnMap.entryPrice < cellTexts.length) {
+            const val = parseFloat(cellTexts[columnMap.entryPrice].replace(/[^\d.-]/g, '').replace(',', '.'));
+            if (!isNaN(val)) entryPrice = val;
+          }
+          if (entryPrice === 0 && numericValues.length > 0) {
+            // Usually first or second numeric value
+            entryPrice = numericValues[0]?.value || 0;
           }
 
-          if (columnMap.exitPrice >= 0 && !isNaN(parseFloat(cellTexts[columnMap.exitPrice]?.replace(/[^0-9.-]/g, '')))) {
-            exitPrice = parseFloat(cellTexts[columnMap.exitPrice].replace(/[^0-9.-]/g, ''));
-          } else if (numericValues.length >= 2) {
-            exitPrice = numericValues[1];
+          // Extract exit price
+          if (columnMap.exitPrice >= 0 && columnMap.exitPrice < cellTexts.length) {
+            const val = parseFloat(cellTexts[columnMap.exitPrice].replace(/[^\d.-]/g, '').replace(',', '.'));
+            if (!isNaN(val)) exitPrice = val;
+          }
+          if (exitPrice === 0 && numericValues.length > 1) {
+            exitPrice = numericValues[1]?.value || 0;
           }
 
-          if (columnMap.volume >= 0 && !isNaN(parseFloat(cellTexts[columnMap.volume]?.replace(/[^0-9.-]/g, '')))) {
-            volume = parseFloat(cellTexts[columnMap.volume].replace(/[^0-9.-]/g, ''));
-          } else if (numericValues.length >= 3) {
-            volume = numericValues[2];
+          // Extract volume
+          if (columnMap.volume >= 0 && columnMap.volume < cellTexts.length) {
+            const val = parseFloat(cellTexts[columnMap.volume].replace(/[^\d.-]/g, '').replace(',', '.'));
+            if (!isNaN(val) && val > 0) volume = val;
+          }
+          if (volume === 0 && numericValues.length > 2) {
+            // Volume is usually a smaller number (0.01 to 100)
+            const volumeCandidate = numericValues.find(n => n.value > 0 && n.value < 1000);
+            if (volumeCandidate) volume = volumeCandidate.value;
           }
 
-          if (columnMap.profit >= 0 && !isNaN(parseFloat(cellTexts[columnMap.profit]?.replace(/[^0-9.-]/g, '')))) {
-            netProfit = parseFloat(cellTexts[columnMap.profit].replace(/[^0-9.-]/g, ''));
-          } else if (numericValues.length >= 4) {
-            netProfit = numericValues[numericValues.length - 2]; // Usually second to last
+          // Extract profit (net profit) - handle spaces and negative numbers
+          if (columnMap.profit >= 0 && columnMap.profit < cellTexts.length) {
+            const profitText = cellTexts[columnMap.profit];
+            // Remove spaces, handle negative (could be in parentheses or with minus)
+            const isNegative = profitText.includes('(') || profitText.trim().startsWith('-');
+            let cleaned = profitText.replace(/\s/g, '').replace(/[()]/g, '').replace(/[^\d.,-]/g, '');
+            if (cleaned.startsWith('-')) cleaned = cleaned.substring(1);
+            const val = parseFloat(cleaned.replace(',', '.'));
+            if (!isNaN(val)) netProfit = isNegative ? -val : val;
+          }
+          if (netProfit === 0 && numericValues.length > 0) {
+            // Profit is usually one of the last numeric values, can be positive or negative
+            // Look for values that are not too large (not balance) and not too small (not prices)
+            const profitCandidates = numericValues.filter(n => 
+              Math.abs(n.value) > 0.01 && Math.abs(n.value) < 1000000
+            );
+            if (profitCandidates.length > 0) {
+              // Usually the last or second-to-last value
+              netProfit = profitCandidates[profitCandidates.length - 1]?.value || 0;
+            }
           }
 
-          if (columnMap.balance >= 0 && !isNaN(parseFloat(cellTexts[columnMap.balance]?.replace(/[^0-9.-]/g, '')))) {
-            balance = parseFloat(cellTexts[columnMap.balance].replace(/[^0-9.-]/g, ''));
-          } else if (numericValues.length >= 5) {
-            balance = numericValues[numericValues.length - 1]; // Usually last
+          // Extract balance - handle spaces as thousand separators
+          if (columnMap.balance >= 0 && columnMap.balance < cellTexts.length) {
+            const balanceText = cellTexts[columnMap.balance];
+            // Remove spaces (thousand separators) and parse
+            const cleaned = balanceText.replace(/\s/g, '').replace(/[^\d.,-]/g, '');
+            const val = parseFloat(cleaned.replace(',', '.'));
+            if (!isNaN(val) && val > 0) balance = val;
+          }
+          if (balance === 0 && numericValues.length > 0) {
+            // Balance is usually the largest positive number (typically > 1000 for real accounts)
+            const balanceCandidates = numericValues.filter(n => n.value > 1000);
+            if (balanceCandidates.length > 0) {
+              // Sort by value descending and take the largest
+              balanceCandidates.sort((a, b) => b.value - a.value);
+              balance = balanceCandidates[0]?.value || 0;
+            }
           }
 
-          // Extract dates
+          // Extract commission and swap if available
+          if (columnMap.commission >= 0 && columnMap.commission < cellTexts.length) {
+            const val = parseFloat(cellTexts[columnMap.commission].replace(/[^\d.-]/g, '').replace(',', '.'));
+            if (!isNaN(val)) commission = val;
+          }
+
+          if (columnMap.swap >= 0 && columnMap.swap < cellTexts.length) {
+            const val = parseFloat(cellTexts[columnMap.swap].replace(/[^\d.-]/g, '').replace(',', '.'));
+            if (!isNaN(val)) swap = val;
+          }
+
+          // Adjust net profit if commission/swap are separate
+          if (commission !== 0 || swap !== 0) {
+            netProfit = netProfit - commission - swap;
+          }
+
+          // Extract dates with improved parsing
           let closeTimeStr = '';
-          if (columnMap.closeTime >= 0) {
+          let openTimeStr = '';
+          
+          if (columnMap.closeTime >= 0 && columnMap.closeTime < cellTexts.length) {
             closeTimeStr = cellTexts[columnMap.closeTime];
           } else {
-            // Look for date patterns in any cell
-            closeTimeStr = cellTexts.find(text => /\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2}/.test(text)) || '';
+            // Look for date patterns in any cell (prioritize later dates for close time)
+            const datePatterns = cellTexts.filter(text => 
+              /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\/\-]\d{2}[\/\-]\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4}/.test(text)
+            );
+            if (datePatterns.length > 0) {
+              closeTimeStr = datePatterns[datePatterns.length - 1]; // Last date is usually close time
+            }
+          }
+
+          if (columnMap.openTime >= 0 && columnMap.openTime < cellTexts.length) {
+            openTimeStr = cellTexts[columnMap.openTime];
           }
 
           // Normalize direction
           let normalizedDirection = '';
-          if (/buy/i.test(direction)) {
+          const dirLower = direction.toLowerCase();
+          if (/buy|long/i.test(dirLower)) {
             normalizedDirection = 'Buy';
-          } else if (/sell/i.test(direction)) {
+          } else if (/sell|short/i.test(dirLower)) {
             normalizedDirection = 'Sell';
           }
 
-          // Validate trade data
-          if (symbol && normalizedDirection && !isNaN(netProfit) && entryPrice > 0 && volume > 0) {
-            // Parse date
+          // Validate trade data - relaxed validation to capture more trades
+          const hasValidSymbol = symbol && symbol.length >= 3 && symbol.length <= 12;
+          const hasValidDirection = normalizedDirection !== '';
+          const hasValidProfit = !isNaN(netProfit);
+          const hasValidVolume = volume > 0 || numericValues.length >= 3;
+
+          if (hasValidSymbol && hasValidDirection && hasValidProfit) {
+            // Parse close date with improved handling
             let closeDate;
             try {
-              if (closeTimeStr.includes('/')) {
-                // DD/MM/YYYY format
-                const [datePart, timePart] = closeTimeStr.split(' ');
-                const [day, month, year] = datePart.split('/');
-                closeDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart || '00:00:00'}`);
-              } else if (closeTimeStr.includes('-')) {
-                // YYYY-MM-DD format
-                closeDate = new Date(closeTimeStr);
-              } else if (closeTimeStr) {
-                closeDate = new Date(closeTimeStr);
+              if (closeTimeStr) {
+                // Try multiple date formats
+                const dateFormats = [
+                  // DD/MM/YYYY HH:MM:SS
+                  /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):?(\d{2})?/,
+                  // DD/MM/YYYY
+                  /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+                  // YYYY-MM-DD HH:MM:SS
+                  /(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):?(\d{2})?/,
+                  // YYYY-MM-DD
+                  /(\d{4})-(\d{2})-(\d{2})/,
+                  // DD-MM-YYYY
+                  /(\d{1,2})-(\d{1,2})-(\d{4})/,
+                ];
+
+                let matched = false;
+                for (const format of dateFormats) {
+                  const match = closeTimeStr.match(format);
+                  if (match) {
+                    if (format === dateFormats[0] || format === dateFormats[2]) {
+                      // Has time component
+                      const [, d1, m1, y1, h, min, sec] = match;
+                      closeDate = new Date(`${y1}-${m1.padStart(2, '0')}-${d1.padStart(2, '0')}T${h.padStart(2, '0')}:${min.padStart(2, '0')}:${(sec || '00').padStart(2, '0')}`);
+                    } else {
+                      // Date only
+                      const [, d1, m1, y1] = match;
+                      closeDate = new Date(`${y1}-${m1.padStart(2, '0')}-${d1.padStart(2, '0')}T00:00:00`);
+                    }
+                    matched = true;
+                    break;
+                  }
+                }
+
+                if (!matched) {
+                  closeDate = new Date(closeTimeStr);
+                }
               } else {
                 closeDate = new Date(); // Fallback to current date
               }
@@ -303,23 +653,49 @@ export default function ImportTrades() {
                 closeDate = new Date(); // Final fallback
               }
             } catch (e) {
+              console.warn('Date parsing error:', e, closeTimeStr);
               closeDate = new Date();
             }
 
+            // Parse open date if available
+            let openDate = null;
+            if (openTimeStr) {
+              try {
+                openDate = new Date(openTimeStr);
+                if (isNaN(openDate.getTime())) {
+                  openDate = null;
+                }
+              } catch (e) {
+                openDate = null;
+              }
+            }
+
+            // Clean symbol - keep only alphanumeric, preserve common separators
+            const cleanedSymbol = symbol.replace(/[^a-zA-Z0-9\/]/g, '').toUpperCase();
+
             const tradeData = {
-              symbol: symbol.replace(/[^a-zA-Z0-9]/g, ''), // Clean symbol
+              symbol: cleanedSymbol,
               direction: normalizedDirection,
               close_time: closeDate.toISOString(),
-              entry_price: entryPrice,
-              exit_price: exitPrice,
-              volume: volume,
+              entry_price: entryPrice || 0,
+              exit_price: exitPrice || 0,
+              volume: volume || 0,
               net_profit: netProfit,
               balance: balance || 0,
-              open_time: null
+              open_time: openDate ? openDate.toISOString() : null
             };
 
             console.log('Parsed trade:', tradeData);
             trades.push(tradeData);
+          } else {
+            console.log('Skipped row - validation failed:', {
+              hasSymbol: hasValidSymbol,
+              hasDirection: hasValidDirection,
+              hasProfit: hasValidProfit,
+              symbol,
+              direction,
+              netProfit
+            });
           }
         } catch (e) {
           console.warn('Error parsing trade row:', e, cellTexts);
@@ -455,6 +831,25 @@ export default function ImportTrades() {
 
       if (metrics) {
         await localDataService.entities.TraderProfile.update(profileId, metrics);
+      }
+
+      // Record a persistent account event so the system remembers this import
+      try {
+        const user = await localDataService.getCurrentUser();
+        await localDataService.entities.AccountEvent.create({
+          type: 'STATEMENT_IMPORTED',
+          user_email: user?.email || null,
+          profile_id: profileId,
+          description: 'Trading statement imported and metrics recalculated',
+          metadata: {
+            file_name: file.name,
+            trades_imported: validTrades.length,
+            profit_percentage: metrics?.profit_percentage,
+            win_rate: metrics?.win_rate
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to record account event for statement import', e);
       }
 
       // Log successful import
