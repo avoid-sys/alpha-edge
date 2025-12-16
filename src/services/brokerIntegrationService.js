@@ -50,6 +50,18 @@ class BrokerIntegrationService {
         apiDocs: 'https://www.metatrader5.com/en/automated-trading',
         supportedAssets: ['forex', 'commodities', 'indices', 'crypto'],
         features: ['advanced charting', 'automated trading', 'expert advisors']
+      },
+      'ctrader': {
+        name: 'cTrader',
+        authType: 'oauth',
+        apiDocs: 'https://help.ctrader.com/ctrader-open-api',
+        supportedAssets: ['forex', 'indices', 'commodities', 'crypto', 'stocks'],
+        features: ['ECN execution', 'advanced charting', 'copy trading', 'OAuth integration'],
+        oauth: {
+          authUrl: 'https://connect.spotware.com/oauth2/authorize',
+          redirectUri: 'https://www.alphaedge.vc/auth/ctrader/callback',
+          scope: 'profile trading' // adjust scopes as needed per Spotware docs
+        }
       }
     };
 

@@ -84,10 +84,30 @@ export default function BrokerExchangeConnect() {
               password: authForm.password
             };
             break;
-          case 'oauth':
-            // OAuth would redirect to external provider
-            alert('OAuth authentication would redirect to ' + platform.name + ' for authorization');
+          case 'oauth': {
+            // Real OAuth redirect for cTrader (and any future OAuth brokers)
+            const oauth = platform.oauth;
+            const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID;
+
+            if (!oauth || !oauth.authUrl || !oauth.redirectUri || !clientId) {
+              alert(
+                `${platform.name} OAuth is not fully configured. Please set VITE_CTRADER_CLIENT_ID and OAuth URLs.`
+              );
+              return;
+            }
+
+            const state = encodeURIComponent(`${id}-${Date.now()}`);
+            const scope = oauth.scope ? encodeURIComponent(oauth.scope) : '';
+
+            const url = `${oauth.authUrl}?response_type=code&client_id=${encodeURIComponent(
+              clientId
+            )}&redirect_uri=${encodeURIComponent(oauth.redirectUri)}${
+              scope ? `&scope=${scope}` : ''
+            }&state=${state}`;
+
+            window.location.href = url;
             return;
+          }
         }
 
         await brokerIntegrationService.connectBroker(id, credentials);
