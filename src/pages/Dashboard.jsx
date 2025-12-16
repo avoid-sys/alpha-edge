@@ -70,7 +70,7 @@ export default function Dashboard() {
       try {
         let fetchedProfile = null;
         let fetchedTrades = [];
-        
+
         if (profileId) {
           fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
@@ -82,7 +82,9 @@ export default function Dashboard() {
                 created_by: user.email
               });
               if (profiles.length > 0) {
-                fetchedProfile = profiles[0];
+                // Prefer a live account profile if available
+                const liveProfile = profiles.find(p => p.is_live_account);
+                fetchedProfile = liveProfile || profiles[0];
                 fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
               }
             }
@@ -90,7 +92,47 @@ export default function Dashboard() {
             // Not logged in or no profile
           }
         }
-        
+
+        // If no profile exists yet but there are connected platforms (broker or exchange),
+        // automatically create a live account profile so the dashboard doesn't stay empty.
+        if (!fetchedProfile) {
+          const liveBrokers = brokerIntegrationService.getConnectedBrokers().map(b => ({ ...b, _type: 'broker' }));
+          const liveExchanges = brokerIntegrationService.getConnectedExchanges().map(e => ({ ...e, _type: 'exchange' }));
+          const livePlatforms = [...liveBrokers, ...liveExchanges];
+
+          if (livePlatforms.length > 0) {
+            const primary = livePlatforms[0];
+
+            // Ensure we have a current user (reuse logic from ImportTrades)
+            let user = await localDataService.getCurrentUser();
+            if (!user) {
+              user = {
+                email: securityService.sanitizeInput('local@alphaedge.com', 'email'),
+                full_name: securityService.sanitizeInput('Live Trader', 'text')
+              };
+              await localDataService.setCurrentUser(user);
+            }
+
+            const nickname = securityService.sanitizeInput(
+              `${primary.name || 'Live Account'}`,
+              'text'
+            );
+
+            const newProfile = await localDataService.entities.TraderProfile.create({
+              nickname,
+              broker: primary.name || 'Live Account',
+              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}-${primary.id}`,
+              created_by: user.email,
+              is_live_account: true,
+              external_platform_id: primary.id,
+              external_platform_type: primary._type
+            });
+
+            fetchedProfile = newProfile;
+            fetchedTrades = [];
+          }
+        }
+
         // Calculate rank based on trader score - only for live connected accounts
         if (fetchedProfile && fetchedProfile.is_live_account) {
           const allProfiles = await localDataService.entities.TraderProfile.list('-trader_score');
@@ -102,12 +144,12 @@ export default function Dashboard() {
           setRank(null); // No rank for demo/file-only accounts
         }
 
-        if (fetchedProfile && fetchedTrades.length > 0) {
-          // Use real data from uploaded files
-        setProfile(fetchedProfile);
-          setTrades(fetchedTrades);
+        if (fetchedProfile) {
+          // Use real data from uploaded files (if any) or show live profile with placeholder stats
+          setProfile(fetchedProfile);
+          setTrades(fetchedTrades || []);
         } else {
-          // Show empty state - no data uploaded yet
+          // Show empty state - no profile and no connections
           setProfile(null);
           setTrades([]);
         }
