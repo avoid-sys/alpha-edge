@@ -256,12 +256,26 @@ export default function Dashboard() {
       setBybitAccount(summary);
     } catch (err) {
       console.error('Failed to load Bybit account data', err);
-      const apiMessage =
+
+      let apiMessage =
         err?.response?.data?.error ||
         err?.response?.data?.retMsg ||
+        err?.response?.data?.message || // some APIs use { code, message }
         err?.message ||
-        'Failed to load Bybit account data';
-      setBybitError(apiMessage);
+        'Failed to load Bybit data';
+
+      // Ensure we never try to render a raw object as React children
+      if (typeof apiMessage === 'object') {
+        if (apiMessage.message) {
+          apiMessage = apiMessage.message;
+        } else if (apiMessage.code) {
+          apiMessage = `${apiMessage.code}: ${JSON.stringify(apiMessage)}`;
+        } else {
+          apiMessage = JSON.stringify(apiMessage);
+        }
+      }
+
+      setBybitError(String(apiMessage));
       setBybitAccount(null);
     } finally {
       setBybitLoading(false);
