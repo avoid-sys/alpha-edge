@@ -137,23 +137,17 @@ export default function BrokerExchangeConnect() {
               client_id: clientId,
               redirect_uri: redirectUri,
               scope: rawScope,
-              product: 'web',
               state: state,
               authUrl: authUrl
             });
-            console.log('cTrader OAuth - Encoded URL:', url);
-            console.log('cTrader OAuth - URLSearchParams string:', params.toString());
-
-            // Log full authorization URL for debugging
+            console.log('cTrader OAuth - Encoded Parameters:', {
+              client_id: encodedClientId,
+              redirect_uri: encodedRedirectUri,
+              scope: encodedScope,
+              state: encodedState
+            });
             console.log('cTrader OAuth - Full Authorization URL:', url);
-            console.log('cTrader OAuth - Parameters:', {
-              client_id: clientId,
-              redirect_uri: redirectUri,
-              scope: rawScope,
-              product: 'web',
-              state: state,
-              authUrl: authUrl
-            });
+            console.log('⚠️  Note: Using manual encoding with %20 for spaces (not +)');
             console.log('✅ About to redirect to cTrader. After authorization, you will be redirected back with code parameter.');
             console.log('⚠️  If you get 400 error, check:');
             console.log('   1. Client ID is correct:', clientId ? '✓' : '✗');
