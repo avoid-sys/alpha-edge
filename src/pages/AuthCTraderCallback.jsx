@@ -53,19 +53,49 @@ export default function AuthCTraderCallback() {
         // Determine redirect_uri based on current origin (for localhost support)
         const currentRedirectUri = `${window.location.origin}/auth/ctrader/callback`;
         
-        // Log request body for debugging (without sensitive data)
-        const requestBody = { 
-          code, 
-          state,
-          redirect_uri: currentRedirectUri
-        };
-        console.log('cTrader Token Request - Body:', { 
-          ...requestBody, 
-          code: code ? `${code.substring(0, 10)}...` : null // Only log first 10 chars of code
+        // SECURITY WARNING: Using client_secret on frontend is NOT recommended for production
+        // This exposes the secret in browser network logs and JavaScript code
+        // For production, use the backend proxy (/api/ctraderAuth) instead
+        const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID || '1506_ZNLG807Bj6mt9w4g9KYgRhO3CeHeleYf2YfoFVKLOaQnF';
+        const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET || 'Pr937H9OaHKwviXgd0Uc0uPjAoHdOzQ6JAU8PC7jkJqPe';
+        
+        // Log request params for debugging (without sensitive data)
+        console.log('cTrader Token Request - Params:', { 
+          grant_type: 'authorization_code',
+          code: code ? `${code.substring(0, 10)}...` : null, // Only log first 10 chars
+          redirect_uri: currentRedirectUri,
+          client_id: clientId ? `${clientId.substring(0, 10)}...` : null,
+          has_client_secret: !!clientSecret
         });
         
-        // Exchange code for tokens via backend (keeps client_secret on server)
-        const res = await axios.post('/api/ctraderAuth', requestBody);
+        // Exchange code for tokens using GET request (as per user requirements)
+        // NOTE: Most OAuth providers require POST, but cTrader may accept GET
+        // If GET fails, fallback to POST via backend proxy
+        let res;
+        try {
+          res = await axios.get('https://openapi.ctrader.com/apps/token', {
+            params: {
+              grant_type: 'authorization_code',
+              code,
+              redirect_uri: currentRedirectUri,
+              client_id: clientId,
+              client_secret: clientSecret,
+            },
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+          });
+        } catch (getError) {
+          // If GET fails (405 Method Not Allowed), fallback to POST via backend proxy
+          console.warn('GET request failed, falling back to POST via backend:', getError);
+          const requestBody = { 
+            code, 
+            state,
+            redirect_uri: currentRedirectUri
+          };
+          res = await axios.post('/api/ctraderAuth', requestBody);
+        }
 
         // Store tokens securely for future API calls
         if (res.data?.access_token) {
@@ -98,55 +128,20 @@ export default function AuthCTraderCallback() {
         setStatus('error');
 
         // Extract detailed error message and avoid "[object Object]"
-        // Priority: error_description > error > details (string) > details (object) > message
-        let errorMessage = 'Failed to complete cTrader authorization.';
-
+        // Improved error handling as per user requirements
+        let errorMessage = 'Unknown error';
+        
         if (err?.response?.data) {
           const errorData = err.response.data;
-          
-          // Direct cTrader API errors (from openapi.ctrader.com)
-          // These come directly in errorData with error_description or error fields
-          if (errorData.error_description) {
-            // Most specific: use error_description directly
-            errorMessage = errorData.error_description;
-          } else if (errorData.error) {
-            // Second priority: use error code and try to get description
-            errorMessage = `cTrader Error: ${errorData.error}`;
-            
-            // Check if there's a description in nested details
-            if (errorData.details?.error_description) {
-              errorMessage += ` - ${errorData.details.error_description}`;
-            } else if (typeof errorData.details === 'string') {
-              errorMessage += ` - ${errorData.details}`;
-            }
-          } else if (errorData.details) {
-            // Backend-wrapped errors (from our api/ctraderAuth.js)
-            const rawDetails = errorData.details;
-            
-            if (typeof rawDetails === 'string') {
-              // String details: use directly
-              errorMessage = rawDetails;
-            } else if (typeof rawDetails === 'object') {
-              // Object details: extract error_description or error
-              if (rawDetails.error_description) {
-                errorMessage = rawDetails.error_description;
-              } else if (rawDetails.error) {
-                errorMessage = `cTrader Error: ${rawDetails.error}`;
-              } else {
-                // Last resort: stringify the object
-                errorMessage = JSON.stringify(rawDetails, null, 2);
-              }
-            }
-          } else {
-            // Fallback: stringify the entire errorData if it's an object
-            errorMessage =
-              typeof errorData === 'string'
-                ? errorData
-                : JSON.stringify(errorData, null, 2);
-          }
+          // Priority: error_description > error > stringify data
+          errorMessage = errorData.error_description || errorData.error || JSON.stringify(errorData);
         } else if (err?.message) {
-          // Network error or other axios error
           errorMessage = err.message;
+        }
+        
+        // Format final error message
+        if (!errorMessage.startsWith('cTrader Error:')) {
+          errorMessage = `cTrader Error: ${errorMessage}`;
         }
 
         console.error('cTrader token exchange failed - Final Error Message:', errorMessage);
