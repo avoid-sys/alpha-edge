@@ -81,18 +81,32 @@ export default function AuthCTraderCallback() {
         if (err?.response?.data) {
           const errorData = err.response.data;
 
-          // If backend wrapped cTrader error inside "details"
-          const details = errorData.details || errorData;
-          const innerDescription = typeof details === 'object' ? details.error_description : undefined;
-          const innerError = typeof details === 'object' ? details.error : undefined;
+          // Separate object and string details so we don't lose string messages
+          const rawDetails = errorData.details;
+          const detailsObject =
+            rawDetails && typeof rawDetails === 'object' ? rawDetails : undefined;
+          const detailsString =
+            rawDetails && typeof rawDetails === 'string' ? rawDetails : undefined;
+
+          const innerDescription = detailsObject?.error_description;
+          const innerError = detailsObject?.error;
 
           if (errorData.error_description || innerDescription) {
+            // Prefer the most specific description
             errorMessage = errorData.error_description || innerDescription;
           } else if (innerError || errorData.error) {
             const baseError = innerError || errorData.error;
             errorMessage = `cTrader Error: ${baseError}`;
+
+            // Preserve string details if they exist (was previously appended)
+            if (detailsString) {
+              errorMessage += ` - ${detailsString}`;
+            }
+          } else if (detailsString) {
+            // Only string details are available
+            errorMessage = detailsString;
           } else {
-            // Fallback: stringify object safely
+            // Fallback: stringify any remaining structure safely
             errorMessage =
               typeof errorData === 'string'
                 ? errorData
