@@ -109,32 +109,42 @@ export default function BrokerExchangeConnect() {
             console.log('cTrader OAuth - Redirect URI:', redirectUri);
             console.log('⚠️  Make sure this EXACT URI is registered in cTrader app settings:');
             console.log('   https://connect.spotware.com/apps → Your App → Redirect URLs');
+            console.log('   Expected: https://alphaedge.vc/auth/ctrader/callback');
 
             const authUrl = oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess/';
             const rawScope = oauth.scope || 'accounts trading';
 
-            const state = encodeURIComponent(`${id}-${Date.now()}`);
+            const state = `${id}-${Date.now()}`;
+            const encodedState = encodeURIComponent(state);
             const scope = encodeURIComponent(rawScope);
+            const encodedRedirectUri = encodeURIComponent(redirectUri);
 
             // cTrader uses a custom OAuth URL format with product=web parameter
             const url = `${authUrl}?client_id=${encodeURIComponent(
               clientId
-            )}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&product=web&state=${state}`;
+            )}&redirect_uri=${encodedRedirectUri}&scope=${scope}&product=web&state=${encodedState}`;
 
             // Log full authorization URL for debugging
             console.log('cTrader OAuth - Full Authorization URL:', url);
             console.log('cTrader OAuth - Parameters:', {
               client_id: clientId,
               redirect_uri: redirectUri,
+              encoded_redirect_uri: encodedRedirectUri,
               scope: rawScope,
               product: 'web',
-              state: state.substring(0, 20) + '...'
+              state: state,
+              encoded_state: encodedState
             });
+            console.log('✅ About to redirect to cTrader. After authorization, you will be redirected back with code parameter.');
 
             // Сохраняем state для проверки в колбэке
-            localStorage.setItem('ctrader_state', state);
+            localStorage.setItem('ctrader_state', encodedState);
+            console.log('💾 Saved state to localStorage:', encodedState.substring(0, 20) + '...');
 
-            window.location.href = url;
+            // Small delay to ensure logs are visible
+            setTimeout(() => {
+              window.location.href = url;
+            }, 100);
             return;
           }
         }

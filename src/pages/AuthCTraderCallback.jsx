@@ -50,15 +50,24 @@ export default function AuthCTraderCallback() {
         setStatus('error');
         const errorMsg = error 
           ? `cTrader authorization failed: ${error}${errorDescription ? ` - ${errorDescription}` : ''}`
-          : 'Missing authorization code from cTrader. The callback URL was reached but no code parameter was found.';
+          : `Missing authorization code from cTrader. 
+
+This usually means:
+1. You accessed this page directly (not from cTrader redirect)
+2. The authorization URL was incorrect
+3. Redirect URI mismatch in cTrader app settings
+
+Please go back to "Connect Platforms" and click "Connect" on cTrader again.`;
         setMessage(errorMsg);
         console.error('cTrader Callback Error - No code received:', {
           fullUrl: window.location.href,
           search: location.search,
           hash: location.hash,
           error,
-          errorDescription
+          errorDescription,
+          savedState: savedState ? 'exists' : 'missing'
         });
+        console.error('⚠️  Did you access this URL directly? You must go through the OAuth flow from "Connect Platforms" page.');
         return;
       }
 
