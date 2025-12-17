@@ -101,7 +101,7 @@ export default function BrokerExchangeConnect() {
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             const redirectUri = isLocalhost
               ? `${window.location.origin}/auth/ctrader/callback`
-              : (oauth.redirectUri || 'https://www.alphaedge.vc/auth/ctrader/callback');
+              : (oauth.redirectUri || 'https://alphaedge.vc/auth/ctrader/callback');
 
             const authUrl = oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess/';
             const rawScope = oauth.scope || 'accounts trading';

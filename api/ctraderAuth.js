@@ -1,12 +1,12 @@
 // Vercel serverless function: exchange cTrader authorization code for tokens
-// using the OpenID Connect endpoint
+// using the cTrader Open API endpoint: https://openapi.ctrader.com/apps/token
 //
 // IMPORTANT:
 // - Configure these env vars in Vercel:
 //   - CTRADER_CLIENT_ID
 //   - CTRADER_CLIENT_SECRET
-//   - CTRADER_REDIRECT_URI (production, e.g. https://www.alphaedge.vc/auth/ctrader/callback)
-//   - CTRADER_LOCAL_REDIRECT_URI (optional, for local dev, e.g. http://localhost:5173/auth/ctrader/callback)
+//   - CTRADER_REDIRECT_URI (production, e.g. https://alphaedge.vc/auth/ctrader/callback)
+//   - CTRADER_LOCAL_REDIRECT_URI (optional, for local dev, e.g. http://localhost:3000/auth/ctrader/callback)
 
 const axios = require('axios');
 
@@ -47,12 +47,8 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // Try both possible token endpoints (cTrader may use either)
-    const tokenUrls = [
-      'https://openid.ctrader.com/connect/token',
-      'https://id.ctrader.com/connect/token',
-      'https://connect.spotware.com/connect/token'
-    ];
+    // cTrader Open API token endpoint
+    const tokenUrl = 'https://openapi.ctrader.com/apps/token';
 
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
@@ -61,40 +57,13 @@ module.exports = async (req, res) => {
     params.append('client_id', clientId);
     params.append('client_secret', clientSecret);
 
-    let lastError = null;
-    let response = null;
-
-    // Try each token endpoint until one works
-    for (const tokenUrl of tokenUrls) {
-      try {
-        response = await axios.post(tokenUrl, params.toString(), {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          timeout: 10000
-        });
-        // If successful, break out of loop
-        break;
-      } catch (err) {
-        lastError = err;
-        // If it's a 404 or connection error, try next URL
-        if (err.response?.status === 404 || err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
-          continue;
-        }
-        // For other errors (400, 401, etc.), this might be the right endpoint but wrong credentials
-        // So we'll try the next one, but keep this error
-        continue;
-      }
-    }
-
-    if (!response) {
-      console.error('ctraderAuth error: All token endpoints failed', lastError?.response?.data || lastError?.message);
-      res.status(lastError?.response?.status || 500).json({
-        error: 'Failed to exchange cTrader authorization code',
-        details: lastError?.response?.data || lastError?.message || 'All token endpoints failed'
-      });
-      return;
-    }
+    // Exchange authorization code for access token
+    const response = await axios.post(tokenUrl, params.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      timeout: 10000
+    });
 
     // You may want to store tokens server-side; for now, return them to the client
     res.status(200).json({
