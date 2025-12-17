@@ -125,30 +125,42 @@ export default function BrokerExchangeConnect() {
             const encodedState = encodeURIComponent(state);
             
             // Build URL manually to control encoding format
-            // cTrader requires response_type=code and product=web parameters
+            // Try different parameter combinations to find what works
+            // Option 1: With response_type and product
             const url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&response_type=code&product=web&state=${encodedState}`;
             
-            // Log decoded parameters for verification (before encoding)
-            console.log('cTrader OAuth - Decoded Parameters (before encoding):', {
+            // Log everything for debugging
+            console.log('=== cTrader OAuth Debug Info ===');
+            console.log('1. Decoded Parameters (before encoding):', {
               client_id: clientId,
               redirect_uri: redirectUri,
               scope: rawScope,
               state: state,
               authUrl: authUrl
             });
-            console.log('cTrader OAuth - Encoded Parameters:', {
+            console.log('2. Encoded Parameters:', {
               client_id: encodedClientId,
               redirect_uri: encodedRedirectUri,
               scope: encodedScope,
               state: encodedState
             });
-            console.log('cTrader OAuth - Full Authorization URL:', url);
-            console.log('⚠️  Note: Using manual encoding with %20 for spaces (not +)');
-            console.log('✅ About to redirect to cTrader. After authorization, you will be redirected back with code parameter.');
-            console.log('⚠️  If you get 400 error, check:');
-            console.log('   1. Client ID is correct:', clientId ? '✓' : '✗');
-            console.log('   2. Redirect URI matches cTrader settings:', redirectUri);
-            console.log('   3. App status is Active in cTrader portal');
+            console.log('3. Full Authorization URL:', url);
+            console.log('4. URL Length:', url.length);
+            console.log('5. Redirect URI Check:');
+            console.log('   - Current redirect_uri:', redirectUri);
+            console.log('   - Must match EXACTLY in cTrader app settings');
+            console.log('   - Check: https://connect.spotware.com/apps → Your App → Redirect URLs');
+            console.log('   - For localhost:', 'http://localhost:3000/auth/ctrader/callback');
+            console.log('   - For production:', 'https://alphaedge.vc/auth/ctrader/callback');
+            console.log('6. Client ID Check:');
+            console.log('   - Client ID:', clientId ? `${clientId.substring(0, 20)}...` : 'MISSING');
+            console.log('   - Must match cTrader app settings');
+            console.log('⚠️  If you get 400 Bad Request:');
+            console.log('   1. Verify redirect_uri is registered in cTrader app settings');
+            console.log('   2. Verify app status is "Active" in cTrader portal');
+            console.log('   3. Verify client_id matches your app');
+            console.log('   4. Check browser network tab for exact error response');
+            console.log('✅ About to redirect to cTrader...');
 
             // Сохраняем state для проверки в колбэке (reuse encodedState from above)
             localStorage.setItem('ctrader_state', encodedState);
