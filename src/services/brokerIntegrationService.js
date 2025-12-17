@@ -58,10 +58,10 @@ class BrokerIntegrationService {
         supportedAssets: ['forex', 'indices', 'commodities', 'crypto', 'stocks'],
         features: ['ECN execution', 'advanced charting', 'copy trading', 'OAuth integration'],
         oauth: {
-          // Per Spotware cTrader ID/Open API docs, the authorize endpoint is under /apps/authorize
-          authUrl: 'https://connect.spotware.com/apps/authorize',
+          // cTrader uses a custom OAuth flow via id.ctrader.com
+          authUrl: 'https://id.ctrader.com/my/settings/openapi/grantingaccess/',
           redirectUri: 'https://www.alphaedge.vc/auth/ctrader/callback',
-          scope: 'profile trading' // adjust scopes as needed per Spotware docs
+          scope: 'accounts trading' // cTrader scopes: accounts (read account info), trading (full access)
         }
       }
     };

@@ -86,24 +86,36 @@ export default function BrokerExchangeConnect() {
             break;
           case 'oauth': {
             // Real OAuth redirect for cTrader (and any future OAuth brokers)
-            const oauth = platform.oauth;
+            const oauth = platform.oauth || {};
             const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID;
 
-            if (!oauth || !oauth.authUrl || !oauth.redirectUri || !clientId) {
+            // URLs зашиты в конфиге brokerIntegrationService, здесь проверяем только clientId
+            if (!clientId) {
               alert(
-                `${platform.name} OAuth is not fully configured. Please set VITE_CTRADER_CLIENT_ID and OAuth URLs.`
+                `${platform.name} OAuth is not fully configured. Please set VITE_CTRADER_CLIENT_ID in your .env.`
               );
               return;
             }
 
-            const state = encodeURIComponent(`${id}-${Date.now()}`);
-            const scope = oauth.scope ? encodeURIComponent(oauth.scope) : '';
+            // Use production redirect_uri or localhost for development
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const redirectUri = isLocalhost
+              ? `${window.location.origin}/auth/ctrader/callback`
+              : (oauth.redirectUri || 'https://www.alphaedge.vc/auth/ctrader/callback');
 
-            const url = `${oauth.authUrl}?response_type=code&client_id=${encodeURIComponent(
+            const authUrl = oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess/';
+            const rawScope = oauth.scope || 'accounts trading';
+
+            const state = encodeURIComponent(`${id}-${Date.now()}`);
+            const scope = encodeURIComponent(rawScope);
+
+            // cTrader uses a custom OAuth URL format with product=web parameter
+            const url = `${authUrl}?client_id=${encodeURIComponent(
               clientId
-            )}&redirect_uri=${encodeURIComponent(oauth.redirectUri)}${
-              scope ? `&scope=${scope}` : ''
-            }&state=${state}`;
+            )}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&product=web&state=${state}`;
+
+            // Сохраняем state для проверки в колбэке
+            localStorage.setItem('ctrader_state', state);
 
             window.location.href = url;
             return;

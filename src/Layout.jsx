@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Trophy,
@@ -17,6 +17,7 @@ import { localDataService } from './services/localDataService';
 
 export default function Layout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const isActive = (path) => location.pathname === path;
@@ -65,12 +66,15 @@ export default function Layout({ children }) {
           </div>
 
           <div className="mt-auto">
-             <button
-                onClick={() => localDataService.auth.logout()}
-                className="flex items-center justify-center w-12 h-12 rounded-2xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-             >
+            <button
+              onClick={async () => {
+                await localDataService.auth.logout();
+                navigate(createPageUrl(''));
+              }}
+              className="flex items-center justify-center w-12 h-12 rounded-2xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            >
               <LogOut size={20} />
-             </button>
+            </button>
           </div>
         </div>
       </div>
@@ -188,9 +192,10 @@ export default function Layout({ children }) {
 
             <div className="mt-8 pt-6 border-t border-gray-200">
               <button
-                onClick={() => {
-                  localDataService.auth.logout();
+                onClick={async () => {
+                  await localDataService.auth.logout();
                   setIsMobileMenuOpen(false);
+                  navigate(createPageUrl(''));
                 }}
                 className="w-full flex items-center justify-center gap-3 p-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
               >

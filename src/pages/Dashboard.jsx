@@ -216,6 +216,65 @@ export default function Dashboard() {
     setEditedName('');
   };
 
+  // Allow user to completely unlink/remove the current account from the dashboard
+  const handleUnlinkAccount = async () => {
+    if (!profile) return;
+
+    const confirmed = window.confirm(
+      'Are you sure you want to unlink this account from Alpha Edge? This will remove the account and its trades from your dashboard.'
+    );
+    if (!confirmed) return;
+
+    try {
+      // If this profile is linked to a live platform, disconnect it first
+      if (profile.external_platform_id && profile.external_platform_type) {
+        try {
+          if (profile.external_platform_type === 'broker') {
+            brokerIntegrationService.disconnectBroker(profile.external_platform_id);
+          } else if (profile.external_platform_type === 'exchange') {
+            brokerIntegrationService.disconnectExchange(profile.external_platform_id);
+          }
+        } catch (e) {
+          console.warn('Failed to disconnect external platform during unlink', e);
+        }
+      }
+
+      // Delete all trades for this profile (file-imported or live synced)
+      await localDataService.entities.Trade.deleteByProfileId(profile.id);
+      // Delete the profile itself
+      await localDataService.entities.TraderProfile.delete(profile.id);
+
+      // Log account event for audit
+      try {
+        const user = await localDataService.getCurrentUser();
+        await localDataService.entities.AccountEvent.create({
+          type: 'PROFILE_UNLINKED',
+          user_email: user?.email || null,
+          profile_id: profile.id,
+          description: 'Trader profile unlinked and removed from dashboard',
+          metadata: {
+            nickname: profile.nickname,
+            broker: profile.broker,
+            external_platform_id: profile.external_platform_id || null,
+            external_platform_type: profile.external_platform_type || null
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to record account event for unlink', e);
+      }
+
+      // Reset dashboard state
+      setProfile(null);
+      setTrades([]);
+      setRank(null);
+      setConnectedBrokers(brokerIntegrationService.getConnectedBrokers());
+      setConnectedExchanges(brokerIntegrationService.getConnectedExchanges());
+    } catch (err) {
+      console.error('Failed to unlink account', err);
+      window.alert('Failed to unlink this account. Please try again.');
+    }
+  };
+
   // Optional: on-demand Bybit sync using user-supplied keys (kept only in memory)
   const handleSyncBybit = async () => {
     const bybit = connectedExchanges.find((ex) => ex.id === 'bybit');
@@ -506,7 +565,7 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
           <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
              <div className="p-2 bg-gray-200 rounded-lg text-gray-700">
                 <Award size={20} />
@@ -538,6 +597,16 @@ export default function Dashboard() {
                 <p className="text-lg font-bold text-gray-800">{profile.trader_score}</p>
              </div>
           </NeumorphicCard>
+
+          {isOwnProfile && profile && (
+            <button
+              type="button"
+              onClick={handleUnlinkAccount}
+              className="ml-2 px-4 py-2 text-xs rounded-lg bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200 transition-colors"
+            >
+              Unlink Account
+            </button>
+          )}
         </div>
       </div>
 

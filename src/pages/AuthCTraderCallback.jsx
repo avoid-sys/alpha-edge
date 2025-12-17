@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
 import { Activity, CheckCircle, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
@@ -11,35 +12,76 @@ export default function AuthCTraderCallback() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const code = params.get('code');
-    const error = params.get('error');
-    const errorDescription = params.get('error_description');
+    const run = async () => {
+      const params = new URLSearchParams(location.search);
+      const code = params.get('code');
+      const error = params.get('error');
+      const errorDescription = params.get('error_description');
+      const state = params.get('state');
+      const savedState = localStorage.getItem('ctrader_state');
 
-    if (error) {
-      setStatus('error');
-      setMessage(errorDescription || `cTrader authorization failed: ${error}`);
-      return;
-    }
+      if (error) {
+        setStatus('error');
+        setMessage(errorDescription || `cTrader authorization failed: ${error}`);
+        return;
+      }
 
-    if (!code) {
-      setStatus('error');
-      setMessage('Missing authorization code from cTrader. Please try connecting again.');
-      return;
-    }
+      if (!code) {
+        setStatus('error');
+        setMessage('Missing authorization code from cTrader. Please try connecting again.');
+        return;
+      }
 
-    // For now we treat receiving a code as a successful connection handoff.
-    // In a full implementation, this is where we would call a backend
-    // API endpoint to exchange the code for access/refresh tokens via
-    // CTRADER_CLIENT_ID/CTRADER_CLIENT_SECRET.
-    setStatus('success');
-    setMessage('cTrader authorization code received. Your account connection is now active.');
+      if (!state || !savedState || state !== savedState) {
+        setStatus('error');
+        setMessage('Invalid cTrader authorization state. Please start the connection again.');
+        return;
+      }
 
-    const timer = setTimeout(() => {
-      navigate(createPageUrl('dashboard'));
-    }, 2500);
+      try {
+        // Determine redirect_uri based on current origin (for localhost support)
+        const currentRedirectUri = `${window.location.origin}/auth/ctrader/callback`;
+        
+        // Exchange code for tokens via backend (keeps client_secret on server)
+        const res = await axios.post('/api/ctraderAuth', { 
+          code, 
+          state,
+          redirect_uri: currentRedirectUri
+        });
 
-    return () => clearTimeout(timer);
+        // Optional: store access token locally for immediate use.
+        // For production you may want to only keep it server-side.
+        if (res.data?.access_token) {
+          localStorage.setItem('ctrader_access_token', res.data.access_token);
+          if (res.data?.refresh_token) {
+            localStorage.setItem('ctrader_refresh_token', res.data.refresh_token);
+          }
+          if (res.data?.expires_in) {
+            localStorage.setItem('ctrader_expires_in', res.data.expires_in);
+          }
+        }
+
+        setStatus('success');
+        setMessage('cTrader authorization successful. Redirecting you to your dashboard.');
+
+        const timer = setTimeout(() => {
+          navigate(createPageUrl('dashboard'));
+        }, 2500);
+
+        return () => clearTimeout(timer);
+      } catch (err) {
+        console.error('cTrader token exchange failed', err);
+        setStatus('error');
+        const apiMessage =
+          err?.response?.data?.error ||
+          err?.response?.data?.details ||
+          err?.message ||
+          'Failed to complete cTrader authorization.';
+        setMessage(String(apiMessage));
+      }
+    };
+
+    run();
   }, [location.search, navigate]);
 
   const isPending = status === 'pending';
