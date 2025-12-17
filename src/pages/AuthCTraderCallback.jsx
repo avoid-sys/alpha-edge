@@ -98,54 +98,54 @@ export default function AuthCTraderCallback() {
         setStatus('error');
 
         // Extract detailed error message and avoid "[object Object]"
+        // Priority: error_description > error > details (string) > details (object) > message
         let errorMessage = 'Failed to complete cTrader authorization.';
 
         if (err?.response?.data) {
           const errorData = err.response.data;
           
           // Direct cTrader API errors (from openapi.ctrader.com)
-          // These come directly in errorData, not wrapped in "details"
+          // These come directly in errorData with error_description or error fields
           if (errorData.error_description) {
+            // Most specific: use error_description directly
             errorMessage = errorData.error_description;
           } else if (errorData.error) {
+            // Second priority: use error code and try to get description
             errorMessage = `cTrader Error: ${errorData.error}`;
-            if (errorData.error_description) {
-              errorMessage += ` - ${errorData.error_description}`;
+            
+            // Check if there's a description in nested details
+            if (errorData.details?.error_description) {
+              errorMessage += ` - ${errorData.details.error_description}`;
+            } else if (typeof errorData.details === 'string') {
+              errorMessage += ` - ${errorData.details}`;
+            }
+          } else if (errorData.details) {
+            // Backend-wrapped errors (from our api/ctraderAuth.js)
+            const rawDetails = errorData.details;
+            
+            if (typeof rawDetails === 'string') {
+              // String details: use directly
+              errorMessage = rawDetails;
+            } else if (typeof rawDetails === 'object') {
+              // Object details: extract error_description or error
+              if (rawDetails.error_description) {
+                errorMessage = rawDetails.error_description;
+              } else if (rawDetails.error) {
+                errorMessage = `cTrader Error: ${rawDetails.error}`;
+              } else {
+                // Last resort: stringify the object
+                errorMessage = JSON.stringify(rawDetails, null, 2);
+              }
             }
           } else {
-            // Backend-wrapped errors (from our api/ctraderAuth.js)
-            // Separate object and string details so we don't lose string messages
-            const rawDetails = errorData.details;
-            const detailsObject =
-              rawDetails && typeof rawDetails === 'object' ? rawDetails : undefined;
-            const detailsString =
-              rawDetails && typeof rawDetails === 'string' ? rawDetails : undefined;
-
-            const innerDescription = detailsObject?.error_description;
-            const innerError = detailsObject?.error;
-
-            if (innerDescription) {
-              errorMessage = innerDescription;
-            } else if (innerError || errorData.error) {
-              const baseError = innerError || errorData.error;
-              errorMessage = `cTrader Error: ${baseError}`;
-
-              // Preserve string details if they exist (was previously appended)
-              if (detailsString) {
-                errorMessage += ` - ${detailsString}`;
-              }
-            } else if (detailsString) {
-              // Only string details are available
-              errorMessage = detailsString;
-            } else {
-              // Fallback: stringify any remaining structure safely
-              errorMessage =
-                typeof errorData === 'string'
-                  ? errorData
-                  : JSON.stringify(errorData, null, 2);
-            }
+            // Fallback: stringify the entire errorData if it's an object
+            errorMessage =
+              typeof errorData === 'string'
+                ? errorData
+                : JSON.stringify(errorData, null, 2);
           }
         } else if (err?.message) {
+          // Network error or other axios error
           errorMessage = err.message;
         }
 
