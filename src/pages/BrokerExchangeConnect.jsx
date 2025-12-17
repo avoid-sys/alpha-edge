@@ -125,9 +125,12 @@ export default function BrokerExchangeConnect() {
             const encodedState = encodeURIComponent(state);
             
             // Build URL manually to control encoding format
-            // Try different parameter combinations to find what works
-            // Option 1: With response_type and product
-            const url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&response_type=code&product=web&state=${encodedState}`;
+            // Try different parameter combinations - cTrader may be sensitive to order
+            // Option 1: Standard OAuth 2.0 order (try this)
+            let url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&response_type=code&scope=${encodedScope}&state=${encodedState}&product=web`;
+            
+            // Option 2: If above doesn't work, try without product=web (uncomment to test)
+            // let url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&response_type=code&scope=${encodedScope}&state=${encodedState}`;
             
             // Log everything for debugging
             console.log('=== cTrader OAuth Debug Info ===');
