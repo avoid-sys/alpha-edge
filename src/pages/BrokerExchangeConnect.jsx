@@ -125,12 +125,16 @@ export default function BrokerExchangeConnect() {
             const encodedState = encodeURIComponent(state);
             
             // Build URL manually to control encoding format
-            // Try different parameter combinations - cTrader may be sensitive to order
-            // Option 1: Standard OAuth 2.0 order (try this)
-            let url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&response_type=code&scope=${encodedScope}&state=${encodedState}&product=web`;
+            // Try without product=web first - it may be causing the 400 error
+            // Option 1: Without product=web (try this first)
+            let url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&response_type=code&scope=${encodedScope}&state=${encodedState}`;
             
-            // Option 2: If above doesn't work, try without product=web (uncomment to test)
-            // let url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&response_type=code&scope=${encodedScope}&state=${encodedState}`;
+            // Option 2: With product=web (if Option 1 doesn't work, uncomment this)
+            // let url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&response_type=code&scope=${encodedScope}&state=${encodedState}&product=web`;
+            
+            // Option 3: Try with trailing slash on authUrl (if Options 1-2 don't work)
+            // let authUrlWithSlash = authUrl + '/';
+            // let url = `${authUrlWithSlash}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&response_type=code&scope=${encodedScope}&state=${encodedState}`;
             
             // Log everything for debugging
             console.log('=== cTrader OAuth Debug Info ===');
