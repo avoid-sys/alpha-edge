@@ -111,15 +111,14 @@ export default function BrokerExchangeConnect() {
             console.log('   https://connect.spotware.com/apps → Your App → Redirect URLs');
             console.log('   Expected: https://alphaedge.vc/auth/ctrader/callback');
 
-            // cTrader authorization URL - try without trailing slash first
-            // Some cTrader endpoints may require trailing slash, but this one doesn't
+            // cTrader authorization URL - must NOT have trailing slash (causes 400 error)
             let authUrl = (oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess').replace(/\/$/, '');
             const rawScope = oauth.scope || 'accounts trading';
 
             const state = `${id}-${Date.now()}`;
             
             // Build URL with proper encoding using URLSearchParams
-            // This ensures correct encoding of special characters
+            // This ensures correct encoding of special characters in redirect_uri and scope
             const params = new URLSearchParams();
             params.append('client_id', clientId);
             params.append('redirect_uri', redirectUri);
@@ -139,6 +138,7 @@ export default function BrokerExchangeConnect() {
               authUrl: authUrl
             });
             console.log('cTrader OAuth - Encoded URL:', url);
+            console.log('cTrader OAuth - URLSearchParams string:', params.toString());
 
             // Log full authorization URL for debugging
             console.log('cTrader OAuth - Full Authorization URL:', url);
