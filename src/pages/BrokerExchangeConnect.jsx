@@ -133,17 +133,21 @@ export default function BrokerExchangeConnect() {
             console.log('cTrader OAuth - Parameters:', {
               client_id: clientId,
               redirect_uri: redirectUri,
-              encoded_redirect_uri: encodedRedirectUri,
               scope: rawScope,
               product: 'web',
               state: state,
-              encoded_state: encodedState
+              authUrl: authUrl
             });
             console.log('✅ About to redirect to cTrader. After authorization, you will be redirected back with code parameter.');
+            console.log('⚠️  If you get 400 error, check:');
+            console.log('   1. Client ID is correct:', clientId ? '✓' : '✗');
+            console.log('   2. Redirect URI matches cTrader settings:', redirectUri);
+            console.log('   3. App status is Active in cTrader portal');
 
-            // Сохраняем state для проверки в колбэке
+            // Сохраняем state для проверки в колбэке (encode for storage)
+            const encodedState = encodeURIComponent(state);
             localStorage.setItem('ctrader_state', encodedState);
-            console.log('💾 Saved state to localStorage:', encodedState.substring(0, 20) + '...');
+            console.log('💾 Saved state to localStorage:', state.substring(0, 20) + '...');
 
             // Small delay to ensure logs are visible
             setTimeout(() => {
