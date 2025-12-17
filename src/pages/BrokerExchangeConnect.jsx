@@ -111,29 +111,24 @@ export default function BrokerExchangeConnect() {
             console.log('   https://connect.spotware.com/apps → Your App → Redirect URLs');
             console.log('   Expected: https://alphaedge.vc/auth/ctrader/callback');
 
-            // cTrader authorization URL - must NOT have trailing slash (causes 400 error)
-            let authUrl = (oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess').replace(/\/$/, '');
+            // cTrader authorization URL - official format from cTrader documentation
+            // URL: https://id.ctrader.com/my/settings/openapi/grantingaccess
+            // NO trailing slash - this causes 400 error
+            const authUrl = 'https://id.ctrader.com/my/settings/openapi/grantingaccess';
             const rawScope = oauth.scope || 'accounts trading';
-
             const state = `${id}-${Date.now()}`;
             
-            // Use URLSearchParams for proper encoding (this was working before)
-            const params = new URLSearchParams();
-            params.append('client_id', clientId);
-            params.append('redirect_uri', redirectUri);
-            params.append('scope', rawScope);
-            params.append('response_type', 'code');
-            params.append('product', 'web');
-            params.append('state', state);
+            // Build URL with proper encoding - cTrader requires specific format
+            // Manual encoding to ensure %20 for spaces (not +)
+            const url = `${authUrl}?` +
+              `client_id=${encodeURIComponent(clientId)}&` +
+              `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+              `scope=${encodeURIComponent(rawScope)}&` +
+              `response_type=code&` +
+              `product=web&` +
+              `state=${encodeURIComponent(state)}`;
             
-            // URLSearchParams uses + for spaces, but cTrader may need %20
-            // Replace + with %20 in scope parameter
-            let url = `${authUrl}?${params.toString()}`;
-            url = url.replace(/scope=([^&]+)/, (match, scopeValue) => {
-              return `scope=${scopeValue.replace(/\+/g, '%20')}`;
-            });
-            
-            // Encode state for localStorage (separate from URL encoding)
+            // Encode state for localStorage
             const encodedState = encodeURIComponent(state);
             
             // Log everything for debugging
