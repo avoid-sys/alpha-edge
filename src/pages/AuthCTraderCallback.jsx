@@ -80,30 +80,28 @@ export default function AuthCTraderCallback() {
         console.log('⚠️  redirect_uri must match:', redirectUriForToken);
         console.log('⚠️  Verify this URI is registered in cTrader app settings');
         
-        // OAuth 2.0 token exchange REQUIRES POST with form-encoded body
-        // cTrader endpoint: https://openapi.ctrader.com/apps/token
-        // Using URLSearchParams for form-encoded body (application/x-www-form-urlencoded)
-        const tokenParams = new URLSearchParams({
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: redirectUriForToken, // Must match registered URI exactly
-          client_id: clientId,
-          client_secret: clientSecret,
-        });
-        
+        // cTrader Open API requires GET request with parameters in query string
+        // Endpoint: https://openapi.ctrader.com/apps/token
+        // Note: This differs from standard OAuth 2.0 (which uses POST), but cTrader uses GET
         let res;
         try {
-          // Primary: Direct POST to cTrader API
-          res = await axios.post('https://openapi.ctrader.com/apps/token', tokenParams.toString(), {
+          // Primary: Direct GET to cTrader API with query parameters
+          res = await axios.get('https://openapi.ctrader.com/apps/token', {
+            params: {
+              grant_type: 'authorization_code',
+              code,
+              redirect_uri: redirectUriForToken, // Must match registered URI exactly
+              client_id: clientId,
+              client_secret: clientSecret,
+            },
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
               'Accept': 'application/json',
             },
           });
-          console.log('✅ Token exchange successful via direct POST');
-        } catch (postError) {
-          // Fallback: POST via backend proxy (keeps client_secret on server)
-          console.warn('Direct POST failed, falling back to backend proxy:', postError);
+          console.log('✅ Token exchange successful via direct GET');
+        } catch (getError) {
+          // Fallback: Try POST via backend proxy (keeps client_secret on server)
+          console.warn('Direct GET failed, falling back to backend proxy:', getError);
           const requestBody = { 
             code, 
             state,
@@ -149,8 +147,8 @@ export default function AuthCTraderCallback() {
         
         if (err?.response?.data) {
           const errorData = err.response.data;
-          // Priority: error_description > error > stringify data
-          errorMessage = errorData.error_description || errorData.error || JSON.stringify(errorData);
+          // Priority: description > error_description > error > stringify data
+          errorMessage = errorData.description || errorData.error_description || errorData.error || JSON.stringify(errorData);
         } else if (err?.message) {
           errorMessage = err.message;
         }
