@@ -69,10 +69,18 @@ module.exports = async (req, res) => {
       params.append('client_secret', clientSecret);
     }
 
-    // Exchange authorization code or refresh token for access token
-    const response = await axios.post(tokenUrl, params.toString(), {
+    // cTrader Open API requires GET request with query parameters
+    // Note: This differs from standard OAuth 2.0 (which uses POST)
+    const response = await axios.get(tokenUrl, {
+      params: {
+        grant_type: grant_type === 'refresh_token' ? 'refresh_token' : 'authorization_code',
+        ...(grant_type === 'refresh_token' 
+          ? { refresh_token, client_id: clientId, client_secret: clientSecret }
+          : { code, redirect_uri: redirectUri, client_id: clientId, client_secret: clientSecret }
+        )
+      },
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Accept': 'application/json'
       },
       timeout: 10000
     });
