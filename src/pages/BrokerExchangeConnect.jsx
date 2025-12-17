@@ -126,7 +126,12 @@ export default function BrokerExchangeConnect() {
             params.append('product', 'web');
             params.append('state', state);
             
-            const url = `${authUrl}?${params.toString()}`;
+            // URLSearchParams uses + for spaces, but cTrader may need %20
+            // Replace + with %20 in scope parameter
+            let url = `${authUrl}?${params.toString()}`;
+            url = url.replace(/scope=([^&]+)/, (match, scopeValue) => {
+              return `scope=${scopeValue.replace(/\+/g, '%20')}`;
+            });
             
             // Encode state for localStorage (separate from URL encoding)
             const encodedState = encodeURIComponent(state);
