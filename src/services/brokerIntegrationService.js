@@ -59,9 +59,10 @@ class BrokerIntegrationService {
         features: ['ECN execution', 'advanced charting', 'copy trading', 'OAuth integration'],
         oauth: {
           // cTrader uses a custom OAuth flow via id.ctrader.com
-          authUrl: 'https://id.ctrader.com/my/settings/openapi/grantingaccess/',
+          // Note: URL should NOT have trailing slash for proper parameter handling
+          authUrl: 'https://id.ctrader.com/my/settings/openapi/grantingaccess',
           redirectUri: 'https://alphaedge.vc/auth/ctrader/callback',
-          scope: 'accounts trading' // cTrader scopes: 'accounts' (read-only), 'trading' (full access), or 'accounts trading'
+          scope: 'accounts' // cTrader scopes: 'accounts' (read-only), 'trading' (full access)
         }
       }
     };
