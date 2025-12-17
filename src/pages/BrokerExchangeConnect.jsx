@@ -111,18 +111,22 @@ export default function BrokerExchangeConnect() {
             console.log('   https://connect.spotware.com/apps → Your App → Redirect URLs');
             console.log('   Expected: https://alphaedge.vc/auth/ctrader/callback');
 
-            const authUrl = oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess/';
+            // cTrader authorization URL - must NOT have trailing slash
+            let authUrl = (oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess').replace(/\/$/, '');
             const rawScope = oauth.scope || 'accounts trading';
 
             const state = `${id}-${Date.now()}`;
-            const encodedState = encodeURIComponent(state);
-            const scope = encodeURIComponent(rawScope);
-            const encodedRedirectUri = encodeURIComponent(redirectUri);
-
-            // cTrader uses a custom OAuth URL format with product=web parameter
-            const url = `${authUrl}?client_id=${encodeURIComponent(
-              clientId
-            )}&redirect_uri=${encodedRedirectUri}&scope=${scope}&product=web&state=${encodedState}`;
+            
+            // Build URL with proper encoding - each parameter encoded separately
+            const params = new URLSearchParams({
+              client_id: clientId,
+              redirect_uri: redirectUri,
+              scope: rawScope, // URLSearchParams will encode this properly
+              product: 'web',
+              state: state
+            });
+            
+            const url = `${authUrl}?${params.toString()}`;
 
             // Log full authorization URL for debugging
             console.log('cTrader OAuth - Full Authorization URL:', url);
