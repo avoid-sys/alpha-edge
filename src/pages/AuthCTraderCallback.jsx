@@ -210,9 +210,33 @@ export default function AuthCTraderCallback() {
               <h1 className="text-lg font-semibold text-gray-800">
                 cTrader Authorization Error
               </h1>
-              <p className="text-sm text-red-600">
-                {message}
-              </p>
+              <div className="text-left space-y-3 mt-4">
+                <p className="text-sm text-red-600 font-medium">
+                  {message}
+                </p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">
+                  <p className="font-semibold mb-2">Troubleshooting Steps:</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Open browser console (F12 → Console) to see detailed error logs</li>
+                    <li>Verify redirect_uri is registered in cTrader app settings:
+                      <br />
+                      <code className="bg-red-100 px-1 rounded">https://alphaedge.vc/auth/ctrader/callback</code>
+                    </li>
+                    <li>Check that your cTrader app is approved (not pending)</li>
+                    <li>Ensure redirect_uri matches exactly (no www, correct path)</li>
+                    <li>Try clearing browser cache and retry</li>
+                  </ol>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+                  <p className="font-semibold mb-1">Common Errors:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li><strong>invalid_grant:</strong> Authorization code expired (try again quickly)</li>
+                    <li><strong>invalid_client:</strong> Check Client ID and Secret</li>
+                    <li><strong>redirect_uri_mismatch:</strong> URI doesn't match registered one</li>
+                    <li><strong>access_denied:</strong> User denied authorization</li>
+                  </ul>
+                </div>
+              </div>
             </>
           )}
         </div>
