@@ -154,8 +154,7 @@ export default function BrokerExchangeConnect() {
             console.log('   2. Redirect URI matches cTrader settings:', redirectUri);
             console.log('   3. App status is Active in cTrader portal');
 
-            // Сохраняем state для проверки в колбэке (encode for storage)
-            const encodedState = encodeURIComponent(state);
+            // Сохраняем state для проверки в колбэке (reuse encodedState from above)
             localStorage.setItem('ctrader_state', encodedState);
             console.log('💾 Saved state to localStorage:', state.substring(0, 20) + '...');
 
