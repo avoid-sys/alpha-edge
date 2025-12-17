@@ -133,17 +133,15 @@ export default function BrokerExchangeConnect() {
             
             // Log everything for debugging
             console.log('=== cTrader OAuth Debug Info ===');
-            console.log('1. Decoded Parameters (before encoding):', {
+            console.log('1. Parameters:', {
               client_id: clientId,
               redirect_uri: redirectUri,
               scope: rawScope,
               response_type: 'code',
               product: 'web',
-              state: state,
-              authUrl: authUrl
+              state: state
             });
-            console.log('2. URL Parameters String:', params.toString());
-            console.log('3. Full Authorization URL:', url);
+            console.log('2. Full Authorization URL:', url);
             console.log('4. URL Length:', url.length);
             console.log('5. Redirect URI Check:');
             console.log('   - Current redirect_uri:', redirectUri);
