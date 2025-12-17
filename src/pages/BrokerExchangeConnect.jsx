@@ -118,11 +118,12 @@ export default function BrokerExchangeConnect() {
             const state = `${id}-${Date.now()}`;
             
             // Build URL with proper encoding using URLSearchParams
-            // This ensures correct encoding of special characters in redirect_uri and scope
+            // cTrader may require response_type=code (standard OAuth 2.0)
             const params = new URLSearchParams();
             params.append('client_id', clientId);
             params.append('redirect_uri', redirectUri);
             params.append('scope', rawScope);
+            params.append('response_type', 'code'); // OAuth 2.0 standard - may be required
             params.append('product', 'web');
             params.append('state', state);
             
