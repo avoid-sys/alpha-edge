@@ -13,22 +13,31 @@ export default function AuthCTraderCallback() {
 
   useEffect(() => {
     const run = async () => {
-      // Log query params for debugging
+      // Log full URL and location for debugging
+      console.log('cTrader Callback - Full URL:', window.location.href);
       console.log('cTrader Callback - Query Params:', location.search);
+      console.log('cTrader Callback - Hash:', location.hash);
+      console.log('cTrader Callback - Pathname:', location.pathname);
       
-      const params = new URLSearchParams(location.search);
-      const code = params.get('code');
-      const error = params.get('error');
-      const errorDescription = params.get('error_description');
-      const state = params.get('state');
+      // Try both query params and hash (some OAuth providers use hash)
+      const queryParams = new URLSearchParams(location.search);
+      const hashParams = new URLSearchParams(location.hash.substring(1)); // Remove #
+      
+      const code = queryParams.get('code') || hashParams.get('code');
+      const error = queryParams.get('error') || hashParams.get('error');
+      const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
+      const state = queryParams.get('state') || hashParams.get('state');
       const savedState = localStorage.getItem('ctrader_state');
       
       console.log('cTrader Callback - Extracted params:', { 
         hasCode: !!code, 
+        code: code ? `${code.substring(0, 10)}...` : null,
         error, 
         errorDescription, 
         hasState: !!state,
-        hasSavedState: !!savedState 
+        state: state ? `${state.substring(0, 20)}...` : null,
+        hasSavedState: !!savedState,
+        savedState: savedState ? `${savedState.substring(0, 20)}...` : null
       });
 
       if (error) {
@@ -39,7 +48,17 @@ export default function AuthCTraderCallback() {
 
       if (!code) {
         setStatus('error');
-        setMessage('Missing authorization code from cTrader. Please try connecting again.');
+        const errorMsg = error 
+          ? `cTrader authorization failed: ${error}${errorDescription ? ` - ${errorDescription}` : ''}`
+          : 'Missing authorization code from cTrader. The callback URL was reached but no code parameter was found.';
+        setMessage(errorMsg);
+        console.error('cTrader Callback Error - No code received:', {
+          fullUrl: window.location.href,
+          search: location.search,
+          hash: location.hash,
+          error,
+          errorDescription
+        });
         return;
       }
 
@@ -61,8 +80,8 @@ export default function AuthCTraderCallback() {
         // SECURITY WARNING: Using client_secret on frontend is NOT recommended for production
         // This exposes the secret in browser network logs and JavaScript code
         // For production, use the backend proxy (/api/ctraderAuth) instead
-        const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID || '1506_ZNLG807Bj6mt9w4g9KYgRhO3CeHeleYf2YfoFVKLOaQnF';
-        const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET || 'Pr937H9OaHKwviXgd0Uc0uPjAoHdOzQ6JAU8PC7jkJqPe';
+        const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID || '19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF';
+        const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET || 'Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe';
         
         // IMPORTANT: redirect_uri must EXACTLY match the one registered in cTrader app settings
         // Check: https://connect.spotware.com/apps → Your App → Redirect URLs

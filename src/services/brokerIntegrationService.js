@@ -61,7 +61,7 @@ class BrokerIntegrationService {
           // cTrader uses a custom OAuth flow via id.ctrader.com
           authUrl: 'https://id.ctrader.com/my/settings/openapi/grantingaccess/',
           redirectUri: 'https://alphaedge.vc/auth/ctrader/callback',
-          scope: 'accounts' // cTrader scopes: 'accounts' (read-only), 'trading' (full access), or 'accounts trading'
+          scope: 'accounts trading' // cTrader scopes: 'accounts' (read-only), 'trading' (full access), or 'accounts trading'
         }
       }
     };
@@ -132,13 +132,17 @@ class BrokerIntegrationService {
   // Load saved connections from localStorage
   loadConnections() {
     try {
-      const brokers = securityService.decrypt(localStorage.getItem('alpha_edge_connected_brokers') || '[]');
-      const exchanges = securityService.decrypt(localStorage.getItem('alpha_edge_connected_exchanges') || '[]');
+      const brokersData = securityService.decrypt(localStorage.getItem('alpha_edge_connected_brokers') || '[]');
+      const exchangesData = securityService.decrypt(localStorage.getItem('alpha_edge_connected_exchanges') || '[]');
 
-      this.connectedBrokers = new Map(JSON.parse(brokers));
-      this.connectedExchanges = new Map(JSON.parse(exchanges));
+      // Handle null/undefined from failed decryption
+      const brokers = brokersData ? (typeof brokersData === 'string' ? JSON.parse(brokersData) : brokersData) : [];
+      const exchanges = exchangesData ? (typeof exchangesData === 'string' ? JSON.parse(exchangesData) : exchangesData) : [];
+
+      this.connectedBrokers = new Map(Array.isArray(brokers) ? brokers : []);
+      this.connectedExchanges = new Map(Array.isArray(exchanges) ? exchanges : []);
     } catch (error) {
-      console.error('Failed to load broker/exchange connections:', error);
+      console.warn('Failed to load broker/exchange connections, using empty maps:', error);
       this.connectedBrokers = new Map();
       this.connectedExchanges = new Map();
     }
