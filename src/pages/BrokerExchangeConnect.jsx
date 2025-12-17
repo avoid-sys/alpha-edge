@@ -117,17 +117,20 @@ export default function BrokerExchangeConnect() {
 
             const state = `${id}-${Date.now()}`;
             
-            // Build URL with proper encoding using URLSearchParams
-            // cTrader may require response_type=code (standard OAuth 2.0)
-            const params = new URLSearchParams();
-            params.append('client_id', clientId);
-            params.append('redirect_uri', redirectUri);
-            params.append('scope', rawScope);
-            params.append('response_type', 'code'); // OAuth 2.0 standard - may be required
-            params.append('product', 'web');
-            params.append('state', state);
+            // cTrader may require specific encoding format
+            // Try manual encoding to ensure spaces are %20 not +
+            const encodedClientId = encodeURIComponent(clientId);
+            const encodedRedirectUri = encodeURIComponent(redirectUri);
+            const encodedScope = encodeURIComponent(rawScope); // This will use %20 for spaces
+            const encodedState = encodeURIComponent(state);
             
-            const url = `${authUrl}?${params.toString()}`;
+            // Build URL manually to control encoding format
+            // Try without response_type first (cTrader may not require it)
+            // Try without product=web (may be optional or cause issues)
+            const url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&state=${encodedState}`;
+            
+            // Alternative: Try with response_type and product if above doesn't work
+            // const url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&response_type=code&product=web&state=${encodedState}`;
             
             // Log decoded parameters for verification (before encoding)
             console.log('cTrader OAuth - Decoded Parameters (before encoding):', {
