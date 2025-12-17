@@ -49,15 +49,17 @@ export default function AuthCTraderCallback() {
           redirect_uri: currentRedirectUri
         });
 
-        // Optional: store access token locally for immediate use.
-        // For production you may want to only keep it server-side.
+        // Store tokens securely for future API calls
         if (res.data?.access_token) {
           localStorage.setItem('ctrader_access_token', res.data.access_token);
           if (res.data?.refresh_token) {
             localStorage.setItem('ctrader_refresh_token', res.data.refresh_token);
           }
           if (res.data?.expires_in) {
-            localStorage.setItem('ctrader_expires_in', res.data.expires_in);
+            // Calculate expiration timestamp
+            const expiresAt = Date.now() + res.data.expires_in * 1000;
+            localStorage.setItem('ctrader_expires_at', expiresAt.toString());
+            localStorage.setItem('ctrader_expires_in', res.data.expires_in.toString());
           }
         }
 
@@ -72,12 +74,27 @@ export default function AuthCTraderCallback() {
       } catch (err) {
         console.error('cTrader token exchange failed', err);
         setStatus('error');
-        const apiMessage =
-          err?.response?.data?.error ||
-          err?.response?.data?.details ||
-          err?.message ||
-          'Failed to complete cTrader authorization.';
-        setMessage(String(apiMessage));
+        
+        // Extract detailed error message
+        let errorMessage = 'Failed to complete cTrader authorization.';
+        
+        if (err?.response?.data) {
+          const errorData = err.response.data;
+          if (errorData.error_description) {
+            errorMessage = errorData.error_description;
+          } else if (errorData.error) {
+            errorMessage = `cTrader Error: ${errorData.error}`;
+            if (errorData.details) {
+              errorMessage += ` - ${errorData.details}`;
+            }
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        setMessage(errorMessage);
       }
     };
 

@@ -3,10 +3,12 @@
 //
 // IMPORTANT:
 // - Configure these env vars in Vercel:
-//   - CTRADER_CLIENT_ID
-//   - CTRADER_CLIENT_SECRET
+//   - CTRADER_CLIENT_ID (e.g., 1506_ZNLG807Bj6mt9w4g9KYgRhO3CeHeleYf2YfoFVKLOaQnF)
+//   - CTRADER_CLIENT_SECRET (e.g., Pr937H9OaHKwviXgd0Uc0uPjAoHdOzQ6JAU8PC7jkJqPe)
 //   - CTRADER_REDIRECT_URI (production, e.g. https://alphaedge.vc/auth/ctrader/callback)
 //   - CTRADER_LOCAL_REDIRECT_URI (optional, for local dev, e.g. http://localhost:3000/auth/ctrader/callback)
+//
+// Supports both authorization_code and refresh_token grant types
 
 const axios = require('axios');
 
@@ -17,19 +19,10 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { code, state, redirect_uri: redirectUriFromClient } = req.body || {};
-
-    if (!code) {
-      res.status(400).json({ error: 'Missing authorization code' });
-      return;
-    }
+    const { code, state, redirect_uri: redirectUriFromClient, grant_type, refresh_token } = req.body || {};
 
     const clientId = process.env.CTRADER_CLIENT_ID;
     const clientSecret = process.env.CTRADER_CLIENT_SECRET;
-    
-    // Use redirect_uri from client request if provided, otherwise use env var
-    // This allows localhost development
-    const redirectUri = redirectUriFromClient || process.env.CTRADER_REDIRECT_URI || process.env.CTRADER_LOCAL_REDIRECT_URI;
 
     if (!clientId || !clientSecret) {
       res.status(500).json({
@@ -39,25 +32,44 @@ module.exports = async (req, res) => {
       return;
     }
 
-    if (!redirectUri) {
-      res.status(500).json({
-        error: 'Missing redirect_uri',
-        details: 'Provide redirect_uri in request body or set CTRADER_REDIRECT_URI in environment'
-      });
-      return;
-    }
-
     // cTrader Open API token endpoint
     const tokenUrl = 'https://openapi.ctrader.com/apps/token';
 
     const params = new URLSearchParams();
-    params.append('grant_type', 'authorization_code');
-    params.append('code', code);
-    params.append('redirect_uri', redirectUri);
-    params.append('client_id', clientId);
-    params.append('client_secret', clientSecret);
+    
+    // Support both authorization_code and refresh_token grant types
+    if (grant_type === 'refresh_token' && refresh_token) {
+      params.append('grant_type', 'refresh_token');
+      params.append('refresh_token', refresh_token);
+      params.append('client_id', clientId);
+      params.append('client_secret', clientSecret);
+    } else {
+      // Default: authorization_code flow
+      if (!code) {
+        res.status(400).json({ error: 'Missing authorization code' });
+        return;
+      }
 
-    // Exchange authorization code for access token
+      // Use redirect_uri from client request if provided, otherwise use env var
+      // This allows localhost development
+      const redirectUri = redirectUriFromClient || process.env.CTRADER_REDIRECT_URI || process.env.CTRADER_LOCAL_REDIRECT_URI;
+
+      if (!redirectUri) {
+        res.status(500).json({
+          error: 'Missing redirect_uri',
+          details: 'Provide redirect_uri in request body or set CTRADER_REDIRECT_URI in environment'
+        });
+        return;
+      }
+
+      params.append('grant_type', 'authorization_code');
+      params.append('code', code);
+      params.append('redirect_uri', redirectUri);
+      params.append('client_id', clientId);
+      params.append('client_secret', clientSecret);
+    }
+
+    // Exchange authorization code or refresh token for access token
     const response = await axios.post(tokenUrl, params.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'

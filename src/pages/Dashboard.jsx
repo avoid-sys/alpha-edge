@@ -3,6 +3,7 @@ import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
 import { brokerIntegrationService } from '@/services/brokerIntegrationService';
 import { getBybitAccountData } from '@/services/bybitApi';
+import { getCTraderTrades, getCTraderAccountInfo, getCTraderToken } from '@/services/ctraderApi';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -50,6 +51,9 @@ export default function Dashboard() {
   const [bybitAccount, setBybitAccount] = useState(null);
   const [bybitLoading, setBybitLoading] = useState(false);
   const [bybitError, setBybitError] = useState(null);
+  const [ctraderAccount, setCTraderAccount] = useState(null);
+  const [ctraderLoading, setCTraderLoading] = useState(false);
+  const [ctraderError, setCTraderError] = useState(null);
 
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
@@ -338,6 +342,115 @@ export default function Dashboard() {
       setBybitAccount(null);
     } finally {
       setBybitLoading(false);
+    }
+  };
+
+  // Sync cTrader data
+  const handleSyncCTrader = async () => {
+    const ctrader = connectedBrokers.find((broker) => broker.id === 'ctrader');
+    if (!ctrader) {
+      alert('cTrader is not connected. Please connect it in Connect Platforms.');
+      return;
+    }
+
+    const token = getCTraderToken();
+    if (!token) {
+      alert('cTrader is not authorized. Please reconnect cTrader on the Connect Platforms page.');
+      return;
+    }
+
+    setCTraderLoading(true);
+    setCTraderError(null);
+
+    try {
+      // Get account info and trades
+      const [accountInfo, tradesData] = await Promise.all([
+        getCTraderAccountInfo().catch(() => null), // Account info may not be available
+        getCTraderTrades({
+          from: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          to: new Date().toISOString().split('T')[0]
+        })
+      ]);
+
+      // Process trades data
+      const trades = tradesData?.deals || tradesData?.trades || [];
+      
+      // Calculate statistics
+      const totalProfit = trades.reduce((sum, trade) => sum + (trade.profit || 0), 0);
+      const winningTrades = trades.filter(t => (t.profit || 0) > 0).length;
+      const winRate = trades.length > 0 ? (winningTrades / trades.length * 100) : 0;
+
+      const summary = {
+        accountInfo: accountInfo || null,
+        tradesCount: trades.length,
+        totalProfit,
+        winRate: winRate.toFixed(2),
+        winningTrades,
+        losingTrades: trades.length - winningTrades,
+        trades: trades.slice(0, 10) // Keep last 10 trades for display
+      };
+
+      setCTraderAccount(summary);
+
+      // Optionally: Import trades into local database for dashboard metrics
+      if (trades.length > 0 && profile) {
+        try {
+          // Convert cTrader trades to our Trade format
+          const importedTrades = trades.map((trade, index) => ({
+            id: `ctrader_${trade.id || trade.dealId || Date.now()}_${index}`,
+            trader_profile_id: profile.id,
+            symbol: trade.symbol || trade.instrument || 'Unknown',
+            entry_time: trade.openTime || trade.time || new Date().toISOString(),
+            exit_time: trade.closeTime || trade.time || new Date().toISOString(),
+            entry_price: trade.openPrice || trade.price || 0,
+            exit_price: trade.closePrice || trade.price || 0,
+            volume: trade.volume || trade.quantity || 0,
+            net_profit: trade.profit || 0,
+            direction: trade.side === 'buy' || trade.orderType === 'Buy' ? 'buy' : 'sell',
+            balance: null // cTrader may not provide balance per trade
+          }));
+
+          // Save trades to local database
+          for (const trade of importedTrades) {
+            try {
+              await localDataService.entities.Trade.create(trade);
+            } catch (e) {
+              // Trade might already exist, skip
+              console.warn('Trade already exists or failed to save:', e);
+            }
+          }
+
+          // Refresh dashboard data
+          setDataVersion(prev => prev + 1);
+        } catch (e) {
+          console.warn('Failed to import cTrader trades to local database:', e);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load cTrader data', err);
+
+      let apiMessage =
+        err?.response?.data?.error_description ||
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to load cTrader data';
+
+      // Ensure we never try to render a raw object as React children
+      if (typeof apiMessage === 'object') {
+        if (apiMessage.message) {
+          apiMessage = apiMessage.message;
+        } else if (apiMessage.code) {
+          apiMessage = `${apiMessage.code}: ${JSON.stringify(apiMessage)}`;
+        } else {
+          apiMessage = JSON.stringify(apiMessage);
+        }
+      }
+
+      setCTraderError(String(apiMessage));
+      setCTraderAccount(null);
+    } finally {
+      setCTraderLoading(false);
     }
   };
 
@@ -677,6 +790,51 @@ export default function Dashboard() {
                       {bybitAccount.totalEquity} {bybitAccount.coin || ''}
                     </p>
                   )}
+                </div>
+              )}
+            </NeumorphicCard>
+          )}
+
+          {/* Optional cTrader quick account summary */}
+          {connectedBrokers.some(broker => broker.id === 'ctrader') && (
+            <NeumorphicCard className="p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    cTrader Account
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Sync trading history from cTrader and import to dashboard.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSyncCTrader}
+                  className="px-3 py-2 text-xs rounded-lg bg-[#e0e5ec] border border-white/60 shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-1px_-1px_3px_#ffffff,1px_1px_3px_#aeaec040] text-gray-700 font-medium transition-all"
+                  disabled={ctraderLoading}
+                >
+                  {ctraderLoading ? 'Syncing…' : 'Sync cTrader Data'}
+                </button>
+              </div>
+
+              {ctraderError && (
+                <p className="text-xs text-red-500">
+                  {ctraderError}
+                </p>
+              )}
+
+              {ctraderAccount && (
+                <div className="mt-1 text-xs text-gray-700 space-y-1">
+                  <p>
+                    <span className="font-semibold">Trades:</span> {ctraderAccount.tradesCount}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Total Profit:</span> {ctraderAccount.totalProfit.toFixed(2)} USD
+                  </p>
+                  <p>
+                    <span className="font-semibold">Win Rate:</span> {ctraderAccount.winRate}%
+                    ({ctraderAccount.winningTrades}W / {ctraderAccount.losingTrades}L)
+                  </p>
                 </div>
               )}
             </NeumorphicCard>
