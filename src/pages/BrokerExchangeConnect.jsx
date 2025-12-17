@@ -142,15 +142,12 @@ export default function BrokerExchangeConnect() {
               client_id: clientId,
               redirect_uri: redirectUri,
               scope: rawScope,
+              response_type: 'code',
+              product: 'web',
               state: state,
               authUrl: authUrl
             });
-            console.log('2. Encoded Parameters:', {
-              client_id: encodedClientId,
-              redirect_uri: encodedRedirectUri,
-              scope: encodedScope,
-              state: encodedState
-            });
+            console.log('2. URL Parameters String:', params.toString());
             console.log('3. Full Authorization URL:', url);
             console.log('4. URL Length:', url.length);
             console.log('5. Redirect URI Check:');
