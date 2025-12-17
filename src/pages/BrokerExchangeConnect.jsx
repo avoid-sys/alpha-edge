@@ -117,16 +117,25 @@ export default function BrokerExchangeConnect() {
 
             const state = `${id}-${Date.now()}`;
             
-            // Build URL with proper encoding - each parameter encoded separately
-            const params = new URLSearchParams({
+            // Try different URL formats - cTrader API may have specific requirements
+            // Format 1: Using URLSearchParams (standard encoding)
+            const params = new URLSearchParams();
+            params.append('client_id', clientId);
+            params.append('redirect_uri', redirectUri);
+            params.append('scope', rawScope);
+            params.append('product', 'web');
+            params.append('state', state);
+            
+            const url = `${authUrl}?${params.toString()}`;
+            
+            // Log decoded parameters for verification
+            console.log('cTrader OAuth - Decoded Parameters:', {
               client_id: clientId,
               redirect_uri: redirectUri,
-              scope: rawScope, // URLSearchParams will encode this properly
+              scope: rawScope,
               product: 'web',
               state: state
             });
-            
-            const url = `${authUrl}?${params.toString()}`;
 
             // Log full authorization URL for debugging
             console.log('cTrader OAuth - Full Authorization URL:', url);
