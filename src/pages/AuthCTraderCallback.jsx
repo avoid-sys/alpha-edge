@@ -64,42 +64,53 @@ export default function AuthCTraderCallback() {
         const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID || '1506_ZNLG807Bj6mt9w4g9KYgRhO3CeHeleYf2YfoFVKLOaQnF';
         const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET || 'Pr937H9OaHKwviXgd0Uc0uPjAoHdOzQ6JAU8PC7jkJqPe';
         
+        // IMPORTANT: redirect_uri must EXACTLY match the one registered in cTrader app settings
+        // Check: https://connect.spotware.com/apps → Your App → Redirect URLs
+        // Current redirect_uri: https://alphaedge.vc/auth/ctrader/callback
+        const redirectUriForToken = 'https://alphaedge.vc/auth/ctrader/callback';
+        
         // Log request params for debugging (without sensitive data)
         console.log('cTrader Token Request - Params:', { 
           grant_type: 'authorization_code',
           code: code ? `${code.substring(0, 10)}...` : null, // Only log first 10 chars
-          redirect_uri: currentRedirectUri,
+          redirect_uri: redirectUriForToken,
           client_id: clientId ? `${clientId.substring(0, 10)}...` : null,
           has_client_secret: !!clientSecret
         });
+        console.log('⚠️  redirect_uri must match:', redirectUriForToken);
+        console.log('⚠️  Verify this URI is registered in cTrader app settings');
         
-        // Exchange code for tokens using GET request (as per user requirements)
-        // NOTE: Most OAuth providers require POST, but cTrader may accept GET
-        // If GET fails, fallback to POST via backend proxy
+        // OAuth 2.0 token exchange REQUIRES POST with form-encoded body
+        // cTrader endpoint: https://openapi.ctrader.com/apps/token
+        // Using URLSearchParams for form-encoded body (application/x-www-form-urlencoded)
+        const tokenParams = new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUriForToken, // Must match registered URI exactly
+          client_id: clientId,
+          client_secret: clientSecret,
+        });
+        
         let res;
         try {
-          res = await axios.get('https://openapi.ctrader.com/apps/token', {
-            params: {
-              grant_type: 'authorization_code',
-              code,
-              redirect_uri: currentRedirectUri,
-              client_id: clientId,
-              client_secret: clientSecret,
-            },
+          // Primary: Direct POST to cTrader API
+          res = await axios.post('https://openapi.ctrader.com/apps/token', tokenParams.toString(), {
             headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
               'Accept': 'application/json',
-              'Content-Type': 'application/json',
             },
           });
-        } catch (getError) {
-          // If GET fails (405 Method Not Allowed), fallback to POST via backend proxy
-          console.warn('GET request failed, falling back to POST via backend:', getError);
+          console.log('✅ Token exchange successful via direct POST');
+        } catch (postError) {
+          // Fallback: POST via backend proxy (keeps client_secret on server)
+          console.warn('Direct POST failed, falling back to backend proxy:', postError);
           const requestBody = { 
             code, 
             state,
-            redirect_uri: currentRedirectUri
+            redirect_uri: redirectUriForToken
           };
           res = await axios.post('/api/ctraderAuth', requestBody);
+          console.log('✅ Token exchange successful via backend proxy');
         }
 
         // Store tokens securely for future API calls
@@ -143,6 +154,11 @@ export default function AuthCTraderCallback() {
         } else if (err?.message) {
           errorMessage = err.message;
         }
+        
+        // Log full error for debugging
+        console.error('cTrader token exchange failed - Full Error:', err);
+        console.error('cTrader token exchange failed - Response:', err?.response);
+        console.error('cTrader token exchange failed - Response Data:', err?.response?.data);
         
         // Format final error message
         if (!errorMessage.startsWith('cTrader Error:')) {
