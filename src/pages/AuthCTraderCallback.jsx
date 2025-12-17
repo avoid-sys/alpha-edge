@@ -51,7 +51,12 @@ export default function AuthCTraderCallback() {
 
       try {
         // Determine redirect_uri based on current origin (for localhost support)
+        // IMPORTANT: This MUST exactly match the redirect_uri used in authorization URL
+        // and the one registered in cTrader app settings
         const currentRedirectUri = `${window.location.origin}/auth/ctrader/callback`;
+        
+        console.log('cTrader Callback - Using redirect_uri:', currentRedirectUri);
+        console.log('⚠️  This must match the redirect_uri from authorization URL and cTrader app settings');
         
         // SECURITY WARNING: Using client_secret on frontend is NOT recommended for production
         // This exposes the secret in browser network logs and JavaScript code

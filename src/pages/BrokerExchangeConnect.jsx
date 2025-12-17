@@ -98,10 +98,17 @@ export default function BrokerExchangeConnect() {
             }
 
             // Use production redirect_uri or localhost for development
+            // IMPORTANT: This redirect_uri MUST exactly match the one registered in cTrader app settings
+            // Check: https://connect.spotware.com/apps - your app - Redirect URLs section
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             const redirectUri = isLocalhost
               ? `${window.location.origin}/auth/ctrader/callback`
               : (oauth.redirectUri || 'https://alphaedge.vc/auth/ctrader/callback');
+
+            // Log redirect_uri for debugging - must match exactly in cTrader app settings
+            console.log('cTrader OAuth - Redirect URI:', redirectUri);
+            console.log('⚠️  Make sure this EXACT URI is registered in cTrader app settings:');
+            console.log('   https://connect.spotware.com/apps → Your App → Redirect URLs');
 
             const authUrl = oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess/';
             const rawScope = oauth.scope || 'accounts trading';
@@ -113,6 +120,16 @@ export default function BrokerExchangeConnect() {
             const url = `${authUrl}?client_id=${encodeURIComponent(
               clientId
             )}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&product=web&state=${state}`;
+
+            // Log full authorization URL for debugging
+            console.log('cTrader OAuth - Full Authorization URL:', url);
+            console.log('cTrader OAuth - Parameters:', {
+              client_id: clientId,
+              redirect_uri: redirectUri,
+              scope: rawScope,
+              product: 'web',
+              state: state.substring(0, 20) + '...'
+            });
 
             // Сохраняем state для проверки в колбэке
             localStorage.setItem('ctrader_state', state);
