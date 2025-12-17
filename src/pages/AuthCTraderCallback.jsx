@@ -74,26 +74,34 @@ export default function AuthCTraderCallback() {
       } catch (err) {
         console.error('cTrader token exchange failed', err);
         setStatus('error');
-        
-        // Extract detailed error message
+
+        // Extract detailed error message and avoid "[object Object]"
         let errorMessage = 'Failed to complete cTrader authorization.';
-        
+
         if (err?.response?.data) {
           const errorData = err.response.data;
-          if (errorData.error_description) {
-            errorMessage = errorData.error_description;
-          } else if (errorData.error) {
-            errorMessage = `cTrader Error: ${errorData.error}`;
-            if (errorData.details) {
-              errorMessage += ` - ${errorData.details}`;
-            }
-          } else if (errorData.details) {
-            errorMessage = errorData.details;
+
+          // If backend wrapped cTrader error inside "details"
+          const details = errorData.details || errorData;
+          const innerDescription = typeof details === 'object' ? details.error_description : undefined;
+          const innerError = typeof details === 'object' ? details.error : undefined;
+
+          if (errorData.error_description || innerDescription) {
+            errorMessage = errorData.error_description || innerDescription;
+          } else if (innerError || errorData.error) {
+            const baseError = innerError || errorData.error;
+            errorMessage = `cTrader Error: ${baseError}`;
+          } else {
+            // Fallback: stringify object safely
+            errorMessage =
+              typeof errorData === 'string'
+                ? errorData
+                : JSON.stringify(errorData, null, 2);
           }
         } else if (err?.message) {
           errorMessage = err.message;
         }
-        
+
         setMessage(errorMessage);
       }
     };
