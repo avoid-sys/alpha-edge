@@ -111,14 +111,15 @@ export default function BrokerExchangeConnect() {
             console.log('   https://connect.spotware.com/apps → Your App → Redirect URLs');
             console.log('   Expected: https://alphaedge.vc/auth/ctrader/callback');
 
-            // cTrader authorization URL - must NOT have trailing slash
+            // cTrader authorization URL - try without trailing slash first
+            // Some cTrader endpoints may require trailing slash, but this one doesn't
             let authUrl = (oauth.authUrl || 'https://id.ctrader.com/my/settings/openapi/grantingaccess').replace(/\/$/, '');
             const rawScope = oauth.scope || 'accounts trading';
 
             const state = `${id}-${Date.now()}`;
             
-            // Try different URL formats - cTrader API may have specific requirements
-            // Format 1: Using URLSearchParams (standard encoding)
+            // Build URL with proper encoding using URLSearchParams
+            // This ensures correct encoding of special characters
             const params = new URLSearchParams();
             params.append('client_id', clientId);
             params.append('redirect_uri', redirectUri);
@@ -128,14 +129,16 @@ export default function BrokerExchangeConnect() {
             
             const url = `${authUrl}?${params.toString()}`;
             
-            // Log decoded parameters for verification
-            console.log('cTrader OAuth - Decoded Parameters:', {
+            // Log decoded parameters for verification (before encoding)
+            console.log('cTrader OAuth - Decoded Parameters (before encoding):', {
               client_id: clientId,
               redirect_uri: redirectUri,
               scope: rawScope,
               product: 'web',
-              state: state
+              state: state,
+              authUrl: authUrl
             });
+            console.log('cTrader OAuth - Encoded URL:', url);
 
             // Log full authorization URL for debugging
             console.log('cTrader OAuth - Full Authorization URL:', url);
