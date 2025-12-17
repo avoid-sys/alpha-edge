@@ -117,17 +117,19 @@ export default function BrokerExchangeConnect() {
 
             const state = `${id}-${Date.now()}`;
             
-            // cTrader may require specific encoding format
-            // Try manual encoding to ensure spaces are %20 not +
-            const encodedClientId = encodeURIComponent(clientId);
-            const encodedRedirectUri = encodeURIComponent(redirectUri);
-            const encodedScope = encodeURIComponent(rawScope); // This will use %20 for spaces
-            const encodedState = encodeURIComponent(state);
+            // Use URLSearchParams for proper encoding (this was working before)
+            const params = new URLSearchParams();
+            params.append('client_id', clientId);
+            params.append('redirect_uri', redirectUri);
+            params.append('scope', rawScope);
+            params.append('response_type', 'code');
+            params.append('product', 'web');
+            params.append('state', state);
             
-            // Build URL manually to control encoding format
-            // Use the format that worked before (allowed account selection)
-            // cTrader requires response_type=code and product=web for proper OAuth flow
-            const url = `${authUrl}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&response_type=code&product=web&state=${encodedState}`;
+            const url = `${authUrl}?${params.toString()}`;
+            
+            // Encode state for localStorage (separate from URL encoding)
+            const encodedState = encodeURIComponent(state);
             
             // Log everything for debugging
             console.log('=== cTrader OAuth Debug Info ===');
