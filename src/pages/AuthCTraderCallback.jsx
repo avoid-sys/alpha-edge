@@ -13,12 +13,23 @@ export default function AuthCTraderCallback() {
 
   useEffect(() => {
     const run = async () => {
+      // Log query params for debugging
+      console.log('cTrader Callback - Query Params:', location.search);
+      
       const params = new URLSearchParams(location.search);
       const code = params.get('code');
       const error = params.get('error');
       const errorDescription = params.get('error_description');
       const state = params.get('state');
       const savedState = localStorage.getItem('ctrader_state');
+      
+      console.log('cTrader Callback - Extracted params:', { 
+        hasCode: !!code, 
+        error, 
+        errorDescription, 
+        hasState: !!state,
+        hasSavedState: !!savedState 
+      });
 
       if (error) {
         setStatus('error');
@@ -42,12 +53,19 @@ export default function AuthCTraderCallback() {
         // Determine redirect_uri based on current origin (for localhost support)
         const currentRedirectUri = `${window.location.origin}/auth/ctrader/callback`;
         
-        // Exchange code for tokens via backend (keeps client_secret on server)
-        const res = await axios.post('/api/ctraderAuth', { 
+        // Log request body for debugging (without sensitive data)
+        const requestBody = { 
           code, 
           state,
           redirect_uri: currentRedirectUri
+        };
+        console.log('cTrader Token Request - Body:', { 
+          ...requestBody, 
+          code: code ? `${code.substring(0, 10)}...` : null // Only log first 10 chars of code
         });
+        
+        // Exchange code for tokens via backend (keeps client_secret on server)
+        const res = await axios.post('/api/ctraderAuth', requestBody);
 
         // Store tokens securely for future API calls
         if (res.data?.access_token) {
@@ -72,7 +90,11 @@ export default function AuthCTraderCallback() {
 
         return () => clearTimeout(timer);
       } catch (err) {
-        console.error('cTrader token exchange failed', err);
+        // Full error logging for debugging
+        console.error('cTrader token exchange failed - Full Error:', err);
+        console.error('cTrader token exchange failed - Response:', err?.response);
+        console.error('cTrader token exchange failed - Response Data:', err?.response?.data);
+        
         setStatus('error');
 
         // Extract detailed error message and avoid "[object Object]"
@@ -80,42 +102,54 @@ export default function AuthCTraderCallback() {
 
         if (err?.response?.data) {
           const errorData = err.response.data;
-
-          // Separate object and string details so we don't lose string messages
-          const rawDetails = errorData.details;
-          const detailsObject =
-            rawDetails && typeof rawDetails === 'object' ? rawDetails : undefined;
-          const detailsString =
-            rawDetails && typeof rawDetails === 'string' ? rawDetails : undefined;
-
-          const innerDescription = detailsObject?.error_description;
-          const innerError = detailsObject?.error;
-
-          if (errorData.error_description || innerDescription) {
-            // Prefer the most specific description
-            errorMessage = errorData.error_description || innerDescription;
-          } else if (innerError || errorData.error) {
-            const baseError = innerError || errorData.error;
-            errorMessage = `cTrader Error: ${baseError}`;
-
-            // Preserve string details if they exist (was previously appended)
-            if (detailsString) {
-              errorMessage += ` - ${detailsString}`;
+          
+          // Direct cTrader API errors (from openapi.ctrader.com)
+          // These come directly in errorData, not wrapped in "details"
+          if (errorData.error_description) {
+            errorMessage = errorData.error_description;
+          } else if (errorData.error) {
+            errorMessage = `cTrader Error: ${errorData.error}`;
+            if (errorData.error_description) {
+              errorMessage += ` - ${errorData.error_description}`;
             }
-          } else if (detailsString) {
-            // Only string details are available
-            errorMessage = detailsString;
           } else {
-            // Fallback: stringify any remaining structure safely
-            errorMessage =
-              typeof errorData === 'string'
-                ? errorData
-                : JSON.stringify(errorData, null, 2);
+            // Backend-wrapped errors (from our api/ctraderAuth.js)
+            // Separate object and string details so we don't lose string messages
+            const rawDetails = errorData.details;
+            const detailsObject =
+              rawDetails && typeof rawDetails === 'object' ? rawDetails : undefined;
+            const detailsString =
+              rawDetails && typeof rawDetails === 'string' ? rawDetails : undefined;
+
+            const innerDescription = detailsObject?.error_description;
+            const innerError = detailsObject?.error;
+
+            if (innerDescription) {
+              errorMessage = innerDescription;
+            } else if (innerError || errorData.error) {
+              const baseError = innerError || errorData.error;
+              errorMessage = `cTrader Error: ${baseError}`;
+
+              // Preserve string details if they exist (was previously appended)
+              if (detailsString) {
+                errorMessage += ` - ${detailsString}`;
+              }
+            } else if (detailsString) {
+              // Only string details are available
+              errorMessage = detailsString;
+            } else {
+              // Fallback: stringify any remaining structure safely
+              errorMessage =
+                typeof errorData === 'string'
+                  ? errorData
+                  : JSON.stringify(errorData, null, 2);
+            }
           }
         } else if (err?.message) {
           errorMessage = err.message;
         }
 
+        console.error('cTrader token exchange failed - Final Error Message:', errorMessage);
         setMessage(errorMessage);
       }
     };

@@ -83,11 +83,28 @@ module.exports = async (req, res) => {
       received_state: state || null
     });
   } catch (err) {
-    console.error('ctraderAuth error:', err?.response?.data || err.message);
-    res.status(err?.response?.status || 500).json({
-      error: 'Failed to exchange cTrader authorization code',
-      details: err?.response?.data || err.message
-    });
+    // Log full error for debugging
+    console.error('ctraderAuth error - Full Error:', err);
+    console.error('ctraderAuth error - Response:', err?.response);
+    console.error('ctraderAuth error - Response Data:', err?.response?.data);
+    
+    const statusCode = err?.response?.status || 500;
+    const errorData = err?.response?.data;
+    
+    // If cTrader API returned a structured error, pass it through
+    if (errorData && (errorData.error || errorData.error_description)) {
+      res.status(statusCode).json({
+        error: errorData.error || 'Failed to exchange cTrader authorization code',
+        error_description: errorData.error_description,
+        details: errorData // Include full error data for debugging
+      });
+    } else {
+      // Generic error or network issue
+      res.status(statusCode).json({
+        error: 'Failed to exchange cTrader authorization code',
+        details: errorData || err.message
+      });
+    }
   }
 };
 
