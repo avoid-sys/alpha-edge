@@ -10,7 +10,15 @@ npm install @supabase/supabase-js
 
 ### 2. Настройка переменных окружения
 
-Создайте файл `.env` в корне проекта. Вы можете использовать следующие команды:
+**ВАЖНО:** Создайте файл `.env` в корне проекта со следующими переменными:
+
+```bash
+# В терминале выполните:
+echo 'VITE_SUPABASE_URL=https://lwgnyerzimcajauxzowx.supabase.co' > .env
+echo 'VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng' >> .env
+```
+
+Или создайте файл вручную с содержимым:
 
 ```bash
 # В терминале выполните:
