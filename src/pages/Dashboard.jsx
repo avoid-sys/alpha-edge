@@ -1113,7 +1113,7 @@ export default function Dashboard() {
 
         {/* Right Column: Score Analysis */}
         <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-           <NeumorphicCard className="p-6 flex flex-col">
+           <NeumorphicCard className="p-6 min-h-[500px] flex flex-col">
               <h3 className="text-xl font-bold text-gray-700 mb-6">Score Analysis</h3>
 
               <div className="flex flex-col gap-8">
