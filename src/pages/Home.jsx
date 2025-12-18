@@ -161,13 +161,7 @@ export default function Home() {
 
 
 
-        // ✅ Основная логика регистрации
-
-        // 🔍 DEBUG: Проверим что передаем в signUp (как предложил пользователь)
-        console.log("EMAIL =", finalEmail, typeof finalEmail);
-        console.log("PASSWORD =", finalPassword.substring(0, 2) + "...", typeof finalPassword);
-        console.log("FULLNAME =", finalFullName, typeof finalFullName);
-
+        // ✅ Регистрация через Supabase Auth
         const { user, error } = await authService.signUp(
           finalEmail,
           finalPassword,
