@@ -1022,91 +1022,6 @@ export default function Dashboard() {
              </NeumorphicCard>
           </div>
 
-          {/* Funds Under Management Section */}
-          <NeumorphicCard className="p-6 relative overflow-hidden">
-            {/* Blur overlay */}
-            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm z-10 flex items-center justify-center">
-              <div className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg">
-                UNDER DEVELOPMENT
-              </div>
-            </div>
-
-            {/* Content (blurred) */}
-            <div className="filter blur-[0.5px]">
-              <h4 className="text-gray-500 font-bold text-sm uppercase mb-6 tracking-wider">Funds Under Management</h4>
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {/* Balance Under Management */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Balance Under Mgmt</p>
-                  <p className="text-xl font-bold text-blue-600">$0.00</p>
-                  <p className="text-[10px] text-gray-400">Total AUM</p>
-                </div>
-
-                {/* Profit Percentage */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Profit %</p>
-                  <p className="text-xl font-bold text-green-600">0.00%</p>
-                  <p className="text-[10px] text-gray-400">Monthly Return</p>
-                </div>
-
-                {/* Active Traders */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Active Traders</p>
-                  <p className="text-xl font-bold text-purple-600">0</p>
-                  <p className="text-[10px] text-gray-400">Managed Accounts</p>
-                </div>
-
-                {/* Sharpe Ratio */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Sharpe Ratio</p>
-                  <p className="text-xl font-bold text-orange-600">0.00</p>
-                  <p className="text-[10px] text-gray-400">Risk-Adjusted</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {/* Performance Metrics */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <h5 className="text-sm font-bold text-gray-600 mb-3">Portfolio Performance</h5>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <p className="text-xs text-gray-400">Alpha</p>
-                      <p className="text-lg font-bold text-blue-600">0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Beta</p>
-                      <p className="text-lg font-bold text-green-600">0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Max DD</p>
-                      <p className="text-lg font-bold text-red-600">0.00%</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Risk Metrics */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <h5 className="text-sm font-bold text-gray-600 mb-3">Risk Metrics</h5>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <p className="text-xs text-gray-400">VaR (95%)</p>
-                      <p className="text-lg font-bold text-orange-600">$0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Sortino</p>
-                      <p className="text-lg font-bold text-purple-600">0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Calmar</p>
-                      <p className="text-lg font-bold text-indigo-600">0.00</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </NeumorphicCard>
-
         </div>
 
         {/* Right Column: Score Analysis */}
@@ -1299,6 +1214,91 @@ export default function Dashboard() {
                     </div>
                  </div>
               </div>
+           </NeumorphicCard>
+
+           {/* Funds Under Management Section */}
+           <NeumorphicCard className="p-6 relative overflow-hidden">
+             {/* Blur overlay */}
+             <div className="absolute inset-0 bg-white/20 backdrop-blur-sm z-10 flex items-center justify-center">
+               <div className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg">
+                 UNDER DEVELOPMENT
+               </div>
+             </div>
+
+             {/* Content (blurred) */}
+             <div className="filter blur-[0.5px]">
+               <h3 className="text-xl font-bold text-gray-700 mb-6">Funds Under Management</h3>
+
+               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                 {/* Balance Under Management */}
+                 <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Balance Under Mgmt</p>
+                   <p className="text-xl font-bold text-blue-600">$0.00</p>
+                   <p className="text-[10px] text-gray-400">Total AUM</p>
+                 </div>
+
+                 {/* Profit Percentage */}
+                 <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Profit %</p>
+                   <p className="text-xl font-bold text-green-600">0.00%</p>
+                   <p className="text-[10px] text-gray-400">Monthly Return</p>
+                 </div>
+
+                 {/* Active Traders */}
+                 <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Active Traders</p>
+                   <p className="text-xl font-bold text-purple-600">0</p>
+                   <p className="text-[10px] text-gray-400">Managed Accounts</p>
+                 </div>
+
+                 {/* Sharpe Ratio */}
+                 <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Sharpe Ratio</p>
+                   <p className="text-xl font-bold text-orange-600">0.00</p>
+                   <p className="text-[10px] text-gray-400">Risk-Adjusted</p>
+                 </div>
+               </div>
+
+               <div className="space-y-4">
+                 {/* Performance Metrics */}
+                 <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <h5 className="text-sm font-bold text-gray-600 mb-3">Portfolio Performance</h5>
+                   <div className="grid grid-cols-3 gap-4 text-center">
+                     <div>
+                       <p className="text-xs text-gray-400">Alpha</p>
+                       <p className="text-lg font-bold text-blue-600">0.00</p>
+                     </div>
+                     <div>
+                       <p className="text-xs text-gray-400">Beta</p>
+                       <p className="text-lg font-bold text-green-600">0.00</p>
+                     </div>
+                     <div>
+                       <p className="text-xs text-gray-400">Max DD</p>
+                       <p className="text-lg font-bold text-red-600">0.00%</p>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Risk Metrics */}
+                 <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <h5 className="text-sm font-bold text-gray-600 mb-3">Risk Metrics</h5>
+                   <div className="grid grid-cols-3 gap-4 text-center">
+                     <div>
+                       <p className="text-xs text-gray-400">VaR (95%)</p>
+                       <p className="text-lg font-bold text-orange-600">$0.00</p>
+                     </div>
+                     <div>
+                       <p className="text-xs text-gray-400">Sortino</p>
+                       <p className="text-lg font-bold text-purple-600">0.00</p>
+                     </div>
+                     <div>
+                       <p className="text-xs text-gray-400">Calmar</p>
+                       <p className="text-lg font-bold text-indigo-600">0.00</p>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
            </NeumorphicCard>
 
         </div>
