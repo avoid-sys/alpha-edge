@@ -90,8 +90,10 @@ export default function BrokerExchangeConnect() {
             const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID || '19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF';
 
             // Debug logging
+            console.log('=== cTrader OAuth Debug ===');
             console.log('cTrader OAuth - Client ID:', clientId ? `${clientId.substring(0, 10)}...` : 'MISSING');
             console.log('cTrader OAuth - From env:', import.meta.env.VITE_CTRADER_CLIENT_ID ? 'YES' : 'NO (using fallback)');
+            console.log('cTrader OAuth - All env vars:', Object.keys(import.meta.env).filter(key => key.includes('CTRADER')));
 
             // Use production redirect_uri or localhost for development
             // IMPORTANT: This redirect_uri MUST exactly match the one registered in cTrader app settings
@@ -127,8 +129,7 @@ export default function BrokerExchangeConnect() {
             const encodedState = encodeURIComponent(state);
             
             // Log everything for debugging
-            console.log('=== cTrader OAuth Debug Info ===');
-            console.log('1. Parameters:', {
+            console.log('3. Parameters:', {
               client_id: clientId,
               redirect_uri: redirectUri,
               scope: rawScope,
@@ -136,7 +137,8 @@ export default function BrokerExchangeConnect() {
               product: 'web',
               state: state
             });
-            console.log('2. Full Authorization URL:', url);
+            console.log('4. Full Authorization URL:', url);
+            console.log('5. URL will redirect to:', url.replace(/scope=[^&]*/, 'scope=trading%20accounts'));
             console.log('4. URL Length:', url.length);
             console.log('5. Redirect URI Check:');
             console.log('   - Current redirect_uri:', redirectUri);
