@@ -94,8 +94,14 @@ Please go back to "Connect Platforms" and click "Connect" on cTrader again.`;
         
         // IMPORTANT: redirect_uri must EXACTLY match the one registered in cTrader app settings
         // Check: https://connect.spotware.com/apps → Your App → Redirect URLs
-        // Current redirect_uri: https://alphaedge.vc/auth/ctrader/callback
-        const redirectUriForToken = 'https://alphaedge.vc/auth/ctrader/callback';
+        // Use localhost for development, production for deployed version
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const redirectUriForToken = isLocalhost
+          ? `${window.location.origin}/auth/ctrader/callback`
+          : 'https://alphaedge.vc/auth/ctrader/callback';
+
+        console.log('cTrader Callback - Using redirect_uri:', redirectUriForToken);
+        console.log('cTrader Callback - Is localhost:', isLocalhost);
         
         // Log request params for debugging (without sensitive data)
         console.log('cTrader Token Request - Params:', { 

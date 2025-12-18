@@ -87,15 +87,11 @@ export default function BrokerExchangeConnect() {
           case 'oauth': {
             // Real OAuth redirect for cTrader (and any future OAuth brokers)
             const oauth = platform.oauth || {};
-            const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID;
+            const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID || '19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF';
 
-            // URLs зашиты в конфиге brokerIntegrationService, здесь проверяем только clientId
-            if (!clientId) {
-              alert(
-                `${platform.name} OAuth is not fully configured. Please set VITE_CTRADER_CLIENT_ID in your .env.`
-              );
-              return;
-            }
+            // Debug logging
+            console.log('cTrader OAuth - Client ID:', clientId ? `${clientId.substring(0, 10)}...` : 'MISSING');
+            console.log('cTrader OAuth - From env:', import.meta.env.VITE_CTRADER_CLIENT_ID ? 'YES' : 'NO (using fallback)');
 
             // Use production redirect_uri or localhost for development
             // IMPORTANT: This redirect_uri MUST exactly match the one registered in cTrader app settings
@@ -119,13 +115,12 @@ export default function BrokerExchangeConnect() {
             const state = `${id}-${Date.now()}`;
             
             // Build URL with proper encoding - cTrader requires specific format
-            // Manual encoding to ensure %20 for spaces (not +)
+            // Try minimal parameters - product=web may cause 400 error
             const url = `${authUrl}?` +
               `client_id=${encodeURIComponent(clientId)}&` +
               `redirect_uri=${encodeURIComponent(redirectUri)}&` +
               `scope=${encodeURIComponent(rawScope)}&` +
               `response_type=code&` +
-              `product=web&` +
               `state=${encodeURIComponent(state)}`;
             
             // Encode state for localStorage
