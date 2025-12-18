@@ -60,7 +60,7 @@ export default function Leaderboard() {
 
   return (
     <div className="max-w-6xl mx-auto pb-20">
-      
+
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-800 mb-2">Global Leaderboard</h1>
         <p className="text-gray-500">Top performing traders ranked by profitability</p>
@@ -91,8 +91,8 @@ export default function Leaderboard() {
           <div className="text-center py-10 text-gray-400">Loading leaderboard...</div>
         ) : (
           traders.map((trader, index) => (
-            <NeumorphicCard 
-              key={trader.id} 
+            <NeumorphicCard
+              key={trader.id}
               className="grid grid-cols-2 md:grid-cols-12 gap-4 px-6 py-4 items-center hover:scale-[1.01] transition-transform cursor-pointer"
               onClick={() => navigate(createPageUrl(`Dashboard?profileId=${trader.id}`))}
             >

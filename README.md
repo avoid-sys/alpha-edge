@@ -124,8 +124,7 @@ alpha-edge/
 │   ├── entities/            # Layout and navigation components
 │   ├── services/            # Business logic and utilities
 │   │   ├── localDataService.js      # Local storage management
-│   │   ├── securityService.js       # Security & encryption
-│   │   └── brokerIntegrationService.js # Platform integrations
+│   │   └── securityService.js       # Security & encryption
 │   ├── App.jsx              # Main application with routing
 │   ├── main.jsx             # React entry point
 │   └── index.css            # Global styles with mobile optimizations

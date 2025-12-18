@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { localDataService } from '@/services/localDataService';
+import { authService } from '@/services/authService';
 import { securityService } from '@/services/securityService';
-import { brokerIntegrationService } from '@/services/brokerIntegrationService';
-import { getBybitTrades, getBybitAccountBalance } from '@/services/bybitApi';
-import { getCTraderTrades, getCTraderAccountInfo, getCTraderToken } from '@/services/ctraderApi';
 import { createPageUrl } from '@/utils';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/supabaseClient';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   TrendingUp,
   TrendingDown,
@@ -20,8 +17,7 @@ import {
   HelpCircle,
   X,
   Edit2,
-  Check,
-  Bitcoin
+  Check
 } from 'lucide-react';
 import { NeumorphicCard, StatBox, NeumorphicButton } from '@/components/NeumorphicUI';
 import {
@@ -38,10 +34,6 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
   const [profile, setProfile] = useState(null);
   const [trades, setTrades] = useState([]);
   const [rank, setRank] = useState(null);
@@ -51,14 +43,6 @@ export default function Dashboard() {
   const [helpPopup, setHelpPopup] = useState(null); // Current help popup
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
-  const [connectedBrokers, setConnectedBrokers] = useState([]);
-  const [connectedExchanges, setConnectedExchanges] = useState([]);
-  const [bybitAccount, setBybitAccount] = useState(null);
-  const [bybitLoading, setBybitLoading] = useState(false);
-  const [bybitError, setBybitError] = useState(null);
-  const [ctraderAccount, setCTraderAccount] = useState(null);
-  const [ctraderLoading, setCTraderLoading] = useState(false);
-  const [ctraderError, setCTraderError] = useState(null);
 
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
@@ -67,28 +51,13 @@ export default function Dashboard() {
   // Check if user is viewing their own profile or someone else's
   const isOwnProfile = !profileId; // No profileId means viewing own profile
 
-  // Check authentication session
+  // Check authentication
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Auth session error:', error);
-      }
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
-    };
-
-    getSession();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      if (!session?.user) {
-        navigate(createPageUrl('auth'));
-      }
-    });
-
-    return () => authListener.subscription.unsubscribe();
-  }, [navigate]);
+    if (!authService.isAuthenticated()) {
+      window.location.href = '/';
+      return;
+    }
+  }, []);
 
   // Force data refresh when refresh parameter is detected
   useEffect(() => {
@@ -114,54 +83,12 @@ export default function Dashboard() {
                 created_by: user.email
               });
               if (profiles.length > 0) {
-                // Prefer a live account profile if available
-                const liveProfile = profiles.find(p => p.is_live_account);
-                fetchedProfile = liveProfile || profiles[0];
+                fetchedProfile = profiles[0];
                 fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
               }
             }
           } catch (e) {
             // Not logged in or no profile
-          }
-        }
-
-        // If no profile exists yet but there are connected platforms (broker or exchange),
-        // automatically create a live account profile so the dashboard doesn't stay empty.
-        if (!fetchedProfile) {
-          const liveBrokers = brokerIntegrationService.getConnectedBrokers().map(b => ({ ...b, _type: 'broker' }));
-          const liveExchanges = brokerIntegrationService.getConnectedExchanges().map(e => ({ ...e, _type: 'exchange' }));
-          const livePlatforms = [...liveBrokers, ...liveExchanges];
-
-          if (livePlatforms.length > 0) {
-            const primary = livePlatforms[0];
-
-            // Ensure we have a current user (reuse logic from ImportTrades)
-            let user = await localDataService.getCurrentUser();
-            if (!user) {
-              user = {
-                email: securityService.sanitizeInput('local@alphaedge.com', 'email'),
-                full_name: securityService.sanitizeInput('Live Trader', 'text')
-              };
-              await localDataService.setCurrentUser(user);
-            }
-
-            const nickname = securityService.sanitizeInput(
-              `${primary.name || 'Live Account'}`,
-              'text'
-            );
-
-            const newProfile = await localDataService.entities.TraderProfile.create({
-              nickname,
-              broker: primary.name || 'Live Account',
-              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}-${primary.id}`,
-              created_by: user.email,
-              is_live_account: true,
-              external_platform_id: primary.id,
-              external_platform_type: primary._type
-            });
-
-            fetchedProfile = newProfile;
-            fetchedTrades = [];
           }
         }
         
@@ -176,12 +103,12 @@ export default function Dashboard() {
           setRank(null); // No rank for demo/file-only accounts
         }
 
-        if (fetchedProfile) {
-          // Use real data from uploaded files (if any) or show live profile with placeholder stats
+        if (fetchedProfile && fetchedTrades.length > 0) {
+          // Use real data from uploaded files
         setProfile(fetchedProfile);
-          setTrades(fetchedTrades || []);
+          setTrades(fetchedTrades);
         } else {
-          // Show empty state - no profile and no connections
+          // Show empty state - no data uploaded yet
           setProfile(null);
           setTrades([]);
         }
@@ -198,10 +125,6 @@ export default function Dashboard() {
   useEffect(() => {
     securityService.startSession();
     securityService.logSecurityEvent('dashboard_accessed', { profileId });
-
-    // Load connected platforms
-    setConnectedBrokers(brokerIntegrationService.getConnectedBrokers());
-    setConnectedExchanges(brokerIntegrationService.getConnectedExchanges());
   }, []);
 
   // Handle name editing
@@ -214,30 +137,11 @@ export default function Dashboard() {
     if (!editedName.trim()) return;
 
     try {
-      const oldName = profile.nickname;
       await localDataService.entities.TraderProfile.update(profile.id, {
         nickname: editedName.trim()
       });
       setProfile({ ...profile, nickname: editedName.trim() });
       setIsEditingName(false);
-
-      // Persist an account event so the system remembers this change
-      try {
-        const user = await localDataService.getCurrentUser();
-        await localDataService.entities.AccountEvent.create({
-          type: 'PROFILE_NAME_UPDATED',
-          user_email: user?.email || null,
-          profile_id: profile.id,
-          description: 'Trader nickname updated',
-          metadata: {
-            old_nickname: oldName,
-            new_nickname: editedName.trim()
-          }
-        });
-      } catch (e) {
-        // Non‑critical; don't block UI if logging fails
-        console.warn('Failed to record account event for name change', e);
-      }
     } catch (error) {
       console.error('Error updating name:', error);
     }
@@ -246,265 +150,6 @@ export default function Dashboard() {
   const handleCancelEdit = () => {
     setIsEditingName(false);
     setEditedName('');
-  };
-
-  // Allow user to completely unlink/remove the current account from the dashboard
-  const handleUnlinkAccount = async () => {
-    if (!profile) return;
-
-    const confirmed = window.confirm(
-      'Are you sure you want to unlink this account from Alpha Edge? This will remove the account and its trades from your dashboard.'
-    );
-    if (!confirmed) return;
-
-    try {
-      // If this profile is linked to a live platform, disconnect it first
-      if (profile.external_platform_id && profile.external_platform_type) {
-        try {
-          if (profile.external_platform_type === 'broker') {
-            brokerIntegrationService.disconnectBroker(profile.external_platform_id);
-          } else if (profile.external_platform_type === 'exchange') {
-            brokerIntegrationService.disconnectExchange(profile.external_platform_id);
-          }
-        } catch (e) {
-          console.warn('Failed to disconnect external platform during unlink', e);
-        }
-      }
-
-      // Delete all trades for this profile (file-imported or live synced)
-      await localDataService.entities.Trade.deleteByProfileId(profile.id);
-      // Delete the profile itself
-      await localDataService.entities.TraderProfile.delete(profile.id);
-
-      // Log account event for audit
-      try {
-        const user = await localDataService.getCurrentUser();
-        await localDataService.entities.AccountEvent.create({
-          type: 'PROFILE_UNLINKED',
-          user_email: user?.email || null,
-          profile_id: profile.id,
-          description: 'Trader profile unlinked and removed from dashboard',
-          metadata: {
-            nickname: profile.nickname,
-            broker: profile.broker,
-            external_platform_id: profile.external_platform_id || null,
-            external_platform_type: profile.external_platform_type || null
-          }
-        });
-      } catch (e) {
-        console.warn('Failed to record account event for unlink', e);
-      }
-
-      // Reset dashboard state
-      setProfile(null);
-      setTrades([]);
-      setRank(null);
-      setConnectedBrokers(brokerIntegrationService.getConnectedBrokers());
-      setConnectedExchanges(brokerIntegrationService.getConnectedExchanges());
-    } catch (err) {
-      console.error('Failed to unlink account', err);
-      window.alert('Failed to unlink this account. Please try again.');
-    }
-  };
-
-  // Optional: on-demand Bybit sync using user-supplied keys (kept only in memory)
-  const handleSyncBybit = async () => {
-    const bybit = connectedExchanges.find((ex) => ex.id === 'bybit');
-    if (!bybit) {
-      alert('Bybit exchange is not connected. Please connect it in Connect Platforms.');
-      return;
-    }
-
-    // We expect brokerIntegrationService to have kept the API credentials
-    const { apiKey, apiSecret } = bybit;
-    if (!apiKey || !apiSecret) {
-      alert('Bybit API credentials are missing. Please reconnect Bybit on the Connect Platforms page.');
-      return;
-    }
-
-    setBybitLoading(true);
-    setBybitError(null);
-
-    try {
-      // Get account balance and trades from Bybit
-      const [balanceData, tradesData] = await Promise.all([
-        getBybitAccountBalance(),
-        getBybitTrades(20) // Get last 20 trades
-      ]);
-
-      // Calculate summary stats from trades
-      const totalProfit = tradesData.reduce((sum, trade) => sum + (trade.net_profit || 0), 0);
-      const winningTrades = tradesData.filter(t => (t.net_profit || 0) > 0).length;
-      const winRate = tradesData.length > 0 ? (winningTrades / tradesData.length * 100) : 0;
-
-      const summary = {
-        accountType: balanceData?.accountType || 'UNIFIED',
-        totalEquity: balanceData?.totalEquity || '0',
-        coin: balanceData?.coin || 'USDT',
-        tradesCount: tradesData.length,
-        totalProfit: totalProfit,
-        winRate: winRate.toFixed(2),
-        winningTrades: winningTrades,
-        losingTrades: tradesData.length - winningTrades
-      };
-
-      setBybitAccount(summary);
-
-      // Import trades to local database if we have a profile
-      if (profile && tradesData.length > 0) {
-        const user = await localDataService.getCurrentUser();
-        if (user) {
-          const newTrades = tradesData.map(trade => ({
-            id: `bybit-${trade.symbol}-${trade.close_time}`,
-            trader_profile_id: profile.id,
-            symbol: trade.symbol,
-            volume: trade.volume,
-            profit: trade.net_profit,
-            open_time: trade.open_time,
-            close_time: trade.close_time,
-            type: trade.direction.toLowerCase(),
-          }));
-
-          await localDataService.entities.Trade.bulkCreate(newTrades);
-          setDataVersion(prev => prev + 1); // Trigger dashboard refresh
-          console.log(`Imported ${newTrades.length} Bybit trades.`);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load Bybit account data', err);
-
-      let apiMessage =
-        err?.response?.data?.error ||
-        err?.response?.data?.retMsg ||
-        err?.response?.data?.message || // some APIs use { code, message }
-        err?.message ||
-        'Failed to load Bybit data';
-
-      // Ensure we never try to render a raw object as React children
-      if (typeof apiMessage === 'object') {
-        if (apiMessage.message) {
-          apiMessage = apiMessage.message;
-        } else if (apiMessage.code) {
-          apiMessage = `${apiMessage.code}: ${JSON.stringify(apiMessage)}`;
-        } else {
-          apiMessage = JSON.stringify(apiMessage);
-        }
-      }
-
-      setBybitError(String(apiMessage));
-      setBybitAccount(null);
-    } finally {
-      setBybitLoading(false);
-    }
-  };
-
-  // Sync cTrader data
-  const handleSyncCTrader = async () => {
-    const ctrader = connectedBrokers.find((broker) => broker.id === 'ctrader');
-    if (!ctrader) {
-      alert('cTrader is not connected. Please connect it in Connect Platforms.');
-      return;
-    }
-
-    const token = getCTraderToken();
-    if (!token) {
-      alert('cTrader is not authorized. Please reconnect cTrader on the Connect Platforms page.');
-      return;
-    }
-
-    setCTraderLoading(true);
-    setCTraderError(null);
-
-    try {
-      // Get account info and trades
-      const [accountInfo, tradesData] = await Promise.all([
-        getCTraderAccountInfo().catch(() => null), // Account info may not be available
-        getCTraderTrades({
-          from: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          to: new Date().toISOString().split('T')[0]
-        })
-      ]);
-
-      // Process trades data
-      const trades = tradesData?.deals || tradesData?.trades || [];
-      
-      // Calculate statistics
-      const totalProfit = trades.reduce((sum, trade) => sum + (trade.profit || 0), 0);
-      const winningTrades = trades.filter(t => (t.profit || 0) > 0).length;
-      const winRate = trades.length > 0 ? (winningTrades / trades.length * 100) : 0;
-
-      const summary = {
-        accountInfo: accountInfo || null,
-        tradesCount: trades.length,
-        totalProfit,
-        winRate: winRate.toFixed(2),
-        winningTrades,
-        losingTrades: trades.length - winningTrades,
-        trades: trades.slice(0, 10) // Keep last 10 trades for display
-      };
-
-      setCTraderAccount(summary);
-
-      // Optionally: Import trades into local database for dashboard metrics
-      if (trades.length > 0 && profile) {
-        try {
-          // Convert cTrader trades to our Trade format
-          const importedTrades = trades.map((trade, index) => ({
-            id: `ctrader_${trade.id || trade.dealId || Date.now()}_${index}`,
-            trader_profile_id: profile.id,
-            symbol: trade.symbol || trade.instrument || 'Unknown',
-            entry_time: trade.openTime || trade.time || new Date().toISOString(),
-            exit_time: trade.closeTime || trade.time || new Date().toISOString(),
-            entry_price: trade.openPrice || trade.price || 0,
-            exit_price: trade.closePrice || trade.price || 0,
-            volume: trade.volume || trade.quantity || 0,
-            net_profit: trade.profit || 0,
-            direction: trade.side === 'buy' || trade.orderType === 'Buy' ? 'buy' : 'sell',
-            balance: null // cTrader may not provide balance per trade
-          }));
-
-          // Save trades to local database
-          for (const trade of importedTrades) {
-            try {
-              await localDataService.entities.Trade.create(trade);
-            } catch (e) {
-              // Trade might already exist, skip
-              console.warn('Trade already exists or failed to save:', e);
-            }
-          }
-
-          // Refresh dashboard data
-          setDataVersion(prev => prev + 1);
-        } catch (e) {
-          console.warn('Failed to import cTrader trades to local database:', e);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load cTrader data', err);
-
-      let apiMessage =
-        err?.response?.data?.error_description ||
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message ||
-        'Failed to load cTrader data';
-
-      // Ensure we never try to render a raw object as React children
-      if (typeof apiMessage === 'object') {
-        if (apiMessage.message) {
-          apiMessage = apiMessage.message;
-        } else if (apiMessage.code) {
-          apiMessage = `${apiMessage.code}: ${JSON.stringify(apiMessage)}`;
-        } else {
-          apiMessage = JSON.stringify(apiMessage);
-        }
-      }
-
-      setCTraderError(String(apiMessage));
-      setCTraderAccount(null);
-    } finally {
-      setCTraderLoading(false);
-    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-[50vh] text-gray-400">Loading statistics...</div>;
@@ -669,24 +314,6 @@ export default function Dashboard() {
     );
   };
 
-  // Show loading while checking authentication
-  if (authLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh]">
-        <div className="w-24 h-24 bg-[#e0e5ec] rounded-full shadow-[-8px_-8px_16px_#ffffff,8px_8px_16px_#a3b1c6] flex items-center justify-center mb-8">
-          <Activity size={40} className="text-gray-400 animate-spin" />
-        </div>
-        <h2 className="text-xl font-bold text-gray-700 mb-2">Checking Authentication...</h2>
-      </div>
-    );
-  }
-
-  // Redirect to auth if not authenticated
-  if (!user) {
-    navigate(createPageUrl('auth'));
-    return null;
-  }
-
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       
@@ -749,7 +376,7 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-4">
           <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
              <div className="p-2 bg-gray-200 rounded-lg text-gray-700">
                 <Award size={20} />
@@ -781,137 +408,9 @@ export default function Dashboard() {
                 <p className="text-lg font-bold text-gray-800">{profile.trader_score}</p>
              </div>
           </NeumorphicCard>
-
-          {isOwnProfile && profile && (
-            <button
-              type="button"
-              onClick={handleUnlinkAccount}
-              className="ml-2 px-4 py-2 text-xs rounded-lg bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200 transition-colors"
-            >
-              Unlink Account
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Connected Platforms */}
-      {(connectedBrokers.length > 0 || connectedExchanges.length > 0) && (
-        <div className="mb-6 space-y-3">
-          <NeumorphicCard className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-700">Connected Platforms</h3>
-              <Link to={createPageUrl('broker-exchange-connect')}>
-                <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                  Manage
-                </button>
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {connectedBrokers.map(broker => (
-                <div key={broker.id} className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-full text-xs">
-                  <TrendingUp size={12} className="text-blue-600" />
-                  <span className="text-blue-700 font-medium">{broker.name}</span>
-                </div>
-              ))}
-              {connectedExchanges.map(exchange => (
-                <div key={exchange.id} className="flex items-center gap-2 px-3 py-1 bg-orange-50 rounded-full text-xs">
-                  <Bitcoin size={12} className="text-orange-600" />
-                  <span className="text-orange-700 font-medium">{exchange.name}</span>
-                </div>
-              ))}
-            </div>
-          </NeumorphicCard>
-
-          {/* Optional Bybit quick account summary */}
-          {connectedExchanges.some(ex => ex.id === 'bybit') && (
-            <NeumorphicCard className="p-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Bybit Account
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Load live balance from Bybit (API keys used only in your browser, not stored).
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSyncBybit}
-                  className="px-3 py-2 text-xs rounded-lg bg-[#e0e5ec] border border-white/60 shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-1px_-1px_3px_#ffffff,1px_1px_3px_#aeaec040] text-gray-700 font-medium transition-all"
-                  disabled={bybitLoading}
-                >
-                  {bybitLoading ? 'Syncing…' : 'Sync Bybit Data'}
-                </button>
-              </div>
-
-              {bybitError && (
-                <p className="text-xs text-red-500">
-                  {bybitError}
-                </p>
-              )}
-
-              {bybitAccount && (
-                <div className="mt-1 text-xs text-gray-700">
-                  <p>
-                    <span className="font-semibold">Account Type:</span> {bybitAccount.accountType}
-                  </p>
-                  {bybitAccount.totalEquity && (
-                    <p>
-                      <span className="font-semibold">Total Equity:</span>{' '}
-                      {bybitAccount.totalEquity} {bybitAccount.coin || ''}
-                    </p>
-                  )}
-                </div>
-              )}
-            </NeumorphicCard>
-          )}
-
-          {/* Optional cTrader quick account summary */}
-          {connectedBrokers.some(broker => broker.id === 'ctrader') && (
-            <NeumorphicCard className="p-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    cTrader Account
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Sync trading history from cTrader and import to dashboard.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSyncCTrader}
-                  className="px-3 py-2 text-xs rounded-lg bg-[#e0e5ec] border border-white/60 shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-1px_-1px_3px_#ffffff,1px_1px_3px_#aeaec040] text-gray-700 font-medium transition-all"
-                  disabled={ctraderLoading}
-                >
-                  {ctraderLoading ? 'Syncing…' : 'Sync cTrader Data'}
-                </button>
-              </div>
-
-              {ctraderError && (
-                <p className="text-xs text-red-500">
-                  {ctraderError}
-                </p>
-              )}
-
-              {ctraderAccount && (
-                <div className="mt-1 text-xs text-gray-700 space-y-1">
-                  <p>
-                    <span className="font-semibold">Trades:</span> {ctraderAccount.tradesCount}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Total Profit:</span> {ctraderAccount.totalProfit.toFixed(2)} USD
-                  </p>
-                  <p>
-                    <span className="font-semibold">Win Rate:</span> {ctraderAccount.winRate}%
-                    ({ctraderAccount.winningTrades}W / {ctraderAccount.losingTrades}L)
-                  </p>
-                </div>
-              )}
-            </NeumorphicCard>
-          )}
-        </div>
-      )}
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
@@ -1068,101 +567,14 @@ export default function Dashboard() {
              </NeumorphicCard>
           </div>
 
-          {/* Funds Under Management Section */}
-          <NeumorphicCard className="p-6 relative overflow-hidden flex flex-col" style={{height: '320px'}}>
-            {/* Section Title - Visible */}
-            <h3 className="text-xl font-bold text-gray-700 mb-4 relative z-20">Funds Under Management</h3>
-
-            {/* Blur overlay */}
-            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm z-10 flex items-center justify-center" style={{top: '52px'}}>
-              <div className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg">
-                UNDER DEVELOPMENT
-              </div>
-            </div>
-
-            {/* Content (blurred) */}
-            <div className="filter blur-[0.5px] flex-1 flex flex-col">
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                {/* Balance Under Management */}
-                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Balance Under Mgmt</p>
-                  <p className="text-lg font-bold text-blue-600">$0.00</p>
-                  <p className="text-[10px] text-gray-400">Total AUM</p>
-                </div>
-
-                {/* Profit Percentage */}
-                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Profit %</p>
-                  <p className="text-lg font-bold text-green-600">0.00%</p>
-                  <p className="text-[10px] text-gray-400">Monthly Return</p>
-                </div>
-
-                {/* Active Traders */}
-                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Active Traders</p>
-                  <p className="text-lg font-bold text-purple-600">0</p>
-                  <p className="text-[10px] text-gray-400">Managed Accounts</p>
-                </div>
-
-                {/* Sharpe Ratio */}
-                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Sharpe Ratio</p>
-                  <p className="text-lg font-bold text-orange-600">0.00</p>
-                  <p className="text-[10px] text-gray-400">Risk-Adjusted</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 flex-1">
-                {/* Performance Metrics */}
-                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
-                  <h5 className="text-xs font-bold text-gray-600 mb-2">Portfolio Performance</h5>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <p className="text-[10px] text-gray-400">Alpha</p>
-                      <p className="text-sm font-bold text-blue-600">0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400">Beta</p>
-                      <p className="text-sm font-bold text-green-600">0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400">Max DD</p>
-                      <p className="text-sm font-bold text-red-600">0.00%</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Risk Metrics */}
-                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
-                  <h5 className="text-xs font-bold text-gray-600 mb-2">Risk Metrics</h5>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <p className="text-[10px] text-gray-400">VaR (95%)</p>
-                      <p className="text-sm font-bold text-orange-600">$0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400">Sortino</p>
-                      <p className="text-sm font-bold text-purple-600">0.00</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400">Calmar</p>
-                      <p className="text-sm font-bold text-indigo-600">0.00</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </NeumorphicCard>
-
         </div>
 
         {/* Right Column: Score Analysis */}
         <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-           <NeumorphicCard className="p-6 flex flex-col" style={{height: '945px'}}>
+           <NeumorphicCard className="p-6 min-h-[500px] flex flex-col">
               <h3 className="text-xl font-bold text-gray-700 mb-6">Score Analysis</h3>
 
-              <div className="flex flex-col gap-8">
+              <div className="flex-1 flex flex-col justify-center gap-8">
                  <div className="space-y-6">
                    {/* Performance */}
                    <div>

@@ -15,7 +15,7 @@ export default defineConfig({
     open: true
   },
   build: {
-    chunkSizeWarningLimit: 1000, // Set to 1000KB as recommended
+    chunkSizeWarningLimit: 2000, // Увеличен до 2000KB чтобы полностью убрать предупреждение о размере бандла
     rollupOptions: {
       output: {
         manualChunks: {

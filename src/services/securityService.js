@@ -249,19 +249,6 @@ class SecurityService {
 
   decrypt(encryptedData) {
     try {
-      // If data is not a string or empty, return as-is
-      if (!encryptedData || typeof encryptedData !== 'string') {
-        return encryptedData;
-      }
-      
-      // Check if data is already valid JSON (not encrypted)
-      try {
-        return JSON.parse(encryptedData);
-      } catch {
-        // Not JSON, proceed with decryption
-      }
-      
-      // Try to decode base64
       const decoded = atob(encryptedData);
       let result = '';
       for (let i = 0; i < decoded.length; i++) {
@@ -269,14 +256,8 @@ class SecurityService {
       }
       return JSON.parse(atob(result));
     } catch (error) {
-      console.warn('Decryption failed, returning raw data:', error.message);
-      // Return null or empty object instead of corrupted data
-      try {
-        // Try to parse as plain JSON as last resort
-        return JSON.parse(encryptedData);
-      } catch {
-        return null; // Return null to indicate corrupted data
-      }
+      console.error('Decryption failed:', error);
+      return encryptedData; // Fallback to encrypted data
     }
   }
 

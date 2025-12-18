@@ -2,7 +2,7 @@ import React from 'react';
 
 export const NeumorphicCard = ({ children, className = '', ...props }) => (
   <div
-    className={`bg-[#e0e5ec] rounded-2xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] border border-white/40 ${className}`}
+    className={`bg-[#e0e5ec] rounded-2xl shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] border border-white/40 ${className}`}
     {...props}
   >
     {children}
@@ -11,8 +11,8 @@ export const NeumorphicCard = ({ children, className = '', ...props }) => (
 
 export const NeumorphicButton = ({ children, className = '', variant = 'default', ...props }) => {
   const variantClasses = {
-    default: 'bg-[#e0e5ec] shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] active:shadow-[inset_-2px_-2px_5px_#ffffff,inset_2px_2px_5px_#aeaec040]',
-    action: 'bg-[#e0e5ec] shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] active:shadow-[inset_-2px_-2px_5px_#ffffff,inset_2px_2px_5px_#aeaec040]'
+    default: 'bg-[#e0e5ec] shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] active:shadow-[inset_-2px_-2px_5px_#ffffff,inset_2px_2px_5px_#aeaec040]',
+    action: 'bg-[#e0e5ec] shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#aeaec040] hover:shadow-[-2px_-2px_5px_#ffffff,2px_2px_5px_#aeaec040] active:shadow-[inset_-2px_-2px_5px_#ffffff,inset_2px_2px_5px_#aeaec040]'
   };
 
   return (

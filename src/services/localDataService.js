@@ -8,8 +8,7 @@ class LocalDataService {
     this.STORAGE_KEYS = {
       TRADER_PROFILES: 'alpha_edge_trader_profiles',
       TRADES: 'alpha_edge_trades',
-      USER: 'alpha_edge_user',
-      ACCOUNT_EVENTS: 'alpha_edge_account_events'
+      USER: 'alpha_edge_user'
     };
     this.initializeStorage();
   }
@@ -24,9 +23,6 @@ class LocalDataService {
     }
     if (!localStorage.getItem(this.STORAGE_KEYS.USER)) {
       localStorage.setItem(this.STORAGE_KEYS.USER, JSON.stringify(null));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEYS.ACCOUNT_EVENTS)) {
-      localStorage.setItem(this.STORAGE_KEYS.ACCOUNT_EVENTS, JSON.stringify([]));
     }
   }
 
@@ -150,54 +146,6 @@ class LocalDataService {
     localStorage.setItem(this.STORAGE_KEYS.TRADES, JSON.stringify(filteredTrades));
   }
 
-  // --- Account Event / "Bill of Exchange" style ledger ---
-  // This keeps a persistent history of important user/account actions.
-  async getAccountEvents() {
-    const raw = localStorage.getItem(this.STORAGE_KEYS.ACCOUNT_EVENTS) || '[]';
-    let events;
-    try {
-      events = JSON.parse(raw);
-    } catch {
-      events = [];
-    }
-    // Newest first
-    return events.sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-  }
-
-  async createAccountEvent(event) {
-    const events = await this.getAccountEvents();
-    const newEvent = {
-      id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
-      created_at: new Date().toISOString(),
-      // Common fields for later querying
-      type: event.type || 'generic',
-      user_email: event.user_email || null,
-      profile_id: event.profile_id || null,
-      // Free-form description and metadata payload
-      description: event.description || '',
-      metadata: event.metadata || {}
-    };
-    events.push(newEvent);
-    localStorage.setItem(this.STORAGE_KEYS.ACCOUNT_EVENTS, JSON.stringify(events));
-    return newEvent;
-  }
-
-  async filterAccountEvents(filters = {}) {
-    const events = await this.getAccountEvents();
-    let filtered = events;
-
-    Object.keys(filters).forEach((key) => {
-      const value = filters[key];
-      if (value !== undefined && value !== null) {
-        filtered = filtered.filter((ev) => ev[key] === value);
-      }
-    });
-
-    return filtered;
-  }
-
   // User methods (simplified)
   async getCurrentUser() {
     return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.USER) || 'null');
@@ -301,11 +249,6 @@ class LocalDataService {
       bulkCreate: (trades) => this.bulkCreateTrades(trades),
       delete: (id) => this.deleteTrade(id),
       deleteByProfileId: (profileId) => this.deleteTradesByProfileId(profileId)
-    },
-    AccountEvent: {
-      list: () => this.getAccountEvents(),
-      filter: (filters) => this.filterAccountEvents(filters),
-      create: (event) => this.createAccountEvent(event)
     }
   };
 }
