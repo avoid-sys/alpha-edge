@@ -202,23 +202,53 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
+        // SMOKE TEST FIRST - как предложил пользователь
+        console.log('=== SMOKE TEST: Прямой вызов Supabase ===');
+        try {
+          // Попробуем зарегистрировать тестового пользователя напрямую
+          const testResult = await authService.signUp('test123@gmail.com', '12345678', 'Test User');
+          console.log('✅ Smoke test successful:', testResult);
+        } catch (testError) {
+          console.log('❌ Smoke test failed:', testError.message);
+
+          // Если smoke test прошел, значит форма сломана
+          if (testError.message.includes('already registered')) {
+            console.log('✅ Smoke test passed - форма сломана, Supabase работает');
+          } else {
+            console.log('❌ Supabase itself broken:', testError);
+            return; // Не продолжаем если Supabase сломан
+          }
+        }
+
         // CRITICAL FIX: Supabase expects strings, not objects
-        // Debug as user suggested
         console.log('=== SIGNUP DEBUG ===');
-        console.log('typeof authForm.email:', typeof authForm.email, 'value:', authForm.email);
-        console.log('typeof authForm.password:', typeof authForm.password);
+        console.log('RAW authForm.email:', authForm.email, 'TYPE:', typeof authForm.email);
+        console.log('RAW authForm.password:', authForm.password, 'TYPE:', typeof authForm.password);
 
-        // The key debug - check what we have before String() conversion
-        console.log('Before String() - email:', authForm.email, 'type:', typeof authForm.email);
+        // Момент истины - проверим что отправляется
+        const rawEmail = authForm.email;
+        const rawPassword = authForm.password;
 
-        // Ensure we have strings (Supabase requirement)
-        const email = String(authForm.email || '').trim();
-        const password = String(authForm.password || '').trim();
+        console.log('BEFORE String() conversion:');
+        console.log('- rawEmail:', rawEmail, 'typeof:', typeof rawEmail);
+        console.log('- rawPassword:', rawPassword, 'typeof:', typeof rawPassword);
+
+        // Конвертируем в строки
+        const email = String(rawEmail || '').trim();
+        const password = String(rawPassword || '').trim();
         const fullName = String(authForm.fullName || '').trim();
 
-        // Final validation as user suggested
-        console.log('typeof email:', typeof email, 'email:', email);
-        console.log('typeof password:', typeof password, 'password length:', password.length);
+        console.log('AFTER String() conversion:');
+        console.log('- email:', email, 'typeof:', typeof email);
+        console.log('- password length:', password.length, 'typeof:', typeof password);
+        console.log('- fullName:', fullName, 'typeof:', typeof fullName);
+
+        // Финальная проверка перед отправкой
+        console.log('=== FINAL CHECK BEFORE SUPABASE ===');
+        console.log('Sending to Supabase:');
+        console.log('- email:', email, 'type:', typeof email);
+        console.log('- password:', password.substring(0, 2) + '...', 'type:', typeof password);
+        console.log('- fullName:', fullName, 'type:', typeof fullName);
 
         // Check if Supabase is working, if not, use demo mode
         if (supabaseStatus === 'disconnected') {
@@ -253,6 +283,25 @@ export default function Home() {
             console.log('🚨 CONFIRMED: JSON parsing error even with hardcoded values!');
           }
         }
+
+        // ПОСЛЕДНЯЯ ПРОВЕРКА ПЕРЕД ОТПРАВКОЙ
+        console.log('🚨 FINAL CHECK BEFORE SUPABASE CALL 🚨');
+        console.log('email value:', JSON.stringify(email), 'type:', typeof email);
+        console.log('password value:', password.substring(0, 2) + '...', 'type:', typeof password);
+        console.log('fullName value:', JSON.stringify(fullName), 'type:', typeof fullName);
+
+        // Проверим что email не объект
+        if (typeof email !== 'string') {
+          console.error('❌ EMAIL IS NOT A STRING! Type:', typeof email, 'Value:', email);
+          throw new Error('Email must be a string, got: ' + typeof email);
+        }
+
+        if (typeof password !== 'string') {
+          console.error('❌ PASSWORD IS NOT A STRING! Type:', typeof password);
+          throw new Error('Password must be a string, got: ' + typeof password);
+        }
+
+        console.log('✅ All values are strings, proceeding with Supabase call...');
 
         const { user, error } = await authService.signUp(
           email,
