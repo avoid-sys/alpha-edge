@@ -74,7 +74,7 @@ export default function Dashboard() {
       try {
         let fetchedProfile = null;
         let fetchedTrades = [];
-
+        
         if (profileId) {
           fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
@@ -136,7 +136,7 @@ export default function Dashboard() {
             fetchedTrades = [];
           }
         }
-
+        
         // Calculate rank based on trader score - only for live connected accounts
         if (fetchedProfile && fetchedProfile.is_live_account) {
           const allProfiles = await localDataService.entities.TraderProfile.list('-trader_score');
@@ -150,7 +150,7 @@ export default function Dashboard() {
 
         if (fetchedProfile) {
           // Use real data from uploaded files (if any) or show live profile with placeholder stats
-          setProfile(fetchedProfile);
+        setProfile(fetchedProfile);
           setTrades(fetchedTrades || []);
         } else {
           // Show empty state - no profile and no connections
@@ -1023,12 +1023,12 @@ export default function Dashboard() {
           </div>
 
           {/* Funds Under Management Section */}
-          <NeumorphicCard className="p-6 relative overflow-hidden flex flex-col">
+          <NeumorphicCard className="p-6 relative overflow-hidden flex flex-col" style={{height: '492px'}}>
             {/* Section Title - Visible */}
-            <h3 className="text-xl font-bold text-gray-700 mb-6 relative z-20">Funds Under Management</h3>
+            <h3 className="text-xl font-bold text-gray-700 mb-4 relative z-20">Funds Under Management</h3>
 
             {/* Blur overlay */}
-            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm z-10 flex items-center justify-center" style={{top: '60px'}}>
+            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm z-10 flex items-center justify-center" style={{top: '52px'}}>
               <div className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg">
                 UNDER DEVELOPMENT
               </div>
@@ -1037,71 +1037,71 @@ export default function Dashboard() {
             {/* Content (blurred) */}
             <div className="filter blur-[0.5px] flex-1 flex flex-col">
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 {/* Balance Under Management */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Balance Under Mgmt</p>
-                  <p className="text-xl font-bold text-blue-600">$0.00</p>
+                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Balance Under Mgmt</p>
+                  <p className="text-lg font-bold text-blue-600">$0.00</p>
                   <p className="text-[10px] text-gray-400">Total AUM</p>
                 </div>
 
                 {/* Profit Percentage */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Profit %</p>
-                  <p className="text-xl font-bold text-green-600">0.00%</p>
+                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Profit %</p>
+                  <p className="text-lg font-bold text-green-600">0.00%</p>
                   <p className="text-[10px] text-gray-400">Monthly Return</p>
                 </div>
 
                 {/* Active Traders */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Active Traders</p>
-                  <p className="text-xl font-bold text-purple-600">0</p>
+                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Active Traders</p>
+                  <p className="text-lg font-bold text-purple-600">0</p>
                   <p className="text-[10px] text-gray-400">Managed Accounts</p>
                 </div>
 
                 {/* Sharpe Ratio */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Sharpe Ratio</p>
-                  <p className="text-xl font-bold text-orange-600">0.00</p>
+                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Sharpe Ratio</p>
+                  <p className="text-lg font-bold text-orange-600">0.00</p>
                   <p className="text-[10px] text-gray-400">Risk-Adjusted</p>
                 </div>
               </div>
 
-              <div className="space-y-4 flex-1">
+              <div className="space-y-3 flex-1">
                 {/* Performance Metrics */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <h5 className="text-sm font-bold text-gray-600 mb-3">Portfolio Performance</h5>
-                  <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                  <h5 className="text-xs font-bold text-gray-600 mb-2">Portfolio Performance</h5>
+                  <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <p className="text-xs text-gray-400">Alpha</p>
-                      <p className="text-lg font-bold text-blue-600">0.00</p>
+                      <p className="text-[10px] text-gray-400">Alpha</p>
+                      <p className="text-sm font-bold text-blue-600">0.00</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400">Beta</p>
-                      <p className="text-lg font-bold text-green-600">0.00</p>
+                      <p className="text-[10px] text-gray-400">Beta</p>
+                      <p className="text-sm font-bold text-green-600">0.00</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400">Max DD</p>
-                      <p className="text-lg font-bold text-red-600">0.00%</p>
+                      <p className="text-[10px] text-gray-400">Max DD</p>
+                      <p className="text-sm font-bold text-red-600">0.00%</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Risk Metrics */}
-                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
-                  <h5 className="text-sm font-bold text-gray-600 mb-3">Risk Metrics</h5>
-                  <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                  <h5 className="text-xs font-bold text-gray-600 mb-2">Risk Metrics</h5>
+                  <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <p className="text-xs text-gray-400">VaR (95%)</p>
-                      <p className="text-lg font-bold text-orange-600">$0.00</p>
+                      <p className="text-[10px] text-gray-400">VaR (95%)</p>
+                      <p className="text-sm font-bold text-orange-600">$0.00</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400">Sortino</p>
-                      <p className="text-lg font-bold text-purple-600">0.00</p>
+                      <p className="text-[10px] text-gray-400">Sortino</p>
+                      <p className="text-sm font-bold text-purple-600">0.00</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400">Calmar</p>
-                      <p className="text-lg font-bold text-indigo-600">0.00</p>
+                      <p className="text-[10px] text-gray-400">Calmar</p>
+                      <p className="text-sm font-bold text-indigo-600">0.00</p>
                     </div>
                   </div>
                 </div>
@@ -1113,7 +1113,7 @@ export default function Dashboard() {
 
         {/* Right Column: Score Analysis */}
         <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-           <NeumorphicCard className="p-6 flex flex-col">
+           <NeumorphicCard className="p-6 flex flex-col" style={{height: '492px'}}>
               <h3 className="text-xl font-bold text-gray-700 mb-6">Score Analysis</h3>
 
               <div className="flex flex-col gap-8">
