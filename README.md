@@ -231,14 +231,59 @@ The built files will be in the `dist/` directory, ready for deployment to:
 - **Repository**: https://github.com/avoid-sys/alpha-edge
 - **Documentation**: See `API_INTEGRATION_GUIDE.md` for backend setup
 
+## 🐛 Troubleshooting
+
+### Vercel Deployment Issues
+
+**If you see "404: NOT_FOUND" or "DEPLOYMENT_NOT_FOUND":**
+
+1. **Check Vercel Dashboard**: Go to your Vercel project → Deployments tab
+2. **View Build Logs**: Click on the latest deployment to see error details
+3. **Common Issues**:
+   - Build timeout (large bundle)
+   - Missing dependencies
+   - Environment variables not set
+   - Framework not detected
+
+**If you see a white screen:**
+
+1. **Check Browser Console**: Press F12 → Console tab
+2. **Look for JavaScript errors**
+3. **CSP blocking**: Scripts might be blocked by security policy
+
+**Quick Fixes:**
+
+```bash
+# Test build locally
+npm run build
+
+# Clear cache and rebuild
+rm -rf node_modules/.vite
+npm run build
+
+# Check bundle size
+ls -lh dist/assets/
+```
+
+### Local Development Issues
+
+If you encounter local development issues:
+
+1. **Node.js Version**: Ensure Node.js 16+ is installed
+2. **Dependencies**: `rm -rf node_modules && npm install`
+3. **Port Issues**: Development server might need different port
+4. **Permissions**: Try running with different permissions
+
+### Database Issues
+
+**Demo Mode**: The app works in demo mode without Supabase
+**Full Database**: Run `database-setup.sql` in Supabase dashboard
+
 ## 📞 Support
 
-If you encounter issues:
-
-1. Make sure Node.js is properly installed: `node --version`
-2. Check npm: `npm --version`
-3. Clear node modules and reinstall: `rm -rf node_modules && npm install`
-4. Try different Node.js installation method
+- **Vercel Issues**: Check [vercel.com/status](https://vercel.com/status)
+- **Build Logs**: Available in Vercel dashboard
+- **Console Errors**: Check browser developer tools
 
 ## 📝 License
 
