@@ -10,13 +10,18 @@
     <meta name="theme-color" content="#e0e5ec">
     <title>Alpha Edge - Trading Analytics Platform</title>
 
-    <!-- Minimal CSP for debugging - will be restored after fixing -->
+    <!-- Security Headers -->
     <meta http-equiv="Content-Security-Policy" content="
-      default-src *;
-      script-src * 'unsafe-inline' 'unsafe-eval';
-      style-src * 'unsafe-inline';
-      img-src * data: blob:;
-      connect-src *;
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: https: blob:;
+      connect-src 'self' https://api.dicebear.com https://pbs.twimg.com https://*.supabase.co wss://*.supabase.co;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
     ">
 
     <!-- Additional Security Headers -->
