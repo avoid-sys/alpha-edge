@@ -30,8 +30,7 @@ class AuthService {
 
   async signUp(email, password, fullName) {
     try {
-      console.log('🔐 Starting signup for:', email);
-
+      // Ensure all inputs are strings
       const emailStr = String(email).trim();
       const passwordStr = String(password);
       const fullNameStr = String(fullName || '').trim();

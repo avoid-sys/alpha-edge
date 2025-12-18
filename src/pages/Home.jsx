@@ -146,22 +146,20 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        // ✅ РЕШЕНИЕ №1: Отдельные useState - значения уже готовы
-        const finalEmail = email.trim();
-        const finalPassword = password.trim();
-        const finalFullName = fullName.trim();
+        // Ensure all inputs are strings and trimmed
+        const finalEmail = String(email).trim();
+        const finalPassword = String(password).trim();
+        const finalFullName = String(fullName).trim();
 
         // Basic validation
-        if (!email) {
+        if (!finalEmail) {
           throw new Error('Please enter your email address');
         }
-        if (!password || password.length < 6) {
+        if (!finalPassword || finalPassword.length < 6) {
           throw new Error('Password must be at least 6 characters long');
         }
 
-
-
-        // ✅ Регистрация через Supabase Auth
+        // Call signup service
         const { user, error } = await authService.signUp(
           finalEmail,
           finalPassword,

@@ -1,11 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-if (!import.meta.env.VITE_SUPABASE_URL) {
-  throw new Error("Missing Supabase env");
-}
+// TEMP: Direct values for testing (will be replaced with env vars)
+const supabaseUrl = 'https://lwgnyerzimcajauxzowx.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+console.log('✅ Supabase initialized with direct values');
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
