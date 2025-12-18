@@ -545,8 +545,8 @@ export default function Home() {
       {/* Leaderboard Modal */}
       {showLeaderboard && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <NeumorphicCard className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center mb-4">
+          <NeumorphicCard className="w-full max-w-3xl p-4 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 flex-shrink-0">
               <div>
                 <h3 className="text-xl font-bold text-gray-800 mb-1">Global Leaderboard</h3>
                 <p className="text-sm text-gray-600">Top 10 elite traders</p>
@@ -559,7 +559,7 @@ export default function Home() {
               </button>
             </div>
 
-            <div>
+            <div className="flex-1 overflow-y-auto min-h-0">
               {leaderboardLoading ? (
                 <div className="text-center py-6">
                   <div className="animate-pulse text-gray-500">Loading leaderboard...</div>
@@ -609,7 +609,7 @@ export default function Home() {
               )}
             </div>
 
-            <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="mt-3 pt-3 border-t border-gray-200 flex-shrink-0">
               <div className="text-center">
                 <p className="text-xs text-gray-600 mb-2">
                   Want to see your name on this leaderboard?
