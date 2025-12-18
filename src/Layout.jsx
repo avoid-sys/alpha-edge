@@ -66,15 +66,15 @@ export default function Layout({ children }) {
           </div>
 
           <div className="mt-auto">
-            <button
+             <button
               onClick={async () => {
                 await localDataService.auth.logout();
                 navigate(createPageUrl(''));
               }}
-              className="flex items-center justify-center w-12 h-12 rounded-2xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            >
+                className="flex items-center justify-center w-12 h-12 rounded-2xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+             >
               <LogOut size={20} />
-            </button>
+             </button>
           </div>
         </div>
       </div>
