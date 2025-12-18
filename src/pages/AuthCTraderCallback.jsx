@@ -108,30 +108,32 @@ Please go back to "Connect Platforms" and click "Connect" on cTrader again.`;
         console.log('⚠️  redirect_uri must match:', redirectUriForToken);
         console.log('⚠️  Verify this URI is registered in cTrader app settings');
         
-        // cTrader Open API requires GET request with parameters in query string
+        // cTrader Open API requires POST request with form-encoded body
         // Endpoint: https://openapi.ctrader.com/apps/token
-        // Note: This differs from standard OAuth 2.0 (which uses POST), but cTrader uses GET
+        // This matches cTrader documentation for token exchange
+        const tokenRequest = new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUriForToken, // Must match registered URI exactly
+          client_id: clientId,
+          client_secret: clientSecret,
+        });
+
         let res;
         try {
-          // Primary: Direct GET to cTrader API with query parameters
-          res = await axios.get('https://openapi.ctrader.com/apps/token', {
-            params: {
-              grant_type: 'authorization_code',
-              code,
-              redirect_uri: redirectUriForToken, // Must match registered URI exactly
-              client_id: clientId,
-              client_secret: clientSecret,
-            },
+          // Primary: Direct POST to cTrader API with form-encoded body
+          res = await axios.post('https://openapi.ctrader.com/apps/token', tokenRequest, {
             headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
               'Accept': 'application/json',
             },
           });
-          console.log('✅ Token exchange successful via direct GET');
-        } catch (getError) {
+          console.log('✅ Token exchange successful via direct POST');
+        } catch (postError) {
           // Fallback: Try POST via backend proxy (keeps client_secret on server)
-          console.warn('Direct GET failed, falling back to backend proxy:', getError);
-          const requestBody = { 
-            code, 
+          console.warn('Direct POST failed, falling back to backend proxy:', postError);
+          const requestBody = {
+            code,
             state,
             redirect_uri: redirectUriForToken
           };
