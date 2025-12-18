@@ -202,7 +202,17 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        console.log('Attempting signup for:', authForm.email);
+        // Ensure all values are strings
+        const email = String(authForm.email || '').trim();
+        const password = String(authForm.password || '').trim();
+        const fullName = String(authForm.fullName || '').trim();
+
+        console.log('Attempting signup for:', email);
+        console.log('Form data types:', {
+          email: typeof email,
+          password: typeof password,
+          fullName: typeof fullName
+        });
 
         // Check if Supabase is working, if not, use demo mode
         if (supabaseStatus === 'disconnected') {
@@ -211,7 +221,7 @@ export default function Home() {
           setSuccessMessage('Demo Mode: Account created successfully! (Database not yet configured)');
           setAuthMode('login');
           setAuthForm({
-            email: authForm.email,
+            email: email,
             password: '',
             confirmPassword: '',
             fullName: ''
@@ -220,9 +230,9 @@ export default function Home() {
         }
 
         const { user, error } = await authService.signUp(
-          authForm.email,
-          authForm.password,
-          authForm.fullName
+          email,
+          password,
+          fullName
         );
 
         if (error) {
@@ -235,7 +245,7 @@ export default function Home() {
           setSuccessMessage('Account created successfully! Please check your email to verify your account.');
           setAuthMode('login');
           setAuthForm({
-            email: authForm.email, // Keep email for login
+            email: email, // Keep email for login
             password: '',
             confirmPassword: '',
             fullName: ''
@@ -245,15 +255,22 @@ export default function Home() {
         }
       } else {
         // Login
-        if (!authForm.email || !authForm.password) {
+        const loginEmail = String(authForm.email || '').trim();
+        const loginPassword = String(authForm.password || '').trim();
+
+        if (!loginEmail || !loginPassword) {
           throw new Error('Please enter your email and password');
         }
 
-        console.log('Attempting login for:', authForm.email);
+        console.log('Attempting login for:', loginEmail);
+        console.log('Login data types:', {
+          email: typeof loginEmail,
+          password: typeof loginPassword
+        });
 
         const { user, error } = await authService.signIn(
-          authForm.email,
-          authForm.password
+          loginEmail,
+          loginPassword
         );
 
         if (error) {
@@ -522,7 +539,7 @@ export default function Home() {
                     className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                     placeholder="Enter your full name"
                     value={authForm.fullName}
-                    onChange={(e) => setAuthForm({...authForm, fullName: e.target.value})}
+                    onChange={(e) => setAuthForm({...authForm, fullName: String(e.target.value || '')})}
                   />
                 </div>
               )}
@@ -537,7 +554,7 @@ export default function Home() {
                   className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                   placeholder="Enter your email"
                   value={authForm.email}
-                  onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                  onChange={(e) => setAuthForm({...authForm, email: String(e.target.value || '')})}
                 />
               </div>
 
@@ -551,7 +568,7 @@ export default function Home() {
                   className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                   placeholder="Enter your password"
                   value={authForm.password}
-                  onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                  onChange={(e) => setAuthForm({...authForm, password: String(e.target.value || '')})}
                 />
               </div>
 
@@ -566,7 +583,7 @@ export default function Home() {
                     className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                     placeholder="Confirm your password"
                     value={authForm.confirmPassword}
-                    onChange={(e) => setAuthForm({...authForm, confirmPassword: e.target.value})}
+                    onChange={(e) => setAuthForm({...authForm, confirmPassword: String(e.target.value || '')})}
                   />
                 </div>
               )}
