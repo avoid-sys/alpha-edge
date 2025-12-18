@@ -59,7 +59,6 @@ export default function Home() {
     subject: '',
     message: ''
   });
-  const [supabaseStatus, setSupabaseStatus] = useState(null); // 'connected', 'disconnected', 'error'
 
   // Check if user is already authenticated
   useEffect(() => {
@@ -89,61 +88,6 @@ export default function Home() {
     checkAuth();
   }, [navigate]);
 
-  // Test Supabase connection on component mount
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        console.log('Testing Supabase connection...');
-        setSupabaseStatus('testing');
-
-        // Test basic auth connection
-        const { data: authData, error: authError } = await supabase.auth.getSession();
-        if (authError) {
-          console.warn('Auth connection test failed:', authError.message);
-          setSupabaseStatus('error');
-          return;
-        } else {
-          console.log('Auth connection test passed');
-        }
-
-        // Test database connection (this will fail if tables don't exist)
-        try {
-          const { data, error } = await supabase.from('profiles').select('count').limit(1);
-          if (error) {
-            console.warn('Database connection test failed (tables may not exist):', error.message);
-            console.warn('Please run the SQL setup from database-setup.sql in your Supabase dashboard');
-
-            // Check if demo users exist
-            const demoUsers = localStorage.getItem('demo_users');
-            if (demoUsers && JSON.parse(demoUsers).length > 0) {
-              setSupabaseStatus('demo');
-            } else {
-              setSupabaseStatus('disconnected');
-            }
-          } else {
-            console.log('Database connection test passed');
-            setSupabaseStatus('connected');
-          }
-        } catch (dbError) {
-          console.warn('Database error:', dbError);
-
-          // Check if demo users exist for fallback
-          const demoUsers = localStorage.getItem('demo_users');
-          if (demoUsers && JSON.parse(demoUsers).length > 0) {
-            setSupabaseStatus('demo');
-          } else {
-            setSupabaseStatus('error');
-          }
-        }
-
-      } catch (err) {
-        console.error('Supabase connection error:', err);
-        setSupabaseStatus('error');
-      }
-    };
-
-    testConnection();
-  }, []);
 
   // Fetch leaderboard data
   const fetchLeaderboard = async () => {
@@ -215,17 +159,6 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        // Check if Supabase is working, if not, use demo mode
-        if (supabaseStatus === 'disconnected') {
-          // Demo mode - simulate successful signup
-          setSuccessMessage('Demo Mode: Account created successfully! (Database not yet configured)');
-          setAuthMode('login');
-          setEmail(email); // Keep email for login
-          setPassword('');
-          setConfirmPassword('');
-          setFullName('');
-          return;
-        }
 
 
         // ✅ Основная логика регистрации
@@ -509,27 +442,6 @@ export default function Home() {
               </button>
             </div>
 
-            {supabaseStatus === 'disconnected' && (
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-yellow-600">⚠️</span>
-                  <p className="text-sm text-yellow-800">
-                    <strong>Demo Mode:</strong> Database not configured. You can still test the signup process.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {supabaseStatus === 'error' && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-red-600">✗</span>
-                  <p className="text-sm text-red-800">
-                    <strong>Connection Error:</strong> Unable to connect to database. Please check your internet connection.
-                  </p>
-                </div>
-              </div>
-            )}
 
             <form onSubmit={handleAuth} className="space-y-4">
               {authMode === 'register' && (
@@ -1023,21 +935,6 @@ export default function Home() {
               className="w-8 h-8 object-contain"
             />
             <span className="font-bold text-gray-800">Alpha Edge</span>
-            {supabaseStatus && (
-              <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                supabaseStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                supabaseStatus === 'disconnected' ? 'bg-yellow-100 text-yellow-800' :
-                supabaseStatus === 'demo' ? 'bg-blue-100 text-blue-800' :
-                supabaseStatus === 'error' ? 'bg-red-100 text-red-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {supabaseStatus === 'connected' ? '✓ Connected' :
-                 supabaseStatus === 'disconnected' ? '⚠ Database Setup Needed' :
-                 supabaseStatus === 'demo' ? '🔄 Demo Mode' :
-                 supabaseStatus === 'error' ? '✗ Connection Error' :
-                 'Testing...'}
-              </span>
-            )}
           </div>
           <p className="text-gray-600 mb-4">
             The Global Leaderboard for Elite Traders
