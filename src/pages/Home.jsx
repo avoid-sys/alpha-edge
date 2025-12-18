@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicCard, NeumorphicButton } from '@/components/NeumorphicUI';
 import { authService } from '@/services/authService';
+import { supabase } from '@/utils/supabase';
 import {
   Trophy,
   TrendingUp,
@@ -66,6 +67,25 @@ export default function Home() {
     }
   }, [navigate]);
 
+  // Test Supabase connection on component mount
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        // Simple connection test
+        const { error } = await supabase.from('profiles').select('id').limit(1);
+        if (error) {
+          console.warn('Supabase connection test failed:', error.message);
+        } else {
+          console.log('Supabase connection test passed');
+        }
+      } catch (err) {
+        console.warn('Supabase connection error:', err);
+      }
+    };
+
+    testConnection();
+  }, []);
+
   // Fetch leaderboard data
   const fetchLeaderboard = async () => {
     setLeaderboardLoading(true);
@@ -110,6 +130,11 @@ export default function Home() {
 
     try {
       if (authMode === 'register') {
+        // Validate form
+        if (!authForm.email || !authForm.password || !authForm.fullName) {
+          throw new Error('Please fill in all required fields');
+        }
+
         if (authForm.password !== authForm.confirmPassword) {
           throw new Error('Passwords do not match');
         }
@@ -118,6 +143,8 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
+        console.log('Attempting signup for:', authForm.email);
+
         const { user, error } = await authService.signUp(
           authForm.email,
           authForm.password,
@@ -125,10 +152,12 @@ export default function Home() {
         );
 
         if (error) {
-          throw error;
+          console.error('Signup error:', error);
+          throw new Error(error.message || 'Failed to create account. Please try again.');
         }
 
         if (user) {
+          console.log('Signup successful for user:', user.email);
           setSuccessMessage('Account created successfully! Please check your email to verify your account.');
           setAuthMode('login');
           setAuthForm({
@@ -137,24 +166,37 @@ export default function Home() {
             confirmPassword: '',
             fullName: ''
           });
+        } else {
+          throw new Error('Account creation failed. Please try again.');
         }
       } else {
         // Login
+        if (!authForm.email || !authForm.password) {
+          throw new Error('Please enter your email and password');
+        }
+
+        console.log('Attempting login for:', authForm.email);
+
         const { user, error } = await authService.signIn(
           authForm.email,
           authForm.password
         );
 
         if (error) {
-          throw error;
+          console.error('Login error:', error);
+          throw new Error(error.message || 'Login failed. Please check your credentials.');
         }
 
         if (user) {
+          console.log('Login successful for user:', user.email);
           navigate(createPageUrl('Dashboard'));
+        } else {
+          throw new Error('Login failed. Please try again.');
         }
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Auth error:', err);
+      setError(err.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

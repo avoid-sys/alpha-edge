@@ -74,6 +74,14 @@ class AuthService {
     try {
       securityService.logSecurityEvent('signup_attempted', { email });
 
+      // Check if Supabase is accessible
+      try {
+        await supabase.from('profiles').select('id').limit(1);
+      } catch (connectionError) {
+        console.warn('Supabase connection issue:', connectionError);
+        // Continue with signup even if connection check fails
+      }
+
       const { data, error } = await auth.signUp({
         email,
         password,
@@ -87,7 +95,20 @@ class AuthService {
 
       if (error) {
         securityService.logSecurityEvent('signup_failed', { email, error: error.message });
-        throw error;
+
+        // Provide more user-friendly error messages
+        let errorMessage = error.message;
+        if (error.message.includes('already registered')) {
+          errorMessage = 'An account with this email already exists. Please try signing in instead.';
+        } else if (error.message.includes('Invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else if (error.message.includes('Password')) {
+          errorMessage = 'Password must be at least 6 characters long.';
+        }
+
+        const customError = new Error(errorMessage);
+        customError.originalError = error;
+        throw customError;
       }
 
       if (data.user) {
@@ -170,6 +191,8 @@ class AuthService {
 
       if (error) {
         console.error('Error creating/updating profile:', error);
+        // Don't throw error here - profile creation failure shouldn't prevent signup
+        // Just log it and continue
       } else {
         console.log('Profile created/updated:', data);
       }
@@ -177,6 +200,7 @@ class AuthService {
       return { data, error };
     } catch (error) {
       console.error('Error in createOrUpdateProfile:', error);
+      // Don't throw error here - profile creation failure shouldn't prevent signup
       return { data: null, error };
     }
   }
