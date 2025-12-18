@@ -89,6 +89,30 @@ export default function BrokerExchangeConnect() {
             const oauth = platform.oauth || {};
             const clientId = import.meta.env.VITE_CTRADER_CLIENT_ID || '19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF';
 
+            // EMERGENCY MANUAL TEST - if all automated attempts fail
+            const manualTest = confirm(
+              '🚨 cTrader OAuth Debug Mode 🚨\n\n' +
+              'Click OK to see manual test URLs in console.\n' +
+              'Click Cancel to proceed with automated redirect.\n\n' +
+              'If automated redirect fails with 400, use manual URLs from console!'
+            );
+
+            if (manualTest) {
+              const testUrls = [
+                `https://id.ctrader.com/my/settings/openapi/grantingaccess?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/ctrader/callback')}&scope=accounts&response_type=code&product=web&state=test123`,
+                `https://connect.spotware.com/apps/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/ctrader/callback')}&scope=trading%20accounts&response_type=code&state=test123`,
+                `https://id.ctrader.com/connect/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/ctrader/callback')}&scope=openid%20profile&response_type=code&state=test123`
+              ];
+
+              console.log('🚨 MANUAL TEST URLs (copy and paste in new tab):');
+              testUrls.forEach((testUrl, index) => {
+                console.log(`${index + 1}. ${testUrl}`);
+              });
+
+              alert('Manual URLs logged to console. Copy one and paste in new tab to test.');
+              return;
+            }
+
             // Debug logging
             console.log('=== cTrader OAuth Debug ===');
             console.log('cTrader OAuth - Client ID:', clientId ? `${clientId.substring(0, 10)}...` : 'MISSING');
@@ -208,11 +232,19 @@ export default function BrokerExchangeConnect() {
             console.log('6. Client ID Check:');
             console.log('   - Client ID:', clientId ? `${clientId.substring(0, 20)}...` : 'MISSING');
             console.log('   - Must match cTrader app settings');
-            console.log('⚠️  If you get 400 Bad Request:');
-            console.log('   1. Verify redirect_uri is registered in cTrader app settings');
-            console.log('   2. Verify app status is "Active" in cTrader portal');
-            console.log('   3. Verify client_id matches your app');
-            console.log('   4. Check browser network tab for exact error response');
+            console.log('7. ULTIMATE 400 FIX CHECKLIST:');
+            console.log('   ✓ Manual %20 encoding (not URLSearchParams)');
+            console.log('   ✓ Added product=web parameter');
+            console.log('   ✓ Tried multiple auth URLs');
+            console.log('   ✓ Checked all scope variations');
+            console.log('   → If still 400, the problem is likely:');
+            console.log('     1. Wrong redirect_uri in cTrader app settings');
+            console.log('     2. App not "Active" in cTrader portal');
+            console.log('     3. Wrong client_id');
+            console.log('     4. cTrader API changed their requirements');
+            console.log('   → MANUAL TEST: Copy this URL and paste in new browser tab:');
+            console.log('     ', url);
+
             console.log('✅ About to redirect to cTrader...');
 
             // Сохраняем state для проверки в колбэке (reuse encodedState from above)
