@@ -1116,7 +1116,7 @@ export default function Dashboard() {
            <NeumorphicCard className="p-6 flex flex-col">
               <h3 className="text-xl font-bold text-gray-700 mb-6">Score Analysis</h3>
 
-              <div className="flex-1 flex flex-col justify-center gap-8">
+              <div className="flex flex-col gap-8">
                  <div className="space-y-6">
                    {/* Performance */}
                    <div>
