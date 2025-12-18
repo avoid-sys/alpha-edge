@@ -1,12 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import Layout from './Layout.jsx';
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Leaderboard from './pages/Leaderboard';
-import Connect from './pages/Connect';
-import ImportTrades from './pages/ImportTrades';
-import { authService } from './services/authService';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Signup from "@/components/Signup";
+import Login from "@/components/Login";
+import Home from "@/components/Home";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -142,13 +138,23 @@ function AppContent() {
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <ErrorBoundary>
-      <Router>
-        <AppContent />
-      </Router>
-    </ErrorBoundary>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

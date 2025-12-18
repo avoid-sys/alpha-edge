@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Supabase Signup</title>
+</head>
+<body>
+    <h1>Debug Supabase Signup</h1>
+
+    <form id="signupForm">
+        <div>
+            <label for="email">Email:</label>
+            <input type="email" id="email" required>
+        </div>
+
+        <div>
+            <label for="password">Password:</label>
+            <input type="password" id="password" required>
+        </div>
+
+        <div>
+            <label for="fullName">Full Name:</label>
+            <input type="text" id="fullName" required>
+        </div>
+
+        <button type="submit">Sign Up</button>
+    </form>
+
+    <div id="output"></div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+        const supabaseUrl = 'https://lwgnyerzimcajauxzowx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng';
+
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const output = document.getElementById('output');
+
+        function log(message) {
+            output.innerHTML += '<div>' + message + '</div>';
+            console.log(message);
+        }
+
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const fullName = document.getElementById('fullName').value;
+
+            log('📧 Raw email: ' + email + ' (type: ' + typeof email + ')');
+            log('🔒 Raw password: ' + password.substring(0, 2) + '... (type: ' + typeof password + ')');
+            log('👤 Raw fullName: ' + fullName + ' (type: ' + typeof fullName + ')');
+
+            // Convert to strings
+            const emailStr = String(email).trim();
+            const passwordStr = String(password);
+            const fullNameStr = String(fullName || '').trim();
+
+            log('🔄 After String() conversion:');
+            log('- emailStr: ' + emailStr + ' (type: ' + typeof emailStr + ')');
+            log('- passwordStr length: ' + passwordStr.length + ' (type: ' + typeof passwordStr + ')');
+            log('- fullNameStr: ' + fullNameStr + ' (type: ' + typeof fullNameStr + ')');
+
+            const signupPayload = {
+                email: emailStr,
+                password: passwordStr,
+                options: {
+                    data: {
+                        full_name: fullNameStr,
+                        display_name: fullNameStr
+                    }
+                }
+            };
+
+            log('📤 Payload: ' + JSON.stringify(signupPayload, null, 2));
+
+            try {
+                log('🚀 Calling supabase.auth.signUp...');
+                const { data, error } = await supabase.auth.signUp(signupPayload);
+
+                if (error) {
+                    log('❌ Error: ' + error.message);
+                    log('Full error: ' + JSON.stringify(error, null, 2));
+                } else {
+                    log('✅ Success!');
+                    log('User: ' + JSON.stringify(data.user, null, 2));
+                }
+            } catch (err) {
+                log('💥 Exception: ' + err.message);
+            }
+        });
+    </script>
+</body>
+</html>

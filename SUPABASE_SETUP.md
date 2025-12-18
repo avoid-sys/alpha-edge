@@ -32,13 +32,8 @@ EOF
 Или создайте файл вручную с содержимым:
 
 ```env
-# Для Vite (рекомендуется)
 VITE_SUPABASE_URL=https://lwgnyerzimcajauxzowx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng
-
-# Для Next.js (если будете мигрировать)
-NEXT_PUBLIC_SUPABASE_URL=https://lwgnyerzimcajauxzowx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng
 ```
 
 ### 3. Настройка Vercel (для продакшена)
@@ -51,16 +46,133 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 #### ✅ Supabase Client (`src/utils/supabase.js`)
 ```javascript
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
 
-if (!import.meta.env.VITE_SUPABASE_URL) {
-  throw new Error("Missing Supabase env");
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables!");
 }
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+```
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+#### ✅ Компоненты аутентификации
+
+**Signup Component (`src/components/Signup.jsx`):**
+```javascript
+import { useState } from "react";
+import { supabase } from "@/utils/supabase";
+
+export default function Signup() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
+      console.error("Signup error:", error.message);
+      return;
+    }
+
+    console.log("Signup success", data);
+  };
+
+  return (
+    <form onSubmit={handleSignup}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        required
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+        required
+      />
+      <button type="submit">Sign Up</button>
+    </form>
+  );
+}
+```
+
+**Login Component (`src/components/Login.jsx`):**
+```javascript
+import { useState } from "react";
+import { supabase } from "@/utils/supabase";
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
+      console.error("Login error:", error.message);
+      return;
+    }
+
+    console.log("Login success", data);
+  };
+
+  return (
+    <form onSubmit={handleLogin}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        required
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+        required
+      />
+      <button type="submit">Log In</button>
+    </form>
+  );
+}
+```
+
+**Protected Route (`src/components/ProtectedRoute.jsx`):**
+```javascript
+import { useEffect, useState } from "react";
+import { supabase } from "@/utils/supabase";
+import { useNavigate } from "react-router-dom";
+
+export default function ProtectedRoute({ children }) {
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const session = supabase.auth.session();
+    if (!session) navigate("/login");
+    else setLoading(false);
+  }, []);
+
+  if (loading) return null;
+  return children;
+}
 ```
 
 #### ✅ Auth Service (`src/services/authService.js`)
@@ -133,6 +245,35 @@ const handleLogin = async (e) => {
 
   console.log('Login success:', user);
 };
+```
+
+#### ✅ Маршруты (`src/App.jsx`)
+```javascript
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Signup from "@/components/Signup";
+import Login from "@/components/Login";
+import Home from "@/components/Home";
+import ProtectedRoute from "@/components/ProtectedRoute";
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
+  );
+}
 ```
 
 #### ✅ Проверка авторизации (`src/App.jsx`)
