@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
 import { brokerIntegrationService } from '@/services/brokerIntegrationService';
-import { getBybitAccountData } from '@/services/bybitApi';
+import { getBybitTrades, getBybitAccountBalance } from '@/services/bybitApi';
 import { getCTraderTrades, getCTraderAccountInfo, getCTraderToken } from '@/services/ctraderApi';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -298,25 +298,50 @@ export default function Dashboard() {
     setBybitError(null);
 
     try {
-      // Example: unified account wallet balance
-      const data = await getBybitAccountData(
-        '/v5/account/wallet-balance',
-        { accountType: 'UNIFIED' },
-        { apiKey, apiSecret }
-      );
+      // Get account balance and trades from Bybit
+      const [balanceData, tradesData] = await Promise.all([
+        getBybitAccountBalance(),
+        getBybitTrades(20) // Get last 20 trades
+      ]);
 
-      // Try to normalize a small summary for display
-      const rawList = data?.result?.list || data?.result?.balances || [];
-      const first = Array.isArray(rawList) && rawList.length > 0 ? rawList[0] : null;
+      // Calculate summary stats from trades
+      const totalProfit = tradesData.reduce((sum, trade) => sum + (trade.net_profit || 0), 0);
+      const winningTrades = tradesData.filter(t => (t.net_profit || 0) > 0).length;
+      const winRate = tradesData.length > 0 ? (winningTrades / tradesData.length * 100) : 0;
 
       const summary = {
-        raw: data,
-        totalEquity: first?.totalEquity || first?.equity || null,
-        accountType: first?.accountType || 'UNIFIED',
-        coin: first?.coin?.[0]?.coin || first?.coin || null
+        accountType: balanceData?.accountType || 'UNIFIED',
+        totalEquity: balanceData?.totalEquity || '0',
+        coin: balanceData?.coin || 'USDT',
+        tradesCount: tradesData.length,
+        totalProfit: totalProfit,
+        winRate: winRate.toFixed(2),
+        winningTrades: winningTrades,
+        losingTrades: tradesData.length - winningTrades
       };
 
       setBybitAccount(summary);
+
+      // Import trades to local database if we have a profile
+      if (profile && tradesData.length > 0) {
+        const user = await localDataService.getCurrentUser();
+        if (user) {
+          const newTrades = tradesData.map(trade => ({
+            id: `bybit-${trade.symbol}-${trade.close_time}`,
+            trader_profile_id: profile.id,
+            symbol: trade.symbol,
+            volume: trade.volume,
+            profit: trade.net_profit,
+            open_time: trade.open_time,
+            close_time: trade.close_time,
+            type: trade.direction.toLowerCase(),
+          }));
+
+          await localDataService.entities.Trade.bulkCreate(newTrades);
+          setDataVersion(prev => prev + 1); // Trigger dashboard refresh
+          console.log(`Imported ${newTrades.length} Bybit trades.`);
+        }
+      }
     } catch (err) {
       console.error('Failed to load Bybit account data', err);
 
