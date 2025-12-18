@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { createPageUrl } from './utils';
 import { localDataService } from './services/localDataService';
+import { supabase } from './supabaseClient';
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -68,8 +69,9 @@ export default function Layout({ children }) {
           <div className="mt-auto">
              <button
               onClick={async () => {
+                await supabase.auth.signOut();
                 await localDataService.auth.logout();
-                navigate(createPageUrl(''));
+                navigate(createPageUrl('auth'));
               }}
                 className="flex items-center justify-center w-12 h-12 rounded-2xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
              >
@@ -193,9 +195,10 @@ export default function Layout({ children }) {
             <div className="mt-8 pt-6 border-t border-gray-200">
               <button
                 onClick={async () => {
+                  await supabase.auth.signOut();
                   await localDataService.auth.logout();
                   setIsMobileMenuOpen(false);
-                  navigate(createPageUrl(''));
+                  navigate(createPageUrl('auth'));
                 }}
                 className="w-full flex items-center justify-center gap-3 p-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
               >

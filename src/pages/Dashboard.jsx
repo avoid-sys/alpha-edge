@@ -5,7 +5,8 @@ import { brokerIntegrationService } from '@/services/brokerIntegrationService';
 import { getBybitTrades, getBybitAccountBalance } from '@/services/bybitApi';
 import { getCTraderTrades, getCTraderAccountInfo, getCTraderToken } from '@/services/ctraderApi';
 import { createPageUrl } from '@/utils';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/supabaseClient';
 import {
   TrendingUp,
   TrendingDown,
@@ -37,6 +38,10 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [profile, setProfile] = useState(null);
   const [trades, setTrades] = useState([]);
   const [rank, setRank] = useState(null);
@@ -61,6 +66,29 @@ export default function Dashboard() {
 
   // Check if user is viewing their own profile or someone else's
   const isOwnProfile = !profileId; // No profileId means viewing own profile
+
+  // Check authentication session
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Auth session error:', error);
+      }
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    };
+
+    getSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (!session?.user) {
+        navigate(createPageUrl('auth'));
+      }
+    });
+
+    return () => authListener.subscription.unsubscribe();
+  }, [navigate]);
 
   // Force data refresh when refresh parameter is detected
   useEffect(() => {
@@ -641,6 +669,24 @@ export default function Dashboard() {
     );
   };
 
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh]">
+        <div className="w-24 h-24 bg-[#e0e5ec] rounded-full shadow-[-8px_-8px_16px_#ffffff,8px_8px_16px_#a3b1c6] flex items-center justify-center mb-8">
+          <Activity size={40} className="text-gray-400 animate-spin" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-700 mb-2">Checking Authentication...</h2>
+      </div>
+    );
+  }
+
+  // Redirect to auth if not authenticated
+  if (!user) {
+    navigate(createPageUrl('auth'));
+    return null;
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       
@@ -1023,7 +1069,7 @@ export default function Dashboard() {
           </div>
 
           {/* Funds Under Management Section */}
-          <NeumorphicCard className="p-6 relative overflow-hidden flex flex-col" style={{height: '492px'}}>
+          <NeumorphicCard className="p-6 relative overflow-hidden flex flex-col" style={{height: '320px'}}>
             {/* Section Title - Visible */}
             <h3 className="text-xl font-bold text-gray-700 mb-4 relative z-20">Funds Under Management</h3>
 
@@ -1113,7 +1159,7 @@ export default function Dashboard() {
 
         {/* Right Column: Score Analysis */}
         <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-           <NeumorphicCard className="p-6 flex flex-col" style={{height: '492px'}}>
+           <NeumorphicCard className="p-6 flex flex-col" style={{height: '945px'}}>
               <h3 className="text-xl font-bold text-gray-700 mb-6">Score Analysis</h3>
 
               <div className="flex flex-col gap-8">
