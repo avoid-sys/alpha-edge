@@ -1023,7 +1023,7 @@ export default function Dashboard() {
           </div>
 
           {/* Funds Under Management Section */}
-          <NeumorphicCard className="p-6 relative overflow-hidden min-h-[350px] flex flex-col">
+          <NeumorphicCard className="p-6 relative overflow-hidden min-h-[968px] flex flex-col">
             {/* Section Title - Visible */}
             <h3 className="text-xl font-bold text-gray-700 mb-6 relative z-20">Funds Under Management</h3>
 
