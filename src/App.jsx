@@ -64,6 +64,8 @@ function AppContent() {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
 
+  console.log('🚀 Alpha Edge v2.0 - Redeploy Test - Commit:', 'cba0d8a', '- Time:', new Date().toISOString());
+
   return (
     <>
       {isLandingPage ? (
