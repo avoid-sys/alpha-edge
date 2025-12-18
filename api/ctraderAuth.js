@@ -3,8 +3,8 @@
 //
 // IMPORTANT:
 // - Configure these env vars in Vercel:
-//   - CTRADER_CLIENT_ID (e.g., 1506_ZNLG807Bj6mt9w4g9KYgRhO3CeHeleYf2YfoFVKLOaQnF)
-//   - CTRADER_CLIENT_SECRET (e.g., Pr937H9OaHKwviXgd0Uc0uPjAoHdOzQ6JAU8PC7jkJqPe)
+//   - CTRADER_CLIENT_ID (e.g., 19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF)
+//   - CTRADER_CLIENT_SECRET (e.g., Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe)
 //   - CTRADER_REDIRECT_URI (production, e.g. https://alphaedge.vc/auth/ctrader/callback)
 //   - CTRADER_LOCAL_REDIRECT_URI (optional, for local dev, e.g. http://localhost:3000/auth/ctrader/callback)
 //
@@ -69,17 +69,38 @@ module.exports = async (req, res) => {
       params.append('client_secret', clientSecret);
     }
 
-    // cTrader Open API requires GET request with query parameters
-    // Note: This differs from standard OAuth 2.0 (which uses POST)
-    const response = await axios.get(tokenUrl, {
-      params: {
-        grant_type: grant_type === 'refresh_token' ? 'refresh_token' : 'authorization_code',
-        ...(grant_type === 'refresh_token' 
-          ? { refresh_token, client_id: clientId, client_secret: clientSecret }
-          : { code, redirect_uri: redirectUri, client_id: clientId, client_secret: clientSecret }
-        )
-      },
+    // cTrader Open API requires POST request with form-encoded body
+    // This matches cTrader documentation
+    let requestParams;
+    if (grant_type === 'refresh_token' && refresh_token) {
+      requestParams = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token,
+        client_id: clientId,
+        client_secret: clientSecret
+      });
+    } else {
+      // authorization_code flow
+      const redirectUri = redirectUriFromClient || process.env.CTRADER_REDIRECT_URI || process.env.CTRADER_LOCAL_REDIRECT_URI;
+      if (!redirectUri) {
+        res.status(500).json({
+          error: 'Missing redirect_uri',
+          details: 'Provide redirect_uri in request body or set CTRADER_REDIRECT_URI in environment'
+        });
+        return;
+      }
+      requestParams = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret
+      });
+    }
+
+    const response = await axios.post(tokenUrl, requestParams, {
       headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json'
       },
       timeout: 10000
