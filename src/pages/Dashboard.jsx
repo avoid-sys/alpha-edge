@@ -1024,8 +1024,11 @@ export default function Dashboard() {
 
           {/* Funds Under Management Section - Aligned with Score Analysis height */}
           <NeumorphicCard className="p-6 relative overflow-hidden min-h-[500px] flex flex-col">
+            {/* Section Title - Visible */}
+            <h3 className="text-xl font-bold text-gray-700 mb-6 relative z-20">Funds Under Management</h3>
+
             {/* Blur overlay */}
-            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm z-10 flex items-center justify-center">
+            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm z-10 flex items-center justify-center" style={{top: '60px'}}>
               <div className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg">
                 UNDER DEVELOPMENT
               </div>
@@ -1033,7 +1036,6 @@ export default function Dashboard() {
 
             {/* Content (blurred) */}
             <div className="filter blur-[0.5px] flex-1 flex flex-col">
-              <h3 className="text-xl font-bold text-gray-700 mb-6">Funds Under Management</h3>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {/* Balance Under Management */}
