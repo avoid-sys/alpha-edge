@@ -1023,7 +1023,7 @@ export default function Dashboard() {
           </div>
 
           {/* Funds Under Management Section */}
-          <NeumorphicCard className="p-6 relative overflow-hidden min-h-[500px] flex flex-col">
+          <NeumorphicCard className="p-6 relative overflow-hidden flex flex-col">
             {/* Section Title - Visible */}
             <h3 className="text-xl font-bold text-gray-700 mb-6 relative z-20">Funds Under Management</h3>
 
@@ -1113,7 +1113,7 @@ export default function Dashboard() {
 
         {/* Right Column: Score Analysis */}
         <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-           <NeumorphicCard className="p-6 min-h-[500px] flex flex-col">
+           <NeumorphicCard className="p-6 flex flex-col">
               <h3 className="text-xl font-bold text-gray-700 mb-6">Score Analysis</h3>
 
               <div className="flex flex-col gap-8">
