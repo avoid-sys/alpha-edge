@@ -31,12 +31,12 @@ import {
 export default function Home() {
   const navigate = useNavigate();
   const [authMode, setAuthMode] = useState(null); // 'login' or 'register'
-  const [authForm, setAuthForm] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    fullName: ''
-  });
+
+  // Отдельные state для каждого поля (решение №1 - useState)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
@@ -190,31 +190,24 @@ export default function Home() {
     try {
       if (authMode === 'register') {
         // Validate form
-        if (!authForm.email || !authForm.password || !authForm.fullName) {
+        if (!email || !password || !fullName) {
           throw new Error('Please fill in all required fields');
         }
 
-        if (authForm.password !== authForm.confirmPassword) {
+        if (password !== confirmPassword) {
           throw new Error('Passwords do not match');
         }
 
-        if (authForm.password.length < 6) {
+        if (password.length < 6) {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        // ✅ ПРАВИЛЬНОЕ РЕШЕНИЕ: Используем state значения
-        // authForm уже содержит правильные string значения из onChange
-        const email = String(authForm.email || '').trim();
-        const password = String(authForm.password || '').trim();
-        const fullName = String(authForm.fullName || '').trim();
+        // ✅ РЕШЕНИЕ №1: Отдельные useState - значения уже готовы
+        const finalEmail = email.trim();
+        const finalPassword = password.trim();
+        const finalFullName = fullName.trim();
 
-        console.log('=== USING STATE VALUES ===');
-        console.log('State values:');
-        console.log('- email:', email, 'type:', typeof email, 'original:', authForm.email);
-        console.log('- password length:', password.length, 'type:', typeof password);
-        console.log('- fullName:', fullName, 'type:', typeof fullName);
-
-        // Проверяем что все корректно
+        // Basic validation
         if (!email) {
           throw new Error('Please enter your email address');
         }
@@ -222,36 +215,25 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        console.log('✅ State values validated, calling Supabase...');
-
         // Check if Supabase is working, if not, use demo mode
         if (supabaseStatus === 'disconnected') {
           // Demo mode - simulate successful signup
-          console.log('Using demo mode for signup');
           setSuccessMessage('Demo Mode: Account created successfully! (Database not yet configured)');
           setAuthMode('login');
-          setAuthForm({
-            email: email,
-            password: '',
-            confirmPassword: '',
-            fullName: ''
-          });
+          setEmail(email); // Keep email for login
+          setPassword('');
+          setConfirmPassword('');
+          setFullName('');
           return;
         }
 
-        // Момент истины - проверим что отправляем
-        console.log('=== SUPABASE CALL DEBUG ===');
-        console.log('FINAL VALUES TO SEND:');
-        console.log('- email:', email, 'TYPE:', typeof email);
-        console.log('- password:', password ? '[HIDDEN]' : 'empty', 'TYPE:', typeof password);
-        console.log('- fullName:', fullName, 'TYPE:', typeof fullName);
 
         // 🔥 SMOKE TEST - hardcoded values (как предложил пользователь)
 
         const { user, error } = await authService.signUp(
-          email,
-          password,
-          fullName
+          finalEmail,
+          finalPassword,
+          finalFullName
         );
 
         if (error) {
@@ -263,19 +245,17 @@ export default function Home() {
           console.log('Signup successful for user:', user.email);
           setSuccessMessage('Account created successfully! Please check your email to verify your account.');
           setAuthMode('login');
-          setAuthForm({
-            email: email, // Keep email for login
-            password: '',
-            confirmPassword: '',
-            fullName: ''
-          });
+          setEmail(finalEmail); // Keep email for login
+          setPassword('');
+          setConfirmPassword('');
+          setFullName('');
         } else {
           throw new Error('Account creation failed. Please try again.');
         }
       } else {
         // Login
-        const loginEmail = String(authForm.email || '').trim();
-        const loginPassword = String(authForm.password || '').trim();
+        const loginEmail = email.trim();
+        const loginPassword = password.trim();
 
         if (!loginEmail || !loginPassword) {
           throw new Error('Please enter your email and password');
@@ -557,11 +537,8 @@ export default function Home() {
                     required
                     className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                     placeholder="Enter your full name"
-                    value={authForm.fullName}
-                    onChange={(e) => {
-                      console.log('FullName input change:', e.target.value, typeof e.target.value);
-                      setAuthForm({...authForm, fullName: e.target.value});
-                    }}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                   />
                 </div>
               )}
@@ -575,11 +552,8 @@ export default function Home() {
                   required
                   className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                   placeholder="Enter your email"
-                  value={authForm.email}
-                  onChange={(e) => {
-                    console.log('Email input change:', e.target.value, typeof e.target.value);
-                    setAuthForm({...authForm, email: e.target.value});
-                  }}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
@@ -592,11 +566,8 @@ export default function Home() {
                   required
                   className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                   placeholder="Enter your password"
-                  value={authForm.password}
-                  onChange={(e) => {
-                    console.log('Password input change:', typeof e.target.value);
-                    setAuthForm({...authForm, password: e.target.value});
-                  }}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
 
@@ -610,11 +581,8 @@ export default function Home() {
                     required
                     className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                     placeholder="Confirm your password"
-                    value={authForm.confirmPassword}
-                    onChange={(e) => {
-                      console.log('ConfirmPassword input change:', typeof e.target.value);
-                      setAuthForm({...authForm, confirmPassword: e.target.value});
-                    }}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                   />
                 </div>
               )}
