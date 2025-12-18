@@ -202,17 +202,45 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        // Ensure all values are strings
-        const email = String(authForm.email || '').trim();
-        const password = String(authForm.password || '').trim();
-        const fullName = String(authForm.fullName || '').trim();
+        // Debug: Check the raw form data
+        console.log('Raw authForm data:', authForm);
+        console.log('Raw authForm.email:', authForm.email, 'Type:', typeof authForm.email);
 
-        console.log('Attempting signup for:', email);
-        console.log('Form data types:', {
-          email: typeof email,
-          password: typeof password,
-          fullName: typeof fullName
-        });
+        // Extract string values properly
+        let email = '';
+        let password = '';
+        let fullName = '';
+
+        // Handle different possible formats of form data
+        if (typeof authForm.email === 'string') {
+          email = authForm.email.trim();
+        } else if (authForm.email && typeof authForm.email === 'object') {
+          // If it's an object, try to extract the value
+          email = String(authForm.email.value || authForm.email.target?.value || authForm.email || '').trim();
+        } else {
+          email = String(authForm.email || '').trim();
+        }
+
+        if (typeof authForm.password === 'string') {
+          password = authForm.password.trim();
+        } else if (authForm.password && typeof authForm.password === 'object') {
+          password = String(authForm.password.value || authForm.password.target?.value || authForm.password || '').trim();
+        } else {
+          password = String(authForm.password || '').trim();
+        }
+
+        if (typeof authForm.fullName === 'string') {
+          fullName = authForm.fullName.trim();
+        } else if (authForm.fullName && typeof authForm.fullName === 'object') {
+          fullName = String(authForm.fullName.value || authForm.fullName.target?.value || authForm.fullName || '').trim();
+        } else {
+          fullName = String(authForm.fullName || '').trim();
+        }
+
+        console.log('Extracted values:');
+        console.log('- Email:', email, 'Type:', typeof email);
+        console.log('- Password:', password ? '[HIDDEN]' : 'empty', 'Type:', typeof password);
+        console.log('- Full Name:', fullName, 'Type:', typeof fullName);
 
         // Check if Supabase is working, if not, use demo mode
         if (supabaseStatus === 'disconnected') {
@@ -539,7 +567,10 @@ export default function Home() {
                     className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                     placeholder="Enter your full name"
                     value={authForm.fullName}
-                    onChange={(e) => setAuthForm({...authForm, fullName: String(e.target.value || '')})}
+                    onChange={(e) => {
+                      console.log('FullName input change:', e.target.value, typeof e.target.value);
+                      setAuthForm({...authForm, fullName: e.target.value});
+                    }}
                   />
                 </div>
               )}
@@ -554,7 +585,10 @@ export default function Home() {
                   className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                   placeholder="Enter your email"
                   value={authForm.email}
-                  onChange={(e) => setAuthForm({...authForm, email: String(e.target.value || '')})}
+                  onChange={(e) => {
+                    console.log('Email input change:', e.target.value, typeof e.target.value);
+                    setAuthForm({...authForm, email: e.target.value});
+                  }}
                 />
               </div>
 
@@ -568,7 +602,10 @@ export default function Home() {
                   className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                   placeholder="Enter your password"
                   value={authForm.password}
-                  onChange={(e) => setAuthForm({...authForm, password: String(e.target.value || '')})}
+                  onChange={(e) => {
+                    console.log('Password input change:', typeof e.target.value);
+                    setAuthForm({...authForm, password: e.target.value});
+                  }}
                 />
               </div>
 
@@ -583,7 +620,10 @@ export default function Home() {
                     className="w-full bg-[#e0e5ec] rounded-lg px-4 py-3 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff]"
                     placeholder="Confirm your password"
                     value={authForm.confirmPassword}
-                    onChange={(e) => setAuthForm({...authForm, confirmPassword: String(e.target.value || '')})}
+                    onChange={(e) => {
+                      console.log('ConfirmPassword input change:', typeof e.target.value);
+                      setAuthForm({...authForm, confirmPassword: e.target.value});
+                    }}
                   />
                 </div>
               )}
