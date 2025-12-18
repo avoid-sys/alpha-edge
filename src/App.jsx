@@ -64,6 +64,8 @@ function AppContent() {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
 
+  console.log('📱 AppContent rendering, path:', location.pathname);
+
   return (
     <>
       {isLandingPage ? (
