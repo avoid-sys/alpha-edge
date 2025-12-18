@@ -96,12 +96,19 @@ export default function BrokerExchangeConnect() {
             console.log('cTrader OAuth - All env vars:', Object.keys(import.meta.env).filter(key => key.includes('CTRADER')));
 
             // Use production redirect_uri or localhost for development
-            // IMPORTANT: This redirect_uri MUST exactly match the one registered in cTrader app settings
-            // Check: https://connect.spotware.com/apps - your app - Redirect URLs section
+            // CRITICAL: This redirect_uri MUST exactly match the one registered in cTrader app settings
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             const redirectUri = isLocalhost
               ? `${window.location.origin}/auth/ctrader/callback`
               : (oauth.redirectUri || 'https://alphaedge.vc/auth/ctrader/callback');
+
+            console.log('cTrader OAuth - Redirect URI check:');
+            console.log('  - Current:', redirectUri);
+            console.log('  - Is localhost:', isLocalhost);
+            console.log('  - Expected in cTrader app settings:');
+            console.log('    For localhost:', `${window.location.origin}/auth/ctrader/callback`);
+            console.log('    For production:', 'https://alphaedge.vc/auth/ctrader/callback');
+            console.log('  ⚠️  MUST MATCH EXACTLY in https://connect.spotware.com/apps');
 
             // Log redirect_uri for debugging - must match exactly in cTrader app settings
             console.log('cTrader OAuth - Redirect URI:', redirectUri);
@@ -112,24 +119,55 @@ export default function BrokerExchangeConnect() {
             // cTrader authorization URL - official format from cTrader documentation
             // URL: https://id.ctrader.com/my/settings/openapi/grantingaccess
             // NO trailing slash - this causes 400 error
-            const authUrl = 'https://id.ctrader.com/my/settings/openapi/grantingaccess';
-            const rawScope = oauth.scope || 'accounts trading';
+            // Try different auth URLs and parameters - cTrader has multiple possible endpoints
+            const authUrls = [
+              'https://connect.spotware.com/apps/authorize',
+              'https://id.ctrader.com/connect/authorize',
+              'https://id.ctrader.com/my/settings/openapi/grantingaccess'
+            ];
+
+            const scopes = [
+              'trading accounts',    // User's suggested scope
+              'accounts trading',    // Previous attempt
+              'accounts',           // Minimal scope
+              'trading',           // Alternative
+              'openid profile',    // Standard OAuth scopes
+              'accounts read',     // Read-only accounts
+              'trading read'       // Read-only trading
+            ];
+
+            const rawScope = oauth.scope || 'trading accounts';
             const state = `${id}-${Date.now()}`;
-            
-            // Build URL with proper encoding - cTrader requires specific format
-            // Try minimal parameters - product=web may cause 400 error
-            const url = `${authUrl}?` +
-              `client_id=${encodeURIComponent(clientId)}&` +
-              `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-              `scope=${encodeURIComponent(rawScope)}&` +
-              `response_type=code&` +
-              `state=${encodeURIComponent(state)}`;
-            
-            // Encode state for localStorage
+
+            // MANUAL ENCODING - cTrader may reject URLSearchParams encoding
+            // Replace + with %20 manually for scope (critical for cTrader)
+            const encodedClientId = encodeURIComponent(clientId);
+            const encodedRedirectUri = encodeURIComponent(redirectUri);
+            const encodedScope = encodeURIComponent(rawScope).replace(/\+/g, '%20'); // FORCE %20 instead of +
             const encodedState = encodeURIComponent(state);
+
+            // Try different parameter combinations and orders
+            const urlVariations = [
+              // Standard OAuth2 with product=web (cTrader specific)
+              `${authUrls[2]}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&response_type=code&product=web&state=${encodedState}`,
+              // Minimal parameters
+              `${authUrls[2]}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&response_type=code&state=${encodedState}`,
+              // Different auth URL
+              `${authUrls[0]}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=${encodedScope}&response_type=code&state=${encodedState}`,
+              // With different scope
+              `${authUrls[2]}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=accounts&response_type=code&state=${encodedState}`,
+              // With trading scope only
+              `${authUrls[2]}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=trading&response_type=code&state=${encodedState}`,
+              // OpenID connect style
+              `${authUrls[1]}?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=openid%20profile&response_type=code&state=${encodedState}`
+            ];
+
+            // Try the most likely working URL first
+            const url = urlVariations[0]; // With product=web parameter
             
             // Log everything for debugging
-            console.log('3. Parameters:', {
+            console.log('=== cTrader URL Variations Debug ===');
+            console.log('1. Parameters:', {
               client_id: clientId,
               redirect_uri: redirectUri,
               scope: rawScope,
@@ -137,8 +175,29 @@ export default function BrokerExchangeConnect() {
               product: 'web',
               state: state
             });
-            console.log('4. Full Authorization URL:', url);
-            console.log('5. URL will redirect to:', url.replace(/scope=[^&]*/, 'scope=trading%20accounts'));
+            console.log('2. Encoded parameters:', {
+              encodedClientId: encodedClientId,
+              encodedRedirectUri: encodedRedirectUri,
+              encodedScope: encodedScope,
+              encodedState: encodedState
+            });
+            console.log('3. Current URL (trying first):', url);
+            console.log('4. All URL variations tried:');
+            urlVariations.forEach((variation, index) => {
+              console.log(`   ${index + 1}. ${variation}`);
+            });
+
+            // Check for common cTrader 400 causes
+            console.log('5. 400 Error Troubleshooting:');
+            console.log('   - Scope encoding:', encodedScope.includes('%20') ? '✓ %20 (good)' : '✗ + (bad)');
+            console.log('   - Client ID format:', clientId.includes('_') ? '✓ Has underscore (good)' : '✗ No underscore (may be bad)');
+            console.log('   - Redirect URI:', redirectUri.startsWith('http') ? '✓ HTTP(S) (good)' : '✗ Not HTTP (bad)');
+            console.log('   - Product param:', url.includes('product=web') ? '✓ Has product=web' : '✗ Missing product=web');
+            console.log('   - URL length:', url.length, url.length > 2000 ? '(WARNING: Too long!)' : '(OK)');
+
+            console.log('6. If 400 persists, try these manual URLs:');
+            console.log('   Manual URL 1:', `https://id.ctrader.com/my/settings/openapi/grantingaccess?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=accounts&response_type=code&state=${encodedState}`);
+            console.log('   Manual URL 2:', `https://connect.spotware.com/apps/authorize?client_id=${encodedClientId}&redirect_uri=${encodedRedirectUri}&scope=trading%20accounts&response_type=code&state=${encodedState}`);
             console.log('4. URL Length:', url.length);
             console.log('5. Redirect URI Check:');
             console.log('   - Current redirect_uri:', redirectUri);

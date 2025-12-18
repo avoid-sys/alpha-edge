@@ -32,8 +32,13 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // cTrader Open API token endpoint
-    const tokenUrl = 'https://openapi.ctrader.com/apps/token';
+        // Try multiple token endpoints - cTrader has different endpoints for different flows
+        const tokenUrls = [
+          'https://openapi.ctrader.com/apps/token',          // Main endpoint
+          'https://connect.spotware.com/apps/token',         // Alternative
+          'https://id.ctrader.com/connect/token'             // OpenID Connect
+        ];
+        const tokenUrl = tokenUrls[0]; // Use main endpoint first
 
     const params = new URLSearchParams();
     
