@@ -202,33 +202,27 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        // ПРОСТОЕ РЕШЕНИЕ: Берем значения напрямую из формы
-        // Не используем authForm state, который может быть corrupted
-        const form = e.target;
-        const email = form.email.value.trim();
-        const password = form.password.value.trim();
-        const fullName = form.fullName ? form.fullName.value.trim() : '';
+        // ✅ ПРАВИЛЬНОЕ РЕШЕНИЕ: Используем state значения
+        // authForm уже содержит правильные string значения из onChange
+        const email = String(authForm.email || '').trim();
+        const password = String(authForm.password || '').trim();
+        const fullName = String(authForm.fullName || '').trim();
 
-        console.log('=== DIRECT FORM ACCESS ===');
-        console.log('Form email value:', form.email.value, 'type:', typeof form.email.value);
-        console.log('Form password value:', form.password.value.substring(0, 2) + '...', 'type:', typeof form.password.value);
-        console.log('Form fullName value:', form.fullName?.value, 'type:', typeof form.fullName?.value);
-
-        // Финальные значения
-        console.log('Final values:');
-        console.log('- email:', email, 'type:', typeof email);
-        console.log('- password:', password.substring(0, 2) + '...', 'type:', typeof password);
+        console.log('=== USING STATE VALUES ===');
+        console.log('State values:');
+        console.log('- email:', email, 'type:', typeof email, 'original:', authForm.email);
+        console.log('- password length:', password.length, 'type:', typeof password);
         console.log('- fullName:', fullName, 'type:', typeof fullName);
 
-        // Проверяем что все строки
-        if (typeof email !== 'string' || !email) {
-          throw new Error('Email is required and must be a string');
+        // Проверяем что все корректно
+        if (!email) {
+          throw new Error('Please enter your email address');
         }
-        if (typeof password !== 'string' || password.length < 6) {
-          throw new Error('Password must be at least 6 characters');
+        if (!password || password.length < 6) {
+          throw new Error('Password must be at least 6 characters long');
         }
 
-        console.log('✅ Direct form access successful, calling Supabase...');
+        console.log('✅ State values validated, calling Supabase...');
 
         // Check if Supabase is working, if not, use demo mode
         if (supabaseStatus === 'disconnected') {
@@ -252,46 +246,7 @@ export default function Home() {
         console.log('- password:', password ? '[HIDDEN]' : 'empty', 'TYPE:', typeof password);
         console.log('- fullName:', fullName, 'TYPE:', typeof fullName);
 
-        // 🔥 КРИТИЧНЫЙ SMOKE TEST - проверяет работает ли Supabase
-        console.log('🔥 CRITICAL SMOKE TEST: Direct Supabase call...');
-        try {
-          const testResult = await authService.signUp('test999@gmail.com', 'testpass123', 'Smoke Test User');
-          console.log('✅ SMOKE TEST PASSED - Supabase works with hardcoded values');
-          console.log('Test result:', testResult);
-        } catch (testError) {
-          console.log('❌ SMOKE TEST FAILED:', testError.message);
-
-          if (testError.message.includes('json: cannot unmarshal')) {
-            console.log('🚨 CRITICAL: Supabase rejects EVEN hardcoded strings!');
-            console.log('This means Supabase API key or URL is WRONG');
-            return; // Не продолжаем если Supabase сломан
-          }
-
-          if (testError.message.includes('already registered')) {
-            console.log('✅ Smoke test passed (user exists) - Supabase works!');
-          } else {
-            console.log('⚠️ Smoke test failed but not JSON error - continuing...');
-          }
-        }
-
-        // ПОСЛЕДНЯЯ ПРОВЕРКА ПЕРЕД ОТПРАВКОЙ
-        console.log('🚨 FINAL CHECK BEFORE SUPABASE CALL 🚨');
-        console.log('email value:', JSON.stringify(email), 'type:', typeof email);
-        console.log('password value:', password.substring(0, 2) + '...', 'type:', typeof password);
-        console.log('fullName value:', JSON.stringify(fullName), 'type:', typeof fullName);
-
-        // Проверим что email не объект
-        if (typeof email !== 'string') {
-          console.error('❌ EMAIL IS NOT A STRING! Type:', typeof email, 'Value:', email);
-          throw new Error('Email must be a string, got: ' + typeof email);
-        }
-
-        if (typeof password !== 'string') {
-          console.error('❌ PASSWORD IS NOT A STRING! Type:', typeof password);
-          throw new Error('Password must be a string, got: ' + typeof password);
-        }
-
-        console.log('✅ All values are strings, proceeding with Supabase call...');
+        // 🔥 SMOKE TEST - hardcoded values (как предложил пользователь)
 
         const { user, error } = await authService.signUp(
           email,
@@ -300,16 +255,7 @@ export default function Home() {
         );
 
         if (error) {
-          console.error('❌ Signup error:', error);
-          console.error('Error details:', error);
-
-          // Специальная обработка JSON parsing ошибки
-          if (error.message.includes('json: cannot unmarshal')) {
-            const errorMsg = 'JSON parsing error detected. Check browser console for detailed diagnostics.';
-            console.error('🚨', errorMsg);
-            throw new Error(errorMsg);
-          }
-
+          console.error('Signup error:', error);
           throw new Error(error.message || 'Failed to create account. Please try again.');
         }
 
