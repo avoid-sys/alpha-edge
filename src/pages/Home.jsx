@@ -202,45 +202,23 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        // Debug: Check the raw form data
-        console.log('Raw authForm data:', authForm);
-        console.log('Raw authForm.email:', authForm.email, 'Type:', typeof authForm.email);
+        // CRITICAL FIX: Supabase expects strings, not objects
+        // Debug as user suggested
+        console.log('=== SIGNUP DEBUG ===');
+        console.log('typeof authForm.email:', typeof authForm.email, 'value:', authForm.email);
+        console.log('typeof authForm.password:', typeof authForm.password);
 
-        // Extract string values properly
-        let email = '';
-        let password = '';
-        let fullName = '';
+        // The key debug - check what we have before String() conversion
+        console.log('Before String() - email:', authForm.email, 'type:', typeof authForm.email);
 
-        // Handle different possible formats of form data
-        if (typeof authForm.email === 'string') {
-          email = authForm.email.trim();
-        } else if (authForm.email && typeof authForm.email === 'object') {
-          // If it's an object, try to extract the value
-          email = String(authForm.email.value || authForm.email.target?.value || authForm.email || '').trim();
-        } else {
-          email = String(authForm.email || '').trim();
-        }
+        // Ensure we have strings (Supabase requirement)
+        const email = String(authForm.email || '').trim();
+        const password = String(authForm.password || '').trim();
+        const fullName = String(authForm.fullName || '').trim();
 
-        if (typeof authForm.password === 'string') {
-          password = authForm.password.trim();
-        } else if (authForm.password && typeof authForm.password === 'object') {
-          password = String(authForm.password.value || authForm.password.target?.value || authForm.password || '').trim();
-        } else {
-          password = String(authForm.password || '').trim();
-        }
-
-        if (typeof authForm.fullName === 'string') {
-          fullName = authForm.fullName.trim();
-        } else if (authForm.fullName && typeof authForm.fullName === 'object') {
-          fullName = String(authForm.fullName.value || authForm.fullName.target?.value || authForm.fullName || '').trim();
-        } else {
-          fullName = String(authForm.fullName || '').trim();
-        }
-
-        console.log('Extracted values:');
-        console.log('- Email:', email, 'Type:', typeof email);
-        console.log('- Password:', password ? '[HIDDEN]' : 'empty', 'Type:', typeof password);
-        console.log('- Full Name:', fullName, 'Type:', typeof fullName);
+        // Final validation as user suggested
+        console.log('typeof email:', typeof email, 'email:', email);
+        console.log('typeof password:', typeof password, 'password length:', password.length);
 
         // Check if Supabase is working, if not, use demo mode
         if (supabaseStatus === 'disconnected') {
@@ -256,6 +234,13 @@ export default function Home() {
           });
           return;
         }
+
+        // Debug: Show exactly what we're sending to Supabase
+        console.log('=== SUPABASE CALL DEBUG ===');
+        console.log('Sending to authService.signUp:');
+        console.log('- email:', email, '(type:', typeof email + ')');
+        console.log('- password:', password.substring(0, 3) + '...', '(type:', typeof password + ')');
+        console.log('- fullName:', fullName, '(type:', typeof fullName + ')');
 
         const { user, error } = await authService.signUp(
           email,
