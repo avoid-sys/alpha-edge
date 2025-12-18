@@ -202,53 +202,33 @@ export default function Home() {
           throw new Error('Password must be at least 6 characters long');
         }
 
-        // SMOKE TEST FIRST - как предложил пользователь
-        console.log('=== SMOKE TEST: Прямой вызов Supabase ===');
-        try {
-          // Попробуем зарегистрировать тестового пользователя напрямую
-          const testResult = await authService.signUp('test123@gmail.com', '12345678', 'Test User');
-          console.log('✅ Smoke test successful:', testResult);
-        } catch (testError) {
-          console.log('❌ Smoke test failed:', testError.message);
+        // ПРОСТОЕ РЕШЕНИЕ: Берем значения напрямую из формы
+        // Не используем authForm state, который может быть corrupted
+        const form = e.target;
+        const email = form.email.value.trim();
+        const password = form.password.value.trim();
+        const fullName = form.fullName ? form.fullName.value.trim() : '';
 
-          // Если smoke test прошел, значит форма сломана
-          if (testError.message.includes('already registered')) {
-            console.log('✅ Smoke test passed - форма сломана, Supabase работает');
-          } else {
-            console.log('❌ Supabase itself broken:', testError);
-            return; // Не продолжаем если Supabase сломан
-          }
-        }
+        console.log('=== DIRECT FORM ACCESS ===');
+        console.log('Form email value:', form.email.value, 'type:', typeof form.email.value);
+        console.log('Form password value:', form.password.value.substring(0, 2) + '...', 'type:', typeof form.password.value);
+        console.log('Form fullName value:', form.fullName?.value, 'type:', typeof form.fullName?.value);
 
-        // CRITICAL FIX: Supabase expects strings, not objects
-        console.log('=== SIGNUP DEBUG ===');
-        console.log('RAW authForm.email:', authForm.email, 'TYPE:', typeof authForm.email);
-        console.log('RAW authForm.password:', authForm.password, 'TYPE:', typeof authForm.password);
-
-        // Момент истины - проверим что отправляется
-        const rawEmail = authForm.email;
-        const rawPassword = authForm.password;
-
-        console.log('BEFORE String() conversion:');
-        console.log('- rawEmail:', rawEmail, 'typeof:', typeof rawEmail);
-        console.log('- rawPassword:', rawPassword, 'typeof:', typeof rawPassword);
-
-        // Конвертируем в строки
-        const email = String(rawEmail || '').trim();
-        const password = String(rawPassword || '').trim();
-        const fullName = String(authForm.fullName || '').trim();
-
-        console.log('AFTER String() conversion:');
-        console.log('- email:', email, 'typeof:', typeof email);
-        console.log('- password length:', password.length, 'typeof:', typeof password);
-        console.log('- fullName:', fullName, 'typeof:', typeof fullName);
-
-        // Финальная проверка перед отправкой
-        console.log('=== FINAL CHECK BEFORE SUPABASE ===');
-        console.log('Sending to Supabase:');
+        // Финальные значения
+        console.log('Final values:');
         console.log('- email:', email, 'type:', typeof email);
         console.log('- password:', password.substring(0, 2) + '...', 'type:', typeof password);
         console.log('- fullName:', fullName, 'type:', typeof fullName);
+
+        // Проверяем что все строки
+        if (typeof email !== 'string' || !email) {
+          throw new Error('Email is required and must be a string');
+        }
+        if (typeof password !== 'string' || password.length < 6) {
+          throw new Error('Password must be at least 6 characters');
+        }
+
+        console.log('✅ Direct form access successful, calling Supabase...');
 
         // Check if Supabase is working, if not, use demo mode
         if (supabaseStatus === 'disconnected') {
@@ -272,15 +252,25 @@ export default function Home() {
         console.log('- password:', password ? '[HIDDEN]' : 'empty', 'TYPE:', typeof password);
         console.log('- fullName:', fullName, 'TYPE:', typeof fullName);
 
-        // 🔥 SMOKE TEST - hardcoded values (как предложил пользователь)
-        console.log('🔥 SMOKE TEST: Trying hardcoded signup...');
+        // 🔥 КРИТИЧНЫЙ SMOKE TEST - проверяет работает ли Supabase
+        console.log('🔥 CRITICAL SMOKE TEST: Direct Supabase call...');
         try {
-          const testResult = await authService.signUp('test123@gmail.com', '12345678', 'Test User');
-          console.log('✅ Smoke test SUCCESS:', testResult);
+          const testResult = await authService.signUp('test999@gmail.com', 'testpass123', 'Smoke Test User');
+          console.log('✅ SMOKE TEST PASSED - Supabase works with hardcoded values');
+          console.log('Test result:', testResult);
         } catch (testError) {
-          console.log('❌ Smoke test FAILED:', testError.message);
+          console.log('❌ SMOKE TEST FAILED:', testError.message);
+
           if (testError.message.includes('json: cannot unmarshal')) {
-            console.log('🚨 CONFIRMED: JSON parsing error even with hardcoded values!');
+            console.log('🚨 CRITICAL: Supabase rejects EVEN hardcoded strings!');
+            console.log('This means Supabase API key or URL is WRONG');
+            return; // Не продолжаем если Supabase сломан
+          }
+
+          if (testError.message.includes('already registered')) {
+            console.log('✅ Smoke test passed (user exists) - Supabase works!');
+          } else {
+            console.log('⚠️ Smoke test failed but not JSON error - continuing...');
           }
         }
 
@@ -310,7 +300,16 @@ export default function Home() {
         );
 
         if (error) {
-          console.error('Signup error:', error);
+          console.error('❌ Signup error:', error);
+          console.error('Error details:', error);
+
+          // Специальная обработка JSON parsing ошибки
+          if (error.message.includes('json: cannot unmarshal')) {
+            const errorMsg = 'JSON parsing error detected. Check browser console for detailed diagnostics.';
+            console.error('🚨', errorMsg);
+            throw new Error(errorMsg);
+          }
+
           throw new Error(error.message || 'Failed to create account. Please try again.');
         }
 
