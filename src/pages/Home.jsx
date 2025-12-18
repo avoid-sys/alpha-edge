@@ -235,12 +235,24 @@ export default function Home() {
           return;
         }
 
-        // Debug: Show exactly what we're sending to Supabase
+        // Момент истины - проверим что отправляем
         console.log('=== SUPABASE CALL DEBUG ===');
-        console.log('Sending to authService.signUp:');
-        console.log('- email:', email, '(type:', typeof email + ')');
-        console.log('- password:', password.substring(0, 3) + '...', '(type:', typeof password + ')');
-        console.log('- fullName:', fullName, '(type:', typeof fullName + ')');
+        console.log('FINAL VALUES TO SEND:');
+        console.log('- email:', email, 'TYPE:', typeof email);
+        console.log('- password:', password ? '[HIDDEN]' : 'empty', 'TYPE:', typeof password);
+        console.log('- fullName:', fullName, 'TYPE:', typeof fullName);
+
+        // 🔥 SMOKE TEST - hardcoded values (как предложил пользователь)
+        console.log('🔥 SMOKE TEST: Trying hardcoded signup...');
+        try {
+          const testResult = await authService.signUp('test123@gmail.com', '12345678', 'Test User');
+          console.log('✅ Smoke test SUCCESS:', testResult);
+        } catch (testError) {
+          console.log('❌ Smoke test FAILED:', testError.message);
+          if (testError.message.includes('json: cannot unmarshal')) {
+            console.log('🚨 CONFIRMED: JSON parsing error even with hardcoded values!');
+          }
+        }
 
         const { user, error } = await authService.signUp(
           email,

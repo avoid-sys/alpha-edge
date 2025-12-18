@@ -111,13 +111,27 @@ class AuthService {
         return { user: demoUser, session: { user: demoUser }, error: null };
       }
 
+      // 🔍 CRITICAL CHECK: Ensure email is string before Supabase call
+      console.log('🔍 AUTH SERVICE: Before Supabase call');
+      console.log('- email:', email, 'type:', typeof email);
+      console.log('- password length:', password.length, 'type:', typeof password);
+      console.log('- fullName:', fullName, 'type:', typeof fullName);
+
+      // Force string conversion one more time
+      const emailStr = String(email).trim();
+      const passwordStr = String(password);
+      const fullNameStr = String(fullName || '').trim();
+
+      console.log('🔍 AFTER String() conversion:');
+      console.log('- emailStr:', emailStr, 'type:', typeof emailStr);
+
       const { data, error } = await auth.signUp({
-        email,
-        password,
+        email: emailStr,
+        password: passwordStr,
         options: {
           data: {
-            full_name: fullName,
-            display_name: fullName
+            full_name: fullNameStr,
+            display_name: fullNameStr
           }
         }
       });
