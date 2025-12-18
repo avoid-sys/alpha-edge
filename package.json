@@ -11,6 +11,7 @@
     "start": "vite"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
     "axios": "^1.13.2",
     "crypto-js": "^4.2.0",
     "date-fns": "^2.29.0",
