@@ -1,6 +1,201 @@
-# Supabase Setup Guide
+# Настройка Supabase в проекте Alpha Edge
 
-This guide will help you set up the Supabase database schema for the Alpha Edge trading platform.
+## 📋 Шаги настройки
+
+### 1. Установка зависимостей
+```bash
+npm install @supabase/supabase-js
+```
+✅ **Уже установлено** в `package.json`
+
+### 2. Настройка переменных окружения
+
+Создайте файл `.env` в корне проекта. Вы можете использовать следующие команды:
+
+```bash
+# В терминале выполните:
+cd /Users/a00013/Alpha\ Edge
+cat > .env << 'EOF'
+VITE_SUPABASE_URL=https://lwgnyerzimcajauxzowx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng
+EOF
+```
+
+Или создайте файл вручную с содержимым:
+
+```env
+# Для Vite (рекомендуется)
+VITE_SUPABASE_URL=https://lwgnyerzimcajauxzowx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng
+
+# Для Next.js (если будете мигрировать)
+NEXT_PUBLIC_SUPABASE_URL=https://lwgnyerzimcajauxzowx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzU2NjUsImV4cCI6MjA4MTYxMTY2NX0.mhYD-K2YKeNcvgerc5WPWhzuItJDXzqdrCjrK69B2Ng
+```
+
+### 3. Настройка Vercel (для продакшена)
+
+В Vercel Dashboard добавьте переменные окружения:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+### 4. Структура кода
+
+#### ✅ Supabase Client (`src/utils/supabase.js`)
+```javascript
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase environment variables. Please check your .env file.')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseKey)
+```
+
+#### ✅ Auth Service (`src/services/authService.js`)
+```javascript
+import { supabase, auth, db } from '@/utils/supabase';
+
+export class AuthService {
+  async signUp(email, password, fullName) {
+    const { data, error } = await auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        data: {
+          full_name: fullName,
+          display_name: fullName
+        }
+      }
+    });
+    return { user: data.user, session: data.session, error };
+  }
+
+  async signIn(email, password) {
+    const { data, error } = await auth.signIn({
+      email: email.trim(),
+      password: password
+    });
+    return { user: data.user, session: data.session, error };
+  }
+}
+```
+
+#### ✅ Форма регистрации (`src/pages/Home.jsx`)
+```jsx
+const [email, setEmail] = useState('');
+const [password, setPassword] = useState('');
+const [fullName, setFullName] = useState('');
+
+const handleSignup = async (e) => {
+  e.preventDefault();
+
+  const { user, error } = await authService.signUp(
+    email.trim(),
+    password.trim(),
+    fullName.trim()
+  );
+
+  if (error) {
+    console.error('Signup error:', error.message);
+    return;
+  }
+
+  console.log('Signup success:', user);
+};
+```
+
+#### ✅ Форма входа
+```jsx
+const handleLogin = async (e) => {
+  e.preventDefault();
+
+  const { user, error } = await authService.signIn(
+    email.trim(),
+    password.trim()
+  );
+
+  if (error) {
+    console.error('Login error:', error.message);
+    return;
+  }
+
+  console.log('Login success:', user);
+};
+```
+
+#### ✅ Проверка авторизации (`src/App.jsx`)
+```jsx
+function ProtectedRoute({ children }) {
+  const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = authService.getCurrentUser();
+      if (user) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+        navigate('/');
+      }
+    };
+
+    checkAuth();
+
+    const unsubscribe = authService.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setIsAuthenticated(true);
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        navigate('/');
+      }
+    });
+
+    return () => unsubscribe?.();
+  }, [navigate]);
+
+  return isAuthenticated ? children : null;
+}
+```
+
+### 5. Проверка работы
+
+1. **Запустите проект:**
+```bash
+npm run dev
+```
+
+2. **Проверьте консоль браузера** на ошибки связанные с Supabase
+
+3. **Протестируйте регистрацию:**
+   - Введите email, пароль и имя
+   - Нажмите "Create Account"
+   - Проверьте email на подтверждение
+
+4. **Протестируйте вход:**
+   - Введите email и пароль
+   - Нажмите "Sign In"
+   - Должны перейти на Dashboard
+
+### 6. Возможные проблемы
+
+#### ❌ "Cannot unmarshal object into Go struct field SignupParams.email"
+**Причина:** Email передается как объект вместо строки
+**Решение:** Используйте `email.trim()` и убедитесь что `email` - строка
+
+#### ❌ "Missing Supabase environment variables"
+**Причина:** Нет файла `.env` или переменных
+**Решение:** Создайте `.env` файл с переменными
+
+#### ❌ "Failed to fetch" или сетевые ошибки
+**Причина:** CORS или проблемы с интернетом
+**Решение:** Проверьте URL Supabase и интернет соединение
+
+---
 
 ## Prerequisites
 

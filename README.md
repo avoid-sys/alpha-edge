@@ -48,6 +48,19 @@ Alpha Edge is a professional trading analytics platform that identifies and conn
 #### Prerequisites
 - Node.js (v16 or higher)
 - npm or yarn
+- Supabase account (for full authentication)
+
+#### Supabase Setup
+1. Copy environment variables:
+```bash
+cp .env.example .env
+# Или создайте .env файл вручную с переменными из SUPABASE_SETUP.md
+```
+
+2. Set up database schema:
+   - Go to Supabase Dashboard > SQL Editor
+   - Run the contents of `database-setup.sql`
+   - Verify RLS policies are enabled
 
 #### Installation
 

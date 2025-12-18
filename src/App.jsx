@@ -1,11 +1,12 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import Layout from './Layout.jsx';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
 import Connect from './pages/Connect';
 import ImportTrades from './pages/ImportTrades';
+import { authService } from './services/authService';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -60,6 +61,60 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// Protected Route Component
+function ProtectedRoute({ children }) {
+  const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = authService.getCurrentUser();
+        if (user) {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setIsAuthenticated(false);
+        navigate('/');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen to auth state changes
+    const unsubscribe = authService.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setIsAuthenticated(true);
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        navigate('/');
+      }
+    });
+
+    return () => unsubscribe?.();
+  }, [navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#e0e5ec] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-800 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? children : null;
+}
+
 function AppContent() {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
@@ -72,14 +127,16 @@ function AppContent() {
           <Route path="/" element={<Home />} />
         </Routes>
       ) : (
-        <Layout>
-          <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/connect" element={<Connect />} />
-            <Route path="/importtrades" element={<ImportTrades />} />
-          </Routes>
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <Routes>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/connect" element={<Connect />} />
+              <Route path="/importtrades" element={<ImportTrades />} />
+            </Routes>
+          </Layout>
+        </ProtectedRoute>
       )}
     </>
   );
