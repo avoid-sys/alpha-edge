@@ -1,29 +1,25 @@
--- Create profiles table for additional user data
--- This table is automatically linked to auth.users via the id field
-
 create table profiles (
-  id uuid references auth.users not null primary key,
+  id uuid references auth.users(id) on delete cascade not null primary key,
   username text unique,
   full_name text,
   avatar_url text,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+  updated_at timestamptz default now()
 );
 
--- Enable Row Level Security (RLS)
+-- Включите RLS (Row Level Security) для приватности
 alter table profiles enable row level security;
 
--- Create policies for secure access
-create policy "Users can view own profile"
+create policy "Public profiles are viewable by everyone."
   on profiles for select
-  using (auth.uid() = id);
+  using (true);
 
-create policy "Users can update own profile"
-  on profiles for update
-  using (auth.uid() = id);
-
-create policy "Users can insert own profile"
+create policy "Users can insert their own profile."
   on profiles for insert
   with check (auth.uid() = id);
+
+create policy "Users can update own profile."
+  on profiles for update
+  using (auth.uid() = id);
 
 -- Create function to handle new user signup
 create or replace function public.handle_new_user()

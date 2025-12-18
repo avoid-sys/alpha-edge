@@ -31,6 +31,7 @@ export default function Auth() {
             }
           }
         });
+
         // Profile is created automatically via database trigger
       } else {
         res = await supabase.auth.signInWithPassword({ email, password });
