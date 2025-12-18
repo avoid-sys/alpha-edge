@@ -75,11 +75,40 @@ class AuthService {
       securityService.logSecurityEvent('signup_attempted', { email });
 
       // Check if Supabase is accessible
+      let isSupabaseAvailable = true;
       try {
-        await supabase.from('profiles').select('id').limit(1);
+        const { error } = await supabase.from('profiles').select('id').limit(1);
+        if (error) {
+          isSupabaseAvailable = false;
+          console.warn('Supabase database not available:', error.message);
+        }
       } catch (connectionError) {
+        isSupabaseAvailable = false;
         console.warn('Supabase connection issue:', connectionError);
-        // Continue with signup even if connection check fails
+      }
+
+      if (!isSupabaseAvailable) {
+        console.log('Using local storage fallback for signup');
+
+        // Create a local user object for demo purposes
+        const demoUser = {
+          id: `demo-${Date.now()}`,
+          email: email,
+          user_metadata: {
+            full_name: fullName,
+            display_name: fullName
+          },
+          created_at: new Date().toISOString(),
+          isDemo: true // Mark as demo user
+        };
+
+        // Store in localStorage for persistence
+        const users = JSON.parse(localStorage.getItem('demo_users') || '[]');
+        users.push(demoUser);
+        localStorage.setItem('demo_users', JSON.stringify(users));
+        localStorage.setItem('current_user', JSON.stringify(demoUser));
+
+        return { user: demoUser, session: { user: demoUser }, error: null };
       }
 
       const { data, error } = await auth.signUp({
@@ -104,6 +133,8 @@ class AuthService {
           errorMessage = 'Please enter a valid email address.';
         } else if (error.message.includes('Password')) {
           errorMessage = 'Password must be at least 6 characters long.';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Network connection error. Please check your internet connection.';
         }
 
         const customError = new Error(errorMessage);
@@ -121,6 +152,16 @@ class AuthService {
       return { user: data.user, session: data.session, error: null };
     } catch (error) {
       console.error('Sign up error:', error);
+
+      // If it's a network error, provide a helpful message
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        return {
+          user: null,
+          session: null,
+          error: new Error('Network connection error. Please check your internet connection and try again.')
+        };
+      }
+
       return { user: null, session: null, error };
     }
   }
@@ -130,6 +171,38 @@ class AuthService {
     try {
       securityService.logSecurityEvent('signin_attempted', { email });
 
+      // Check if Supabase is accessible
+      let isSupabaseAvailable = true;
+      try {
+        const { error } = await supabase.from('profiles').select('id').limit(1);
+        if (error) {
+          isSupabaseAvailable = false;
+          console.warn('Supabase database not available, checking local storage:', error.message);
+        }
+      } catch (connectionError) {
+        isSupabaseAvailable = false;
+        console.warn('Supabase connection issue:', connectionError);
+      }
+
+      if (!isSupabaseAvailable) {
+        console.log('Using local storage fallback for signin');
+
+        // Check local storage for demo user
+        const users = JSON.parse(localStorage.getItem('demo_users') || '[]');
+        const user = users.find(u => u.email === email);
+
+        if (user) {
+          // Simulate successful signin
+          localStorage.setItem('current_user', JSON.stringify(user));
+          this.currentUser = user;
+          this.session = { user };
+
+          return { user, session: { user }, error: null };
+        } else {
+          throw new Error('Invalid email or password. Please check your credentials.');
+        }
+      }
+
       const { data, error } = await auth.signIn({
         email,
         password
@@ -137,7 +210,20 @@ class AuthService {
 
       if (error) {
         securityService.logSecurityEvent('signin_failed', { email, error: error.message });
-        throw error;
+
+        // Provide more user-friendly error messages
+        let errorMessage = error.message;
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password. Please check your credentials.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please check your email and click the confirmation link.';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Network connection error. Please check your internet connection.';
+        }
+
+        const customError = new Error(errorMessage);
+        customError.originalError = error;
+        throw customError;
       }
 
       if (data.user) {
@@ -150,6 +236,16 @@ class AuthService {
       return { user: data.user, session: data.session, error: null };
     } catch (error) {
       console.error('Sign in error:', error);
+
+      // If it's a network error, provide a helpful message
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        return {
+          user: null,
+          session: null,
+          error: new Error('Network connection error. Please check your internet connection and try again.')
+        };
+      }
+
       return { user: null, session: null, error };
     }
   }

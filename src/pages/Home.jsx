@@ -63,9 +63,30 @@ export default function Home() {
 
   // Check if user is already authenticated
   useEffect(() => {
+    const checkAuth = () => {
+      // First check Supabase auth
     if (authService.isAuthenticated()) {
       navigate(createPageUrl('Dashboard'));
-    }
+        return;
+      }
+
+      // Then check local storage for demo users
+      const currentUser = localStorage.getItem('current_user');
+      if (currentUser) {
+        try {
+          const user = JSON.parse(currentUser);
+          // Set the demo user in auth service
+          authService.currentUser = user;
+          authService.session = { user };
+          navigate(createPageUrl('Dashboard'));
+        } catch (error) {
+          console.warn('Error parsing demo user from localStorage:', error);
+          localStorage.removeItem('current_user');
+        }
+      }
+    };
+
+    checkAuth();
   }, [navigate]);
 
   // Test Supabase connection on component mount
@@ -90,15 +111,29 @@ export default function Home() {
           const { data, error } = await supabase.from('profiles').select('count').limit(1);
           if (error) {
             console.warn('Database connection test failed (tables may not exist):', error.message);
-            console.warn('Please run the SQL setup from SUPABASE_SETUP.md in your Supabase dashboard');
-            setSupabaseStatus('disconnected');
+            console.warn('Please run the SQL setup from database-setup.sql in your Supabase dashboard');
+
+            // Check if demo users exist
+            const demoUsers = localStorage.getItem('demo_users');
+            if (demoUsers && JSON.parse(demoUsers).length > 0) {
+              setSupabaseStatus('demo');
+            } else {
+              setSupabaseStatus('disconnected');
+            }
           } else {
             console.log('Database connection test passed');
             setSupabaseStatus('connected');
           }
         } catch (dbError) {
           console.warn('Database error:', dbError);
-          setSupabaseStatus('error');
+
+          // Check if demo users exist for fallback
+          const demoUsers = localStorage.getItem('demo_users');
+          if (demoUsers && JSON.parse(demoUsers).length > 0) {
+            setSupabaseStatus('demo');
+          } else {
+            setSupabaseStatus('error');
+          }
         }
 
       } catch (err) {
@@ -971,11 +1006,13 @@ export default function Home() {
               <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
                 supabaseStatus === 'connected' ? 'bg-green-100 text-green-800' :
                 supabaseStatus === 'disconnected' ? 'bg-yellow-100 text-yellow-800' :
+                supabaseStatus === 'demo' ? 'bg-blue-100 text-blue-800' :
                 supabaseStatus === 'error' ? 'bg-red-100 text-red-800' :
                 'bg-gray-100 text-gray-800'
               }`}>
                 {supabaseStatus === 'connected' ? '✓ Connected' :
                  supabaseStatus === 'disconnected' ? '⚠ Database Setup Needed' :
+                 supabaseStatus === 'demo' ? '🔄 Demo Mode' :
                  supabaseStatus === 'error' ? '✗ Connection Error' :
                  'Testing...'}
               </span>

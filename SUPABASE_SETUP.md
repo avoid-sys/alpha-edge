@@ -7,6 +7,17 @@ This guide will help you set up the Supabase database schema for the Alpha Edge 
 - Supabase account and project created
 - Project URL and API keys (already configured)
 
+## Quick Setup
+
+### Option 1: Run the Setup Script (Recommended)
+
+1. Go to your Supabase project dashboard
+2. Navigate to the **SQL Editor**
+3. Copy and paste the entire contents of `database-setup.sql`
+4. Click **Run** to execute all the SQL commands
+
+### Option 2: Manual Setup
+
 ## Database Schema
 
 ### 1. Profiles Table
