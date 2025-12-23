@@ -17,7 +17,7 @@ export const NeumorphicButton = ({ children, className = '', variant = 'default'
 
   return (
     <button
-      className={`px-6 py-3 rounded-xl border border-white/40 transition-all duration-200 text-gray-700 font-medium ${variantClasses[variant]} ${className}`}
+      className={`px-6 py-3 sm:px-6 sm:py-3 rounded-xl border border-white/40 transition-all duration-200 text-gray-700 font-medium min-h-[48px] sm:min-h-[auto] ${variantClasses[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -26,21 +26,36 @@ export const NeumorphicButton = ({ children, className = '', variant = 'default'
 };
 
 export const StatBox = ({ title, value, subValue, icon: Icon, trend, className = '' }) => (
-  <NeumorphicCard className={`p-6 ${className}`}>
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm text-gray-500 font-medium">{title}</p>
-        <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+  <NeumorphicCard className={`px-4 py-4 sm:px-5 sm:py-4 min-h-[80px] sm:min-h-[auto] ${className}`}>
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide truncate">
+          {title}
+        </p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mt-1 leading-tight break-words overflow-hidden text-ellipsis max-w-full">
+          {value}
+        </p>
         {subValue && (
-          <p className="text-xs text-gray-400 mt-1">{subValue}</p>
+          <p className="text-[11px] sm:text-xs text-gray-400 mt-1 leading-snug break-words overflow-hidden text-ellipsis max-w-full">
+            {subValue}
+          </p>
         )}
-        {trend && (
-          <p className={`text-sm mt-1 ${trend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {trend >= 0 ? '+' : ''}{trend}%
+        {typeof trend === 'number' && !Number.isNaN(trend) && trend !== 0 && (
+          <p
+            className={`text-[11px] sm:text-xs mt-1 font-semibold ${
+              trend >= 0 ? 'text-green-500' : 'text-red-500'
+            }`}
+          >
+            {trend >= 0 ? '+' : ''}
+            {trend}%
           </p>
         )}
       </div>
-      {Icon && <Icon size={32} className="text-gray-400" />}
+      {Icon && (
+        <div className="flex-shrink-0 pl-1">
+          <Icon size={22} className="sm:w-7 sm:h-7 text-gray-400" />
+        </div>
+      )}
     </div>
   </NeumorphicCard>
 );

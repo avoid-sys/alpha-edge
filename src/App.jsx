@@ -1,25 +1,48 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Signup from "@/components/Signup";
-import Login from "@/components/Login";
-import Home from "@/components/Home";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import Layout from './Layout.jsx';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
+import Leaderboard from './pages/Leaderboard';
+import Connect from './pages/Connect';
+import ImportTrades from './pages/ImportTrades';
+import TermsOfService from './pages/TermsOfService';
+import InvestorForm from './pages/InvestorForm';
+import Support from './pages/Support';
 
-export default function App() {
+function AppContent() {
+  const location = useLocation();
+  const isLandingPage = location.pathname === '/';
+
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
-
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+    <>
+      {isLandingPage ? (
+        <Routes>
+          <Route path="/" element={<Home />} />
+        </Routes>
+      ) : (
+        <Layout>
+          <Routes>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/connect" element={<Connect />} />
+            <Route path="/importtrades" element={<ImportTrades />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/investor-form" element={<InvestorForm />} />
+            <Route path="/support" element={<Support />} />
+          </Routes>
+        </Layout>
+      )}
+    </>
   );
 }
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
+
+export default App;

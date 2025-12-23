@@ -1,0 +1,1009 @@
+import React, { useEffect, useState } from 'react';
+import { localDataService } from '@/services/localDataService';
+import { securityService } from '@/services/securityService';
+import { createPageUrl } from '@/utils';
+import { eloApi } from '@/backend/ELOApi';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Calendar,
+  Award,
+  BarChart2,
+  ArrowUpRight,
+  ArrowDownRight,
+  Target,
+  HelpCircle,
+  X,
+  Edit2,
+  Check
+} from 'lucide-react';
+import { NeumorphicCard, StatBox, NeumorphicButton } from '@/components/NeumorphicUI';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Legend
+} from 'recharts';
+
+export default function Dashboard() {
+  const [profile, setProfile] = useState(null);
+  const [trades, setTrades] = useState([]);
+  const [rank, setRank] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [chartPeriod, setChartPeriod] = useState('1W'); // '1W', '1M', 'ALL'
+  const [dataVersion, setDataVersion] = useState(0); // Force refresh counter
+  const [helpPopup, setHelpPopup] = useState(null); // Current help popup
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [eloData, setEloData] = useState(null);
+  const [eloLoading, setEloLoading] = useState(false);
+
+  const [searchParams] = useSearchParams();
+  const profileId = searchParams.get('profileId');
+  console.log('Dashboard component initialized, profileId from URL:', profileId);
+  const refreshParam = searchParams.get('refresh');
+
+  // Check if user is viewing their own profile or someone else's
+  const isOwnProfile = !profileId; // No profileId means viewing own profile
+
+  // Force data refresh when refresh parameter is detected
+  useEffect(() => {
+    if (refreshParam) {
+      setDataVersion(prev => prev + 1);
+    }
+  }, [refreshParam]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        let fetchedProfile = null;
+        let fetchedTrades = [];
+        
+        if (profileId) {
+          fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
+          fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
+        } else {
+          try {
+            const user = await localDataService.getCurrentUser();
+            if (user) {
+              const profiles = await localDataService.entities.TraderProfile.filter({
+                created_by: user.email
+              });
+              if (profiles.length > 0) {
+                fetchedProfile = profiles[0];
+                fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
+              }
+            }
+          } catch (e) {
+            // Not logged in or no profile
+          }
+        }
+        
+        // Calculate rank based on trader score - only for live connected accounts
+        if (fetchedProfile && fetchedProfile.is_live_account) {
+          const allProfiles = await localDataService.entities.TraderProfile.list('-trader_score');
+          // Filter to only live accounts
+          const liveProfiles = allProfiles.filter(p => p.is_live_account);
+          const userRank = liveProfiles.findIndex(p => p.id === fetchedProfile.id) + 1;
+          setRank(userRank);
+        } else {
+          setRank(null); // No rank for demo/file-only accounts
+        }
+
+        if (fetchedProfile && fetchedTrades.length > 0) {
+          // Use real data from uploaded files
+          console.log('Setting profile with real data:', fetchedProfile.name);
+          setProfile(fetchedProfile);
+          setTrades(fetchedTrades);
+        } else {
+          // Show empty state - no data uploaded yet
+          console.log('No profile data found, setting to null');
+          setProfile(null);
+          setTrades([]);
+        }
+      } catch (error) {
+        console.error("Error fetching data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [profileId, dataVersion]);
+
+  // Initialize security and load connected platforms on component mount
+  useEffect(() => {
+    securityService.startSession();
+    securityService.logSecurityEvent('dashboard_accessed', { profileId });
+  }, []);
+
+  const loadELOData = async () => {
+    console.log('loadELOData called with profileId:', profileId, 'profile:', !!profile);
+    setEloLoading(true);
+    try {
+      // Always show ELO data - either from profile or mock data
+      let elo = null;
+
+      if (profileId && profile) {
+        console.log('Loading ELO data for profile:', profileId, 'profile name:', profile.name);
+        // First try to get existing ELO data
+        elo = await eloApi.getTraderELO(profile.id);
+        console.log('ELO data received:', elo);
+
+        // If no ELO data exists, calculate it automatically
+        if (!elo && profile) {
+          console.log('No existing ELO data, calculating...');
+
+          // Prepare trade data from profile
+          const tradeData = [];
+          if (profile.trades && profile.trades.length > 0) {
+            profile.trades.forEach(trade => {
+              tradeData.push({
+                openTime: new Date(trade.open_time),
+                closeTime: new Date(trade.close_time),
+                pnl: trade.profit_loss,
+                entryPrice: trade.entry_price,
+                exitPrice: trade.exit_price,
+                positionSize: trade.position_size
+              });
+            });
+          }
+
+          // Prepare account data
+          const accountData = {
+            initialBalance: profile.initial_balance || 10000,
+            accountAgeDays: profile.account_age_days || 30,
+            equityHistory: [] // Will be populated from trades if available
+          };
+
+          // Calculate ELO
+          const result = await eloApi.calculateTraderELO(tradeData, accountData, profile.id);
+          if (result.success && result.elo) {
+            elo = result.elo;
+          }
+        }
+      }
+
+      // If we still don't have ELO data, use mock data
+      if (!elo) {
+        console.log('Using mock ELO data as fallback');
+        elo = {
+          traderId: profileId || 'demo',
+          eloScore: 75.5,
+          rawScore: 80.2,
+          reliability: {
+            totalTrades: 150,
+            reliabilityMultiplier: 0.9,
+            dataCoverage: 0.85,
+            confidenceCoefficient: 0.76
+          },
+          blocks: [
+            {
+              name: 'Performance',
+              score: 82.3,
+              confidence: 'high',
+              availableMetrics: 4,
+              totalMetrics: 4,
+              coveragePercent: 100,
+              metrics: [],
+              originalWeight: 0.40,
+              adjustedWeight: 0.40
+            },
+            {
+              name: 'RiskControl',
+              score: 68.7,
+              confidence: 'medium',
+              availableMetrics: 2,
+              totalMetrics: 3,
+              coveragePercent: 67,
+              metrics: [],
+              originalWeight: 0.30,
+              adjustedWeight: 0.30
+            },
+            {
+              name: 'Consistency',
+              score: 88.1,
+              confidence: 'high',
+              availableMetrics: 3,
+              totalMetrics: 3,
+              coveragePercent: 100,
+              metrics: [],
+              originalWeight: 0.15,
+              adjustedWeight: 0.15
+            },
+            {
+              name: 'AccountHealth',
+              score: 72.4,
+              confidence: 'medium',
+              availableMetrics: 2,
+              totalMetrics: 3,
+              coveragePercent: 67,
+              metrics: [],
+              originalWeight: 0.10,
+              adjustedWeight: 0.10
+            },
+            {
+              name: 'Longevity',
+              score: 55.2,
+              confidence: 'high',
+              availableMetrics: 1,
+              totalMetrics: 1,
+              coveragePercent: 100,
+              metrics: [],
+              originalWeight: 0.05,
+              adjustedWeight: 0.05
+            }
+          ],
+          penalties: [],
+          missingMetrics: ['Monthly Positive Ratio', 'Trade Frequency Stability'],
+          lowConfidenceBlocks: ['RiskControl', 'AccountHealth'],
+          category: 'Professional',
+          calculatedAt: new Date(),
+          dataQuality: {
+            hasRequiredFields: true,
+            totalTrades: 150,
+            dataCompleteness: 0.85
+          }
+        };
+      }
+
+      console.log('Setting ELO data:', elo);
+      setEloData(elo);
+    } catch (error) {
+      console.error('Failed to load/calculate ELO data:', error);
+      // Set mock data as fallback in case of error
+      const fallbackElo = {
+          traderId: profile.id,
+          eloScore: 75.5,
+          rawScore: 80.2,
+          reliability: {
+            totalTrades: 150,
+            reliabilityMultiplier: 0.9,
+            dataCoverage: 0.85,
+            confidenceCoefficient: 0.76
+          },
+          blocks: [
+            {
+              name: 'Performance',
+              score: 82.3,
+              confidence: 'high',
+              availableMetrics: 4,
+              totalMetrics: 4,
+              coveragePercent: 100,
+              metrics: [],
+              originalWeight: 0.40,
+              adjustedWeight: 0.40
+            },
+            {
+              name: 'RiskControl',
+              score: 68.7,
+              confidence: 'medium',
+              availableMetrics: 2,
+              totalMetrics: 3,
+              coveragePercent: 67,
+              metrics: [],
+              originalWeight: 0.30,
+              adjustedWeight: 0.30
+            },
+            {
+              name: 'Consistency',
+              score: 88.1,
+              confidence: 'high',
+              availableMetrics: 3,
+              totalMetrics: 3,
+              coveragePercent: 100,
+              metrics: [],
+              originalWeight: 0.15,
+              adjustedWeight: 0.15
+            },
+            {
+              name: 'AccountHealth',
+              score: 72.4,
+              confidence: 'medium',
+              availableMetrics: 2,
+              totalMetrics: 3,
+              coveragePercent: 67,
+              metrics: [],
+              originalWeight: 0.10,
+              adjustedWeight: 0.10
+            },
+            {
+              name: 'Longevity',
+              score: 55.2,
+              confidence: 'high',
+              availableMetrics: 1,
+              totalMetrics: 1,
+              coveragePercent: 100,
+              metrics: [],
+              originalWeight: 0.05,
+              adjustedWeight: 0.05
+            }
+          ],
+          penalties: [],
+          missingMetrics: ['Monthly Positive Ratio', 'Trade Frequency Stability'],
+          lowConfidenceBlocks: ['RiskControl', 'AccountHealth'],
+          category: 'Professional',
+          calculatedAt: new Date(),
+          dataQuality: {
+            hasRequiredFields: true,
+            totalTrades: 150,
+            dataCompleteness: 0.85
+          }
+        };
+        console.log('Setting fallback mock ELO data:', mockElo);
+        setEloData(mockElo);
+      } finally {
+        setEloLoading(false);
+      }
+    }
+  };
+
+  // Load ELO data when component mounts or profile changes
+  useEffect(() => {
+    console.log('Loading ELO data - profile exists:', !!profile, 'profileId:', profileId);
+    loadELOData();
+  }, [profile, profileId]);
+
+  // Handle name editing
+  useEffect(() => {
+    console.log('Loading ELO data - profile exists:', !!profile, 'profileId:', profileId);
+    loadELOData();
+  }, [profile, profileId]);
+
+  // Handle name editing
+  const handleEditName = () => {
+    setEditedName(profile.nickname);
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!editedName.trim()) return;
+
+    try {
+      await localDataService.entities.TraderProfile.update(profile.id, {
+        nickname: editedName.trim()
+      });
+      setProfile({ ...profile, nickname: editedName.trim() });
+      setIsEditingName(false);
+    } catch (error) {
+      console.error('Error updating name:', error);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingName(false);
+    setEditedName('');
+  };
+
+
+
+  // Get current balance from last trade or account data
+  const getCurrentBalance = (tradeList) => {
+    if (tradeList.length > 0) {
+      // Sort trades by date and get the latest balance
+      const sortedTrades = [...tradeList].sort((a, b) => new Date(b.close_time) - new Date(a.close_time));
+      const latestTrade = sortedTrades[0];
+      return parseFloat(latestTrade.balance || 0).toFixed(2);
+    }
+    return '0.00'; // No trades yet
+  };
+
+  // Calculate equity curve data as percentages from initial balance
+  const getEquityData = () => {
+    if (trades.length === 0) return [];
+
+    // Sort trades by date
+    const sortedTrades = [...trades].sort((a, b) => new Date(a.close_time) - new Date(b.close_time));
+
+    // Calculate initial balance
+    let initialBalance = 10000; // Default
+    if (sortedTrades.length > 0 && sortedTrades[0].balance) {
+      // Use actual balance data if available
+      initialBalance = sortedTrades[0].balance - sortedTrades[0].net_profit;
+    }
+
+    const equityPoints = sortedTrades.map((trade) => ({
+      name: new Date(trade.close_time).toLocaleDateString(),
+      value: initialBalance > 0 ? ((parseFloat(trade.balance || 0) - initialBalance) / initialBalance) * 100 : 0
+    }));
+
+    // Filter based on selected period
+    let filteredPoints = equityPoints;
+    const now = new Date();
+
+    switch (chartPeriod) {
+      case '1W':
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        filteredPoints = equityPoints.filter(point => {
+          const pointDate = new Date(point.name);
+          return pointDate >= oneWeekAgo;
+        });
+        break;
+      case '1M':
+        const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        filteredPoints = equityPoints.filter(point => {
+          const pointDate = new Date(point.name);
+          return pointDate >= oneMonthAgo;
+        });
+        break;
+      case 'ALL':
+        // Keep all points
+        break;
+      default:
+        filteredPoints = equityPoints.slice(-7);
+    }
+
+    return filteredPoints;
+  };
+
+  const equityData = profile ? getEquityData() : [];
+
+  // Help content for each metric
+  const helpContent = {
+    performance: {
+      title: "Performance Score",
+      description: "Overall performance rating combining annualized return, win rate, risk/reward ratio, and expectancy. Higher scores indicate better trading performance.",
+      metrics: {
+        "Ann. Return": "Annualized return percentage based on total profit over trading period",
+        "Win Rate": "Percentage of profitable trades out of total trades",
+        "R/R": "Risk/Reward ratio - average profit divided by average loss",
+        "Expectancy": "Average profit per trade in account currency"
+      }
+    },
+    risk: {
+      title: "Risk Control Score",
+      description: "Risk management effectiveness combining maximum drawdown, volatility, and risk per trade. Higher scores indicate better risk control.",
+      metrics: {
+        "Max DD": "Maximum Drawdown - largest peak-to-trough decline in account equity",
+        "Volatility": "Standard deviation of returns - measures return variability",
+        "Risk/Trade": "Average risk exposure per trade as percentage of account"
+      }
+    },
+    consistency: {
+      title: "Consistency Score",
+      description: "Trading consistency measuring equity curve smoothness, monthly profitability, and trade frequency stability. Higher scores indicate more consistent performance.",
+      metrics: {
+        "Roughness": "Measure of equity curve smoothness (1 - R²)",
+        "Positive Mos": "Monthly positive ratio - percentage of profitable months",
+        "Freq Std": "Trade frequency standard deviation - consistency of trading activity"
+      }
+    },
+    health: {
+      title: "Account Health Score",
+      description: "Overall account status considering violations, leverage usage, and risk limit breaches. Higher scores indicate healthier account management.",
+      metrics: {
+        "Violations": "Number of trading rule violations",
+        "Leverage": "Excessive leverage usage incidents",
+        "Risk Limit": "Number of risk limit breaches"
+      }
+    }
+  };
+
+  // Help popup component
+  const HelpPopup = ({ metric, onClose }) => {
+    if (!helpContent[metric]) return null;
+
+    const content = helpContent[metric];
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-white rounded-lg p-6 max-w-lg mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-gray-800">{content.title}</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X size={20} />
+            </button>
+          </div>
+          <p className="text-gray-600 text-sm leading-relaxed mb-4">{content.description}</p>
+
+          {content.metrics && (
+            <div>
+              <h4 className="font-semibold text-gray-700 mb-2">Component Metrics:</h4>
+              <div className="space-y-2">
+                {Object.entries(content.metrics).map(([key, value]) => (
+                  <div key={key} className="flex justify-between items-start text-sm">
+                    <span className="font-medium text-gray-700 min-w-0 flex-1">{key}:</span>
+                    <span className="text-gray-600 ml-2 flex-1">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Main component render
+  if (loading) {
+    return <div className="flex items-center justify-center h-[50vh] text-gray-400">Loading statistics...</div>;
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh]">
+        <div className="w-24 h-24 bg-[#e0e5ec] rounded-full shadow-[-8px_-8px_16px_#ffffff,8px_8px_16px_#a3b1c6] flex items-center justify-center mb-8">
+          <Activity size={40} className="text-gray-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-700 mb-2">{profileId ? 'Trader Not Found' : 'No Trading Account Found'}</h2>
+        <p className="text-gray-500 mb-8">{profileId ? 'The requested trader profile does not exist.' : 'Connect your live trading account to view your dashboard.'}</p>
+        {!profileId && (
+          <Link to={createPageUrl('Connect')}>
+            <NeumorphicButton variant="action">Connect Account</NeumorphicButton>
+          </Link>
+        )}
+        {profileId && (
+          <Link to={createPageUrl('Leaderboard')}>
+             <NeumorphicButton>Back to Leaderboard</NeumorphicButton>
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700">
+
+      {/* Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#e0e5ec] p-1 shadow-[-6px_-6px_12px_#ffffff,6px_6px_12px_#a3b1c6] mx-auto sm:mx-0">
+            <img src={profile.avatar_url} alt="Avatar" className="w-full h-full rounded-xl object-cover" />
+          </div>
+          <div className="text-center sm:text-left">
+            {isEditingName ? (
+              <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
+                <input
+                  type="text"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  className="text-xl sm:text-3xl font-bold text-gray-800 bg-[#e0e5ec] rounded-lg px-3 py-1 border-none outline-none shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff] w-full max-w-xs"
+                  placeholder="Enter your name"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveName();
+                    if (e.key === 'Escape') handleCancelEdit();
+                  }}
+                />
+                <button
+                  onClick={handleSaveName}
+                  className="p-2 bg-green-100 rounded-lg text-green-600 hover:bg-green-200 transition-colors"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-2 bg-red-100 rounded-lg text-red-600 hover:bg-red-200 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
+                <h1 className="text-xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left">{profile.nickname}</h1>
+                {isOwnProfile && (
+                  <button
+                    onClick={handleEditName}
+                    className="p-2 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
+                    title="Edit name"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 text-gray-500">
+              <span className="flex items-center gap-1"><Target size={14} /> {profile.broker}</span>
+              <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+              <span className="flex items-center gap-1 text-orange-600 font-medium">
+                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                File Imported
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex gap-4">
+          <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
+             <div className="p-2 bg-gray-200 rounded-lg text-gray-700">
+                <Award size={20} />
+             </div>
+             <div>
+                <p className="text-xs text-gray-500 font-bold uppercase">Rank</p>
+                <p className="text-lg font-bold text-gray-800">#{rank || 'N/A'}</p>
+             </div>
+          </NeumorphicCard>
+
+          {eloData && (
+            <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
+               <div
+                 className="p-2 rounded-lg text-white font-bold"
+                 style={{ backgroundColor: eloApi.getELOColor(eloData.eloScore) }}
+               >
+                 ELO
+               </div>
+               <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase">Trader ELO</p>
+                  <p className="text-lg font-bold text-gray-800">{eloApi.formatELOScore(eloData.eloScore)}</p>
+                  <p className="text-xs text-gray-600">{eloData.category}</p>
+               </div>
+            </NeumorphicCard>
+          )}
+
+          {eloLoading && (
+            <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
+               <div className="p-2 bg-gray-200 rounded-lg animate-pulse">
+                 <div className="w-5 h-5 bg-gray-300 rounded"></div>
+               </div>
+               <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase">Trader ELO</p>
+                  <p className="text-lg font-bold text-gray-400">Calculating...</p>
+               </div>
+            </NeumorphicCard>
+          )}
+
+          {isOwnProfile && (
+            <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
+               <div className="p-2 bg-green-100 rounded-lg text-green-700">
+                  <TrendingUp size={20} />
+               </div>
+               <div>
+                  <p className="text-xs text-gray-500 font-bold uppercase">Balance</p>
+                  <p className="text-lg font-bold text-gray-800">${getCurrentBalance(trades)}</p>
+               </div>
+            </NeumorphicCard>
+          )}
+
+          {!eloData && !eloLoading && (
+            <NeumorphicCard className="px-6 py-3">
+              <button
+                onClick={async () => {
+                  setEloLoading(true);
+                  try {
+                    // Prepare trade data for ELO calculation
+                    const tradeData = trades.map(trade => ({
+                      openTime: new Date(trade.open_time),
+                      closeTime: new Date(trade.close_time),
+                      pnl: trade.profit_loss,
+                      entryPrice: trade.entry_price,
+                      exitPrice: trade.exit_price,
+                      positionSize: trade.position_size
+                    }));
+
+                    // Prepare account data
+                    const accountData = {
+                      initialBalance: profile.initial_balance || 10000,
+                      accountAgeDays: profile.account_age_days || 30,
+                      equityHistory: [] // Will be populated from trades if available
+                    };
+
+                    const result = await eloApi.calculateTraderELO(tradeData, accountData, profile.id);
+                    if (result.success && result.elo) {
+                      setEloData(result.elo);
+                    }
+                  } catch (error) {
+                    console.error('ELO calculation failed:', error);
+                  } finally {
+                    setEloLoading(false);
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-3 py-2 px-4 bg-purple-100 hover:bg-purple-200 rounded-lg text-purple-700 font-medium transition-colors"
+                disabled={eloLoading}
+              >
+                <Award size={16} />
+                {eloLoading ? 'Calculating ELO...' : 'Calculate ELO Score'}
+              </button>
+          </NeumorphicCard>
+          )}
+        </div>
+      </div>
+
+
+      {/* Main Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
+          <StatBox 
+          title="Total Profit"
+            value={`${profile.profit_percentage}%`}
+            trend={profile.profit_percentage}
+          />
+
+          <StatBox 
+          title="Win Rate"
+            value={`${profile.win_rate}%`}
+          subValue={`${profile.profitable_trades_count}/${profile.total_trades} trades`}
+          />
+
+          <StatBox 
+          title="Profit Factor"
+            value={profile.profit_factor}
+          trend={profile.profit_factor > 1.5 ? 12 : -5}
+          />
+
+          <StatBox 
+          title="Active Days"
+            value={profile.trading_days}
+          trend={null}
+        />
+
+        <StatBox
+          title="Sharpe Ratio"
+          value={profile.sharpe_ratio}
+          trend={null}
+        />
+
+        {isOwnProfile ? (
+          <StatBox
+            title="Expectancy"
+            value={`$${profile.expectancy}`}
+            trend={null}
+          />
+        ) : (
+          <StatBox 
+            title="Total Trades"
+            value={profile.total_trades}
+            trend={null}
+          />
+        )}
+      </div>
+
+      {/* Content Split */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-8">
+
+        {/* Left Column: Chart & Detailed Stats */}
+        <div className="lg:col-span-3 space-y-4 lg:space-y-8">
+          {/* Chart Section */}
+          <NeumorphicCard className="p-6 min-h-[350px]">
+             <div className="flex justify-between items-center mb-8">
+                <h3 className="text-xl font-bold text-gray-700">Equity Curve</h3>
+                <div className="flex gap-2">
+                   <button
+                     onClick={() => setChartPeriod('1W')}
+                     className={`px-4 py-1 rounded-lg text-xs font-bold shadow-inner transition-colors ${
+                       chartPeriod === '1W'
+                         ? 'bg-blue-500 text-white'
+                         : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                     }`}
+                   >
+                     1W
+                   </button>
+                   <button
+                     onClick={() => setChartPeriod('1M')}
+                     className={`px-4 py-1 rounded-lg text-xs font-bold shadow-inner transition-colors ${
+                       chartPeriod === '1M'
+                         ? 'bg-blue-500 text-white'
+                         : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                     }`}
+                   >
+                     1M
+                   </button>
+                   <button
+                     onClick={() => setChartPeriod('ALL')}
+                     className={`px-4 py-1 rounded-lg text-xs font-bold shadow-inner transition-colors ${
+                       chartPeriod === 'ALL'
+                         ? 'bg-blue-500 text-white'
+                         : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                     }`}
+                   >
+                     ALL
+                   </button>
+                </div>
+             </div>
+             
+             <div className="h-[280px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={equityData}>
+                    <defs>
+                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ccc" opacity={0.5} />
+                    <XAxis dataKey="name" hide />
+                    <YAxis hide domain={['auto', 'auto']} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '5px 5px 10px #d1d9e6, -5px -5px 10px #ffffff' }}
+                      formatter={(value) => [`${value.toFixed(2)}%`, 'Return']}
+                      labelFormatter={(label) => `Date: ${label}`}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="value" 
+                      stroke="#3b82f6" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#colorValue)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+             </div>
+          </NeumorphicCard>
+
+          {/* Detailed Streaks */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+             <NeumorphicCard className="p-6">
+                <h4 className="text-gray-500 font-bold text-sm uppercase mb-4 tracking-wider">Winning Streaks</h4>
+                <div className="grid grid-cols-2 gap-3">
+                   <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Daily Streak</p>
+                      <p className="text-lg font-bold text-green-600">+{profile.max_win_streak}</p>
+                      <p className="text-[10px] text-gray-400">trades</p>
+                   </div>
+                   <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Current Streak</p>
+                      <p className="text-lg font-bold text-green-600">+{profile.current_win_streak}</p>
+                      <p className="text-[10px] text-gray-400">trades</p>
+                   </div>
+                </div>
+             </NeumorphicCard>
+
+             <NeumorphicCard className="p-6">
+                <h4 className="text-gray-500 font-bold text-sm uppercase mb-4 tracking-wider">Losing Streaks</h4>
+                <div className="grid grid-cols-2 gap-3">
+                   <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Max Streak</p>
+                      <p className="text-lg font-bold text-red-500">-{profile.max_loss_streak}</p>
+                      <p className="text-[10px] text-gray-400">trades</p>
+                   </div>
+                   <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Current Streak</p>
+                      <p className="text-lg font-bold text-red-500">-{profile.current_loss_streak}</p>
+                      <p className="text-[10px] text-gray-400">trades</p>
+                   </div>
+                </div>
+             </NeumorphicCard>
+          </div>
+
+        </div>
+
+        {/* Right Column: ELO Analysis */}
+        <div className="lg:col-span-2 space-y-4 lg:space-y-6">
+           <NeumorphicCard className="p-6 min-h-[500px] flex flex-col">
+              <h3 className="text-xl font-bold text-gray-700 mb-6">ELO Analysis</h3>
+
+              {eloLoading ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <Award size={48} className="text-gray-300 mx-auto mb-4 animate-pulse" />
+                    <p className="text-gray-500 mb-2">Calculating ELO Score...</p>
+                    <p className="text-sm text-gray-400">Analyzing trading performance</p>
+                  </div>
+                </div>
+              ) : eloData ? (
+                <div className="flex-1 flex flex-col gap-6">
+                  {/* ELO Score Overview */}
+                  <div className="text-center p-4 bg-[#e0e5ec] rounded-xl shadow-inner">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Award size={24} style={{ color: eloApi.getELOColor(eloData.eloScore) }} />
+                      <span className="text-2xl font-bold" style={{ color: eloApi.getELOColor(eloData.eloScore) }}>
+                        {eloApi.formatELOScore(eloData.eloScore)}
+                      </span>
+                          </div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">{eloData.category}</p>
+                    <p className="text-xs text-gray-500">
+                      Data Coverage: {(eloData.dataQuality.dataCompleteness * 100).toFixed(0)}%
+                    </p>
+                   </div>
+
+                  {/* ELO Blocks */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Block Scores</h4>
+                    {eloData.blocks.filter(block => block.confidence !== 'excluded').map((block, index) => (
+                      <div key={index}>
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="flex items-center gap-1">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              {block.name.charAt(0).toUpperCase() + block.name.slice(1).replace(/([A-Z])/g, ' $1')}
+                            </p>
+                            <span className={`text-xs px-1.5 py-0.5 rounded text-white font-medium ${
+                              block.confidence === 'high' ? 'bg-green-500' :
+                              block.confidence === 'medium' ? 'bg-yellow-500' :
+                              block.confidence === 'low' ? 'bg-orange-500' : 'bg-red-500'
+                            }`}>
+                              {block.confidence === 'excluded' ? 'excluded' : block.confidence}
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold text-blue-600">
+                            {block.score !== null ? block.score.toFixed(1) : 'N/A'}
+                          </span>
+                        </div>
+                       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
+                          <div
+                            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, block.score)}%` }}
+                          ></div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-gray-500">
+                          <div className="flex justify-between">
+                            <span>Metrics:</span>
+                            <span className="font-medium text-gray-700">{block.availableMetrics}/{block.totalMetrics}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Coverage:</span>
+                            <span className="font-medium text-gray-700">{block.coveragePercent.toFixed(0)}%</span>
+                          </div>
+                       </div>
+                   </div>
+                    ))}
+                 </div>
+
+                  {/* Reliability & Penalties */}
+                  <div className="space-y-4 pt-4 border-t border-gray-300/50">
+                    <h4 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Reliability Factors</h4>
+
+                    <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Total Trades</p>
+                        <p className="text-lg font-bold text-gray-800">{eloData.dataQuality.totalTrades}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Reliability</p>
+                        <p className="text-lg font-bold text-blue-600">
+                          {(eloData.reliability.reliabilityMultiplier * 100).toFixed(0)}%
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Data Coverage</p>
+                        <p className="text-lg font-bold text-green-600">
+                          {(eloData.dataQuality.dataCompleteness * 100).toFixed(0)}%
+                        </p>
+                    </div>
+                     <div>
+                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Confidence</p>
+                        <p className="text-lg font-bold text-purple-600">
+                          {(eloData.reliability.confidenceCoefficient * 100).toFixed(0)}%
+                        </p>
+                    </div>
+                 </div>
+
+                    {eloData.penalties.length > 0 && (
+                      <div className="mt-4">
+                        <h5 className="text-sm font-bold text-red-600 uppercase tracking-wider mb-2">Penalties Applied</h5>
+                        <div className="space-y-1">
+                          {eloData.penalties.map((penalty, index) => (
+                            <div key={index} className="flex justify-between text-xs">
+                              <span className="text-gray-600">{penalty.name}:</span>
+                              <span className="font-medium text-red-600">-{penalty.value}</span>
+                        </div>
+                          ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {eloData.missingMetrics.length > 0 && (
+                      <div className="mt-4">
+                        <h5 className="text-sm font-bold text-orange-600 uppercase tracking-wider mb-2">Missing Metrics</h5>
+                        <div className="text-xs text-gray-600">
+                          {eloData.missingMetrics.slice(0, 5).join(', ')}
+                          {eloData.missingMetrics.length > 5 && ` +${eloData.missingMetrics.length - 5} more`}
+                        </div>
+                          </div>
+                        )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <Award size={48} className="text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 mb-2">No ELO data available</p>
+                    <p className="text-sm text-gray-400">Unable to load ELO analysis</p>
+                  </div>
+                </div>
+              )}
+           </NeumorphicCard>
+
+        </div>
+
+      </div>
+
+      {/* Help Popup */}
+      {helpPopup && <HelpPopup metric={helpPopup} onClose={() => setHelpPopup(null)} />}
+    </div>
+  );

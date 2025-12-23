@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Trophy,
@@ -9,25 +9,20 @@ import {
   LogOut,
   Menu,
   X,
-  Globe
+  Zap,
+  Globe,
+  FileText,
+  DollarSign,
+  HelpCircle
 } from 'lucide-react';
 import { createPageUrl } from './utils';
-import { authService } from './services/authService';
+import { localDataService } from './services/localDataService';
 
 export default function Layout({ children }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false);
 
   const isActive = (path) => location.pathname === path;
-
-  const handleLogout = async () => {
-    await authService.signOut();
-    setShowLogoutConfirm(false);
-    // Redirect to home page
-    navigate('/');
-  };
 
   const NavItem = ({ icon: Icon, path, tooltip }) => (
     <Link
@@ -48,10 +43,9 @@ export default function Layout({ children }) {
   );
 
   return (
-    <div className="flex h-screen bg-[#e0e5ec] font-sans text-gray-700 overflow-hidden selection:bg-gray-300">
-      
+    <div className="min-h-screen bg-[#e0e5ec] font-sans text-gray-700 overflow-x-hidden selection:bg-gray-300">
       {/* Floating Sidebar (Desktop) */}
-      <div className="hidden md:flex flex-col items-center py-8 pl-6 pr-2 z-20">
+      <div className="hidden md:flex flex-col items-center py-8 pl-6 pr-2 z-20 fixed left-0 top-0 h-screen">
         <div className="w-20 h-[92vh] bg-[#e0e5ec] rounded-[30px] shadow-[-10px_-10px_30px_#ffffff,10px_10px_30px_#aeaec040] flex flex-col items-center py-8 border border-white/40">
           <div className="mb-12">
             <Link to={createPageUrl('Dashboard')}>
@@ -73,9 +67,8 @@ export default function Layout({ children }) {
 
           <div className="mt-auto">
              <button
-                onClick={() => setShowLogoutConfirm(true)}
+                onClick={() => localDataService.auth.logout()}
                 className="flex items-center justify-center w-12 h-12 rounded-2xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                title="Sign Out"
              >
               <LogOut size={20} />
              </button>
@@ -179,12 +172,53 @@ export default function Layout({ children }) {
                 <Wallet size={24} />
                 <span className="font-medium">Upload Files</span>
               </Link>
+
+              <div className="pt-4 border-t border-gray-200">
+                <Link
+                  to={createPageUrl("terms-of-service")}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-200 ${
+                    location.pathname === '/terms-of-service'
+                      ? 'bg-gray-800 text-white shadow-lg'
+                      : 'bg-[#e0e5ec] text-gray-700 hover:bg-white hover:shadow-md'
+                  }`}
+                >
+                  <FileText size={24} />
+                  <span className="font-medium">Terms & Conditions</span>
+                </Link>
+
+                <Link
+                  to={createPageUrl("investor-form")}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-200 ${
+                    location.pathname === '/investor-form'
+                      ? 'bg-gray-800 text-white shadow-lg'
+                      : 'bg-[#e0e5ec] text-gray-700 hover:bg-white hover:shadow-md'
+                  }`}
+                >
+                  <DollarSign size={24} />
+                  <span className="font-medium">For Investors</span>
+                </Link>
+
+                <Link
+                  to={createPageUrl("support")}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-200 ${
+                    location.pathname === '/support'
+                      ? 'bg-gray-800 text-white shadow-lg'
+                      : 'bg-[#e0e5ec] text-gray-700 hover:bg-white hover:shadow-md'
+                  }`}
+                >
+                  <HelpCircle size={24} />
+                  <span className="font-medium">Support</span>
+                </Link>
+              </div>
             </nav>
 
             <div className="mt-8 pt-6 border-t border-gray-200">
               <button
                 onClick={() => {
-                  setShowLogoutConfirm(true);
+                  localDataService.auth.logout();
                   setIsMobileMenuOpen(false);
                 }}
                 className="w-full flex items-center justify-center gap-3 p-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
@@ -198,41 +232,11 @@ export default function Layout({ children }) {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden relative">
-        <div className="p-4 md:p-10 max-w-[1600px] mx-auto min-h-screen pt-20 md:pt-6">
+      <main className="md:ml-24 min-h-screen">
+        <div className="p-4 md:p-10 max-w-[1600px] mx-auto pt-20 md:pt-6">
           {children}
         </div>
       </main>
-
-      {/* Logout Confirmation Dialog */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-2xl">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <LogOut size={32} className="text-red-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign Out</h3>
-              <p className="text-gray-600 mb-6">Are you sure you want to sign out of your account?</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
