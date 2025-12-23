@@ -11,6 +11,7 @@ import ImportTrades from './pages/ImportTrades';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import TestAuth from './pages/TestAuth';
+import CTraderCallback from './pages/CTraderCallback';
 import TermsOfService from './pages/TermsOfService';
 import InvestorForm from './pages/InvestorForm';
 import Support from './pages/Support';
@@ -19,6 +20,7 @@ function AppContent() {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
   const isAuthPage = ['/login', '/register', '/test-auth'].includes(location.pathname);
+  const isCallbackPage = location.pathname === '/auth/ctrader/callback';
 
   return (
     <>
@@ -31,6 +33,10 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/test-auth" element={<TestAuth />} />
+        </Routes>
+      ) : isCallbackPage ? (
+        <Routes>
+          <Route path="/auth/ctrader/callback" element={<CTraderCallback />} />
         </Routes>
       ) : (
         <Layout>

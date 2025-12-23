@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
+import { fetchAndAnalyzeTrades } from '@/services/cTraderService';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
@@ -18,6 +19,7 @@ import {
   X,
   Edit2,
   Check,
+  Zap,
   Trash2,
   Share2
 } from 'lucide-react';
@@ -1214,6 +1216,50 @@ export default function Dashboard() {
     }
   };
 
+  const handleFetchCTraderData = async () => {
+    if (!localStorage.getItem('ctrader_tokens')) {
+      alert('Please connect to cTrader first in the Connect page.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const trades = await fetchAndAnalyzeTrades(true); // true for demo account
+
+      // Clear existing data first
+      const existingTrades = await localDataService.entities.Trade.filter({
+        trader_profile_id: profile.id
+      });
+      for (const trade of existingTrades) {
+        await localDataService.entities.Trade.delete(trade.id);
+      }
+
+      // Save new trades from cTrader
+      for (const trade of trades) {
+        await localDataService.entities.Trade.create({
+          trader_profile_id: profile.id,
+          ...trade
+        });
+      }
+
+      // Update profile to reflect cTrader data
+      await localDataService.entities.TraderProfile.update(profile.id, {
+        is_live_account: true,
+        broker: 'cTrader',
+        last_updated: new Date().toISOString()
+      });
+
+      // Refresh page to show new data
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error fetching cTrader data:', error);
+      alert('Failed to fetch data from cTrader. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center h-[50vh] text-gray-400">Loading statistics...</div>;
 
   if (!profile) {
@@ -1442,6 +1488,14 @@ export default function Dashboard() {
                       title="Generate share image"
                     >
                       <Share2 size={16} />
+                    </button>
+                    <button
+                      onClick={handleFetchCTraderData}
+                      disabled={loading}
+                      className="p-2 bg-purple-100 rounded-lg text-purple-600 hover:bg-purple-200 disabled:bg-purple-50 disabled:text-purple-400 transition-colors"
+                      title="Fetch data from cTrader"
+                    >
+                      <Zap size={16} />
                     </button>
                     <button
                       onClick={handleUnlinkData}

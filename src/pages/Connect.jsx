@@ -2,9 +2,17 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicButton } from '@/components/NeumorphicUI';
-import { Upload } from 'lucide-react';
+import { Upload, Zap } from 'lucide-react';
 
 export default function Connect() {
+
+  const handleConnectCTrader = () => {
+    const state = Math.random().toString(36).substring(2);
+    localStorage.setItem('ctrader_state', state);
+    const redirectUri = encodeURIComponent('http://localhost:3008/auth/ctrader/callback'); // Adjust for your Vite port
+    const authUrl = `${import.meta.env.VITE_CTRADER_AUTH_URL}?client_id=${import.meta.env.VITE_CTRADER_CLIENT_ID}&redirect_uri=${redirectUri}&scope=accounts&response_type=code&state=${state}`;
+    window.location.href = authUrl;
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
@@ -22,6 +30,23 @@ export default function Connect() {
             </NeumorphicButton>
           </Link>
           <p className="text-xs text-gray-500 mt-1 text-center">Upload trading statements from any broker</p>
+        </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-[#e0e5ec] text-gray-500">or</span>
+          </div>
+        </div>
+
+        <div>
+          <NeumorphicButton onClick={handleConnectCTrader} className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0">
+            <Zap size={20} className="mr-2" />
+            Connect cTrader Live
+          </NeumorphicButton>
+          <p className="text-xs text-gray-500 mt-1 text-center">Connect directly to your cTrader account</p>
         </div>
       </div>
 
