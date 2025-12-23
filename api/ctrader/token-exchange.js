@@ -67,14 +67,30 @@ export default async function handler(req, res) {
       body
     });
 
-    const data = await response.json();
+    const contentType = response.headers.get('content-type');
+    let data;
+
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      // If not JSON — read as text (HTML error page)
+      const text = await response.text();
+      console.error('❌ Spotware returned non-JSON (likely HTML error page):', text.substring(0, 500));
+      return res.status(400).json({
+        error: 'Spotware returned HTML instead of JSON',
+        spotware_status: response.status,
+        response_preview: text.substring(0, 500),
+        content_type: contentType
+      });
+    }
 
     // Log FULL response from Spotware (even if error)
     console.log('📡 Spotware response:', {
       status: response.status,
       ok: response.ok,
       data: data,
-      headers: Object.fromEntries(response.headers.entries())
+      headers: Object.fromEntries(response.headers.entries()),
+      content_type: contentType
     });
 
     if (!response.ok) {

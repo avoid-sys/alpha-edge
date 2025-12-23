@@ -44,7 +44,7 @@ const CTraderCallback = () => {
     console.log('📡 Making request to: /api/ctrader/token-exchange');
 
     fetch('/api/ctrader/token-exchange', {
-      method: 'POST',
+      method: 'POST', // Explicit POST to avoid 405 errors
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code,
