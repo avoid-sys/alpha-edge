@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicCard } from '@/components/NeumorphicUI';
+import { useAuth } from '../components/AuthProvider';
 import {
   Trophy,
   TrendingUp,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export default function Home() {
+  const { user } = useAuth();
 
   const features = [
     {
@@ -87,6 +89,29 @@ export default function Home() {
             </p>
           </div>
 
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+            <button
+              onClick={() => user ? window.location.href = '/dashboard' : window.location.href = '/register'}
+              className="inline-flex items-center justify-center px-8 py-4 bg-blue-600 text-white font-semibold rounded-xl shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] hover:shadow-[6px_6px_12px_#d1d9e6,-6px_-6px_12px_#ffffff] hover:bg-blue-700 transition-all duration-200 text-lg"
+            >
+              {user ? "Go to Dashboard" : "Get Started"}
+              <ArrowRight className="ml-2" size={20} />
+            </button>
+            {!user && (
+              <button
+                onClick={() => window.location.href = '/login'}
+                className="inline-flex items-center justify-center px-8 py-4 bg-[#e0e5ec] text-gray-700 font-semibold rounded-xl shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] hover:shadow-[6px_6px_12px_#d1d9e6,-6px_-6px_12px_#ffffff] hover:bg-white transition-all duration-200 text-lg"
+              >
+                Sign In
+              </button>
+            )}
+            {user && (
+              <div className="inline-flex items-center justify-center px-8 py-4 bg-green-100 text-green-700 font-semibold rounded-xl shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] text-lg">
+                Welcome back, {user.email}!
+              </div>
+            )}
+          </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-2xl mx-auto">

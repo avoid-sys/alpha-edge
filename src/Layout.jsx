@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Trophy,
@@ -17,12 +17,20 @@ import {
 } from 'lucide-react';
 import { createPageUrl } from './utils';
 import { localDataService } from './services/localDataService';
+import { useAuth } from './components/AuthProvider';
 
 export default function Layout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const isActive = (path) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const NavItem = ({ icon: Icon, path, tooltip }) => (
     <Link
@@ -67,8 +75,9 @@ export default function Layout({ children }) {
 
           <div className="mt-auto">
              <button
-                onClick={() => localDataService.auth.logout()}
+                onClick={handleSignOut}
                 className="flex items-center justify-center w-12 h-12 rounded-2xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                title="Sign Out"
              >
               <LogOut size={20} />
              </button>
@@ -216,9 +225,14 @@ export default function Layout({ children }) {
             </nav>
 
             <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="mb-3 text-center">
+                <p className="text-sm text-gray-600">
+                  Signed in as <span className="font-medium text-gray-800">{user?.email}</span>
+                </p>
+              </div>
               <button
                 onClick={() => {
-                  localDataService.auth.logout();
+                  handleSignOut();
                   setIsMobileMenuOpen(false);
                 }}
                 className="w-full flex items-center justify-center gap-3 p-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"

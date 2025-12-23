@@ -1,11 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { AuthProvider } from './components/AuthProvider';
+import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './Layout.jsx';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
 import Connect from './pages/Connect';
 import ImportTrades from './pages/ImportTrades';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import TestAuth from './pages/TestAuth';
 import TermsOfService from './pages/TermsOfService';
 import InvestorForm from './pages/InvestorForm';
 import Support from './pages/Support';
@@ -13,6 +18,7 @@ import Support from './pages/Support';
 function AppContent() {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
+  const isAuthPage = ['/login', '/register', '/test-auth'].includes(location.pathname);
 
   return (
     <>
@@ -20,13 +26,19 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Home />} />
         </Routes>
+      ) : isAuthPage ? (
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/test-auth" element={<TestAuth />} />
+        </Routes>
       ) : (
         <Layout>
           <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/connect" element={<Connect />} />
-            <Route path="/importtrades" element={<ImportTrades />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+            <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
+            <Route path="/importtrades" element={<ProtectedRoute><ImportTrades /></ProtectedRoute>} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/investor-form" element={<InvestorForm />} />
             <Route path="/support" element={<Support />} />
@@ -39,9 +51,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 }
 

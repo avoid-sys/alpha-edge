@@ -3,6 +3,7 @@ import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
+import html2canvas from 'html2canvas';
 import {
   TrendingUp,
   TrendingDown,
@@ -16,7 +17,9 @@ import {
   HelpCircle,
   X,
   Edit2,
-  Check
+  Check,
+  Trash2,
+  Share2
 } from 'lucide-react';
 import { NeumorphicCard, StatBox, NeumorphicButton } from '@/components/NeumorphicUI';
 import {
@@ -366,11 +369,29 @@ export default function Dashboard() {
       const sqn = tradeStdDev > 0 ? Math.sqrt(totalTrades) * (tradeMean / tradeStdDev) : 0;
 
 
-      // Recovery Factor - fixed using max DD amount at peak
-      const ddIndex = drawdowns.indexOf(Math.min(...drawdowns));
-      const maxDDPeak = cumMax[ddIndex] || initialBalance;
-      const maxDDAmount = Math.abs(maxDrawdownPct / 100) * maxDDPeak;
-      const recoveryFactor = maxDDAmount > 0 ? totalReturn / (maxDrawdownPct / 100) : 0; // Simplified ratio
+      // Recovery Factor - net profit divided by max drawdown amount
+      const maxDDAmount = Math.abs(maxDrawdownPct / 100) * equityPeak;
+      const recoveryFactor = maxDDAmount > 0 ? totalReturn / maxDrawdownPct : 0;
+
+      // Average Drawdown - calculate properly
+      const drawdownPeriods = [];
+      let currentDD = 0;
+      let ddStart = null;
+
+      dailyEquityArray.forEach((equity, i) => {
+        const dd = (equity - cumMax[i]) / cumMax[i];
+        if (dd < 0) {
+          if (ddStart === null) ddStart = i;
+          currentDD = Math.min(currentDD, dd);
+        } else if (ddStart !== null) {
+          drawdownPeriods.push(Math.abs(currentDD));
+          currentDD = 0;
+          ddStart = null;
+        }
+      });
+
+      const avgDrawdownPct = drawdownPeriods.length > 0 ?
+        (drawdownPeriods.reduce((a, b) => a + b, 0) / drawdownPeriods.length) * 100 : 0;
 
       // Account Age (days)
       const accountAge = Math.ceil(durationDays);
@@ -392,7 +413,7 @@ export default function Dashboard() {
         sortinoRatio: sortinoRatio,
         calmarRatio: calmarRatio,
         maxDrawdown: maxDrawdownPct,
-        avgDrawdown: 0, // Placeholder - can be calculated if needed
+        avgDrawdown: avgDrawdownPct,
         volatility: annVol,
         annualizedReturn: annReturnPct,
         totalTrades: totalTrades,
@@ -407,7 +428,8 @@ export default function Dashboard() {
         tradingDays: tradingDays,
         activityRate: activityRate,
         maxWinStreak: maxWinStreak,
-        maxLoseStreak: maxLoseStreak
+        maxLoseStreak: maxLoseStreak,
+        currentStreak: currentWinStreak > 0 ? currentWinStreak : -currentLoseStreak
       };
 
       return result;
@@ -440,7 +462,8 @@ export default function Dashboard() {
           tradingDays: 0,
           activityRate: 0,
           maxWinStreak: 0,
-          maxLoseStreak: 0
+          maxLoseStreak: 0,
+          currentStreak: 0
         };
     }
   };
@@ -635,6 +658,560 @@ export default function Dashboard() {
   const handleCancelEdit = () => {
     setIsEditingName(false);
     setEditedName('');
+  };
+
+  // Generate social media share image
+  const handleGenerateShareImage = async () => {
+    try {
+      // Create a temporary div with the share content
+      const shareDiv = document.createElement('div');
+      shareDiv.style.position = 'absolute';
+      shareDiv.style.left = '-9999px';
+      shareDiv.style.top = '-9999px';
+      shareDiv.style.width = '1400px';
+      shareDiv.style.minHeight = '2000px';
+      shareDiv.style.backgroundColor = '#ffffff';
+      shareDiv.style.padding = '0px';
+      shareDiv.style.borderRadius = '0px';
+      shareDiv.style.border = '2px solid #1f2937';
+      shareDiv.style.fontFamily = '"Times New Roman", serif';
+      shareDiv.style.position = 'relative';
+      shareDiv.style.overflow = 'visible';
+      shareDiv.style.boxShadow = '0 0 30px rgba(0,0,0,0.15)';
+
+      // Determine data source
+      const dataSource = profile.is_live_account ? `${profile.broker} (Live Account)` : 'File Upload';
+
+      // Professional hedge fund report header
+      shareDiv.innerHTML = `
+        <!-- Watermark -->
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 120px; color: rgba(0,0,0,0.03); font-weight: bold; z-index: 0; pointer-events: none; user-select: none; font-family: 'Times New Roman', serif;">ALPHA EDGE</div>
+
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 40px 50px; position: relative; z-index: 1;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center;">
+              <img src="/logo.png" style="width: 60px; height: 60px; border-radius: 50%; margin-right: 20px; border: 3px solid rgba(255,255,255,0.2);" />
+              <div>
+                <h1 style="font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">ALPHA EDGE</h1>
+                <p style="font-size: 14px; margin: 2px 0 0 0; opacity: 0.9;">Trading Analytics Platform</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; opacity: 0.8;">Report Generated</div>
+              <div style="font-size: 14px; font-weight: 600;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+            </div>
+          </div>
+          <div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px;">
+            <h2 style="font-size: 24px; font-weight: 600; margin: 0; letter-spacing: 0.5px;">TRADER PERFORMANCE REPORT</h2>
+            <p style="font-size: 16px; margin: 5px 0 0 0; opacity: 0.9;">Comprehensive Analytics & Risk Assessment</p>
+          </div>
+        </div>
+
+        <!-- Main Report Content -->
+        <div style="padding: 50px; background: #ffffff; position: relative; z-index: 1;">
+          <!-- Executive Summary -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">EXECUTIVE SUMMARY</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px;">
+              <div>
+                <h4 style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 15px;">Trader Profile</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280;">Name:</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${profile.nickname}</td></tr>
+                  <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280;">Data Source:</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${dataSource}</td></tr>
+                  <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280;">Account Age:</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${metrics?.accountAge !== undefined ? metrics.accountAge + ' days' : '0 days'}</td></tr>
+                  <tr><td style="padding: 8px 0; font-weight: 600; color: #6b7280;">Global Rank:</td><td style="padding: 8px 0; color: #1f2937; font-weight: bold; color: #d97706;">#${rank || 'N/A'}</td></tr>
+                </table>
+              </div>
+              <div>
+                <h4 style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 15px;">Performance Overview</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #059669; margin-bottom: 5px;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Win Rate</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Profit Factor</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #374151; margin-bottom: 5px; filter: blur(4px);">****</div>
+                    <div style="font-size: 12px; color: #6b7280;">Total Profit</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #ea580c; margin-bottom: 5px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Total Trades</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Performance Analytics Section -->
+          <div style="margin-bottom: 40px; page-break-before: always;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">PERFORMANCE ANALYTICS</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-bottom: 35px;">
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Return Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Total Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.totalReturn !== undefined ? (metrics.totalReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Annualized Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.annualizedReturn !== undefined ? (metrics.annualizedReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Expectancy:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.expectancy !== undefined ? '$' + metrics.expectancy.toFixed(2) : '$0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">SQN:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sqn !== undefined ? metrics.sqn.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Efficiency Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Profit Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #7c3aed;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Win Rate:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Win/Loss:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">**** / ****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Best Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669; filter: blur(3px);">****</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Alpha Edge Score</h4>
+                <div style="text-align: center; margin-bottom: 15px;">
+                  <div style="font-size: 36px; font-weight: bold; color: #1f2937; margin-bottom: 5px;">${eloScores?.elo_score || 1000}</div>
+                  <div style="font-size: 14px; color: #6b7280;">Trader ELO Rating</div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #059669;">${eloScores?.performance_score || 0}</div>
+                    <div style="color: #6b7280;">Performance</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #d97706;">${eloScores?.risk_score || 0}</div>
+                    <div style="color: #6b7280;">Risk</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #7c3aed;">${eloScores?.consistency_score || 0}</div>
+                    <div style="color: #6b7280;">Consistency</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #0891b2;">${eloScores?.account_health_score || 0}</div>
+                    <div style="color: #6b7280;">Health</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Risk Assessment Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">RISK ASSESSMENT</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px;">
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Risk Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sharpe Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sortino Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sortinoRatio !== undefined ? metrics.sortinoRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.maxDrawdown !== undefined ? metrics.maxDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.avgDrawdown !== undefined ? metrics.avgDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Trading Risk</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Risk per Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Volatility:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.volatility !== undefined ? (metrics.volatility * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Recovery Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.recoveryFactor !== undefined ? metrics.recoveryFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Calmar Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.calmarRatio !== undefined ? metrics.calmarRatio.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trading Statistics Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">TRADING STATISTICS</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px;">
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Trade Analysis</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Total Trades:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Winning Trades:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round(metrics.winRate * metrics.totalTrades / 100) : '0'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Losing Trades:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round((100 - metrics.winRate) * metrics.totalTrades / 100) : '0'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Trade Frequency:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.totalTrades !== undefined && metrics?.accountAge !== undefined ? (metrics.totalTrades / metrics.accountAge).toFixed(1) + '/day' : '0.0/day'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Streak Analysis</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Win Streak:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.maxWinStreak || 0} trades</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Loss Streak:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.maxLoseStreak || 0} trades</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Current Streak:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.currentStreak !== undefined ? (metrics.currentStreak > 0 ? '+' + metrics.currentStreak : metrics.currentStreak) + ' trades' : '0 trades'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Trade Duration:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.avgTradeDuration !== undefined ? Math.round(metrics.avgTradeDuration / 60) + 'min' : '0min'}</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Global Rank Showcase -->
+          <div style="text-align: center; margin-top: 50px;">
+            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 20px; padding: 30px; margin-bottom: 20px; border: 3px solid #f59e0b;">
+              <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 20px;">
+                  <span style="color: white; font-size: 24px;">🏆</span>
+                </div>
+                <div>
+                  <div style="font-size: 48px; font-weight: bold; color: white; line-height: 1;">#${rank || 'N/A'}</div>
+                  <div style="font-size: 12px; color: #fbbf24; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">GLOBAL LEADERBOARD</div>
+                </div>
+              </div>
+              <div style="font-size: 18px; color: white; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Elite Trading Community</div>
+            </div>
+
+            <div style="background: #f8fafc; border-radius: 15px; padding: 20px; border: 2px solid #e5e7eb; display: inline-block;">
+              <div style="font-size: 16px; color: #374151; font-weight: 600;">Professional Trader Certification</div>
+              <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">Alpha Edge Capital Management</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f8fafc; padding: 20px 50px; border-top: 1px solid #e5e7eb; text-align: center;">
+          <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">This report is confidential and intended solely for the recipient. Generated by Alpha Edge Trading Analytics Platform.</div>
+          <div style="font-size: 10px; color: #9ca3af;">© 2024 Alpha Edge. All rights reserved. | Share your achievements #AlphaEdge</div>
+        </div>
+
+          <!-- Risk Assessment Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">RISK ASSESSMENT</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px;">
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Risk Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sharpe Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sortino Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sortinoRatio !== undefined ? metrics.sortinoRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.maxDrawdown !== undefined ? metrics.maxDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.avgDrawdown !== undefined ? metrics.avgDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Trading Risk</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Risk per Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Volatility:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.volatility !== undefined ? (metrics.volatility * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Recovery Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.recoveryFactor !== undefined ? metrics.recoveryFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Calmar Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.calmarRatio !== undefined ? metrics.calmarRatio.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Performance Analytics Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">PERFORMANCE ANALYTICS</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-bottom: 35px;">
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Return Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Total Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.totalReturn !== undefined ? (metrics.totalReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Annualized Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.annualizedReturn !== undefined ? (metrics.annualizedReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Expectancy:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.expectancy !== undefined ? '$' + metrics.expectancy.toFixed(2) : '$0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">SQN:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sqn !== undefined ? metrics.sqn.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Efficiency Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Profit Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #7c3aed;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Win Rate:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Win/Loss:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">**** / ****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Best Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669; filter: blur(3px);">****</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Alpha Edge Score</h4>
+                <div style="text-align: center; margin-bottom: 15px;">
+                  <div style="font-size: 36px; font-weight: bold; color: #1f2937; margin-bottom: 5px;">${eloScores?.elo_score || 1000}</div>
+                  <div style="font-size: 14px; color: #6b7280;">Trader ELO Rating</div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #059669;">${eloScores?.performance_score || 0}</div>
+                    <div style="color: #6b7280;">Performance</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #d97706;">${eloScores?.risk_score || 0}</div>
+                    <div style="color: #6b7280;">Risk</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #7c3aed;">${eloScores?.consistency_score || 0}</div>
+                    <div style="color: #6b7280;">Consistency</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #0891b2;">${eloScores?.account_health_score || 0}</div>
+                    <div style="color: #6b7280;">Health</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Key Performance Indicators -->
+          <div style="margin-bottom: 35px;">
+            <h3 style="text-align: center; font-size: 24px; font-weight: bold; color: #374151; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px;">Key Performance Indicators</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+              <!-- Win Rate Card -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #059669, #047857); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);">
+                  <span style="color: white; font-size: 20px;">🎯</span>
+                </div>
+                <div style="font-size: 28px; font-weight: bold; color: #059669; margin-bottom: 5px;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</div>
+                <div style="font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Win Rate</div>
+              </div>
+
+              <!-- Profit Factor Card -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #7c3aed, #6d28d9); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);">
+                  <span style="color: white; font-size: 20px;">💰</span>
+                </div>
+                <div style="font-size: 28px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${metrics?.profitFactor !== undefined ? (metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)) : '0.00'}</div>
+                <div style="font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Profit Factor</div>
+              </div>
+
+              <!-- Total Profit Card -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #374151, #1f2937); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(55, 65, 81, 0.3);">
+                  <span style="color: white; font-size: 20px;">📊</span>
+                </div>
+                <div style="font-size: 28px; font-weight: bold; color: #374151; filter: blur(4px); margin-bottom: 5px;">****</div>
+                <div style="font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Total Profit</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced Metrics Section -->
+          <div style="margin-bottom: 35px;">
+            <h3 style="text-align: center; font-size: 20px; font-weight: bold; color: #6b7280; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">Advanced Analytics</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+              <!-- Left Column -->
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #4f46e5, #3730a3); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(79, 70, 229, 0.3);">
+                    <span style="color: white; font-size: 14px;">📅</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #4f46e5; margin-bottom: 3px;">${metrics?.accountAge !== undefined ? metrics.accountAge + 'd' : '0d'}</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Account Age</div>
+                </div>
+
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #dc2626, #b91c1c); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(220, 38, 38, 0.3);">
+                    <span style="color: white; font-size: 14px;">📊</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #dc2626; margin-bottom: 3px;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Sharpe Ratio</div>
+                </div>
+              </div>
+
+              <!-- Right Column -->
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #ea580c, #c2410c); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(234, 88, 12, 0.3);">
+                    <span style="color: white; font-size: 14px;">🎯</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #ea580c; margin-bottom: 3px;">${metrics?.sqn !== undefined ? metrics.sqn.toFixed(2) : '0.00'}</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">SQN</div>
+                </div>
+
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #374151, #1f2937); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(55, 65, 81, 0.3);">
+                    <span style="color: white; font-size: 14px;">⚠️</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #374151; filter: blur(4px); margin-bottom: 3px;">****</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Risk/Trade</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trading Streaks & Volume -->
+          <div style="margin-bottom: 35px;">
+            <h3 style="text-align: center; font-size: 20px; font-weight: bold; color: #6b7280; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">Trading Performance</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+              <!-- Winning Streak -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #16a34a, #15803d); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(22, 163, 74, 0.3);">
+                  <span style="color: white; font-size: 18px;">🔥</span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; color: #16a34a; margin-bottom: 5px;">+${metrics?.maxWinStreak || 0}</div>
+                <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Winning Streak</div>
+              </div>
+
+              <!-- Losing Streak -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #dc2626, #b91c1c); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);">
+                  <span style="color: white; font-size: 18px;">❌</span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 5px;">-${metrics?.maxLoseStreak || 0}</div>
+                <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Losing Streak</div>
+              </div>
+
+              <!-- Volume -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #7c3aed, #6d28d9); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);">
+                  <span style="color: white; font-size: 18px;">📊</span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</div>
+                <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Total Trades</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Global Rank Showcase -->
+          <div style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 25px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(30, 41, 59, 0.3); border: 3px solid #f59e0b;">
+              <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 20px; box-shadow: 0 6px 12px rgba(245, 158, 11, 0.4);">
+                  <span style="color: white; font-size: 24px;">🏆</span>
+                </div>
+                <div>
+                  <div style="font-size: 48px; font-weight: bold; color: white; text-shadow: 0 3px 6px rgba(0,0,0,0.3); line-height: 1;">#${rank || 'N/A'}</div>
+                  <div style="font-size: 12px; color: #fbbf24; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">RANK</div>
+                </div>
+              </div>
+              <div style="font-size: 18px; color: white; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Global Leaderboard</div>
+              <div style="font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500;">Elite Trading Community</div>
+            </div>
+
+            <!-- Achievement Badge -->
+            <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; box-shadow: inset -3px -3px 6px #ffffff, inset 3px 3px 6px #aeaec040; border: 2px solid rgba(255,255,255,0.4); display: inline-block;">
+              <div style="font-size: 14px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Professional Trader</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; font-size: 10px; color: #9ca3af;">
+          Generated by Alpha Edge • Share your achievements #AlphaEdge
+        </div>
+      `;
+
+      document.body.appendChild(shareDiv);
+
+      // Wait for images to load
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Wait for images and styles to load completely
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Generate canvas with ultra high quality
+      const canvas = await html2canvas(shareDiv, {
+        backgroundColor: '#ffffff',
+        scale: 2, // Good quality for report rendering
+        width: 1400,
+        height: 2000,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        imageTimeout: 20000,
+        removeContainer: true,
+        foreignObjectRendering: false,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 1000,
+        windowHeight: 800,
+        onclone: async (clonedDoc) => {
+          // Ensure all images are loaded in cloned document
+          const images = clonedDoc.querySelectorAll('img');
+          const promises = Array.from(images).map(img => {
+            return new Promise((resolve) => {
+              if (img.complete) {
+                resolve();
+              } else {
+                img.onload = resolve;
+                img.onerror = resolve;
+                // Force reload image
+                const src = img.src;
+                img.src = '';
+                img.src = src;
+              }
+            });
+          });
+
+          // Wait for fonts to load
+          await document.fonts.ready;
+
+          return Promise.all(promises);
+        }
+      });
+
+      // Convert to blob and download with high quality
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `alpha-edge-${profile.nickname}-trading-stats.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 'image/png', 1.0); // Maximum quality
+
+      // Remove temporary element
+      document.body.removeChild(shareDiv);
+
+      alert('High-quality share image generated! Check your downloads.');
+
+    } catch (error) {
+      console.error('Error generating share image:', error);
+      alert('Error generating share image. Please try again.');
+    }
+  };
+
+  // Handle data unlinking
+  const handleUnlinkData = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to unlink all trading data from your account?\n\n' +
+      'This will permanently delete:\n' +
+      '• All trade records\n' +
+      '• Performance metrics\n' +
+      '• Account statistics\n\n' +
+      'You can upload new data afterwards, but the current data will be lost forever.\n\n' +
+      'Continue?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+
+      // Delete all trades associated with this profile
+      const trades = await localDataService.entities.Trade.filter({
+        trader_profile_id: profile.id
+      });
+
+      for (const trade of trades) {
+        await localDataService.entities.Trade.delete(trade.id);
+      }
+
+      // Reset profile metrics and data
+      await localDataService.entities.TraderProfile.update(profile.id, {
+        initial_balance: 1000,
+        trader_score: 0,
+        total_trades: 0,
+        win_rate: 0,
+        total_pnl: 0,
+        // Keep other profile info like nickname, broker, etc.
+      });
+
+      // Refresh the page to show empty state
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error unlinking data:', error);
+      alert('Error unlinking data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-[50vh] text-gray-400">Loading statistics...</div>;
@@ -851,6 +1428,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
                 <h1 className="text-xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left">{profile.nickname}</h1>
                 {isOwnProfile && (
+                  <div className="flex gap-2">
                   <button
                     onClick={handleEditName}
                     className="p-2 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
@@ -858,6 +1436,22 @@ export default function Dashboard() {
                   >
                     <Edit2 size={16} />
                   </button>
+                    <button
+                      onClick={handleGenerateShareImage}
+                      className="p-2 bg-blue-100 rounded-lg text-blue-600 hover:bg-blue-200 transition-colors"
+                      title="Generate share image"
+                    >
+                      <Share2 size={16} />
+                    </button>
+                    <button
+                      onClick={handleUnlinkData}
+                      disabled={loading}
+                      className="p-2 bg-red-100 rounded-lg text-red-600 hover:bg-red-200 disabled:bg-red-50 disabled:text-red-400 transition-colors"
+                      title="Unlink all trading data"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -910,27 +1504,27 @@ export default function Dashboard() {
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-6">
-          <StatBox
-            title="Total Profit"
+          <StatBox 
+          title="Total Profit"
             value={metrics?.totalReturn !== undefined ? `${Math.abs(metrics.totalReturn) > 1000 ? (Number((metrics.totalReturn / 1000).toFixed(1))) + 'K%' : Number(metrics.totalReturn).toFixed(2) + '%'}` : '0.00%'}
           />
 
-          <StatBox
-            title="Win Rate"
+          <StatBox 
+          title="Win Rate"
             value={metrics?.winRate !== undefined ? `${metrics.winRate.toFixed(1)}%` : '0.0%'}
             subValue={metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? `${Math.round(metrics.winRate * metrics.totalTrades / 100)}/${metrics.totalTrades > 999 ? (metrics.totalTrades / 1000).toFixed(1) + 'K' : metrics.totalTrades} trades` : '0/0 trades'}
           />
 
-          <StatBox
-            title="Profit Factor"
+          <StatBox 
+          title="Profit Factor"
             value={metrics?.profitFactor !== undefined ? (isFinite(metrics.profitFactor) ? (metrics.profitFactor > 999 ? '999+' : metrics.profitFactor.toFixed(2)) : '∞') : '0.00'}
             trend={metrics?.profitFactor !== undefined ? (metrics.profitFactor > 1.5 ? 12 : -5) : 0}
           />
 
-          <StatBox
+          <StatBox 
           title="Account Age"
             value={metrics?.accountAge !== undefined ? `${metrics.accountAge} days` : '0 days'}
-          />
+        />
 
         <StatBox
           title="Sharpe Ratio"
@@ -943,7 +1537,7 @@ export default function Dashboard() {
             value={metrics?.expectancy !== undefined ? (Math.abs(metrics.expectancy) > 999999 ? '$999K+' : `$${Math.abs(metrics.expectancy) > 999 ? (metrics.expectancy / 1000).toFixed(1) + 'K' : metrics.expectancy.toFixed(2)}`) : '$0.00'}
           />
         ) : (
-          <StatBox
+          <StatBox 
             title="Total Trades"
             value={metrics?.totalTrades > 999 ? (metrics.totalTrades / 1000).toFixed(1) + 'K' : (metrics?.totalTrades || 0).toString()}
             trend={metrics?.totalTrades || 0}
@@ -1112,7 +1706,7 @@ export default function Dashboard() {
                           </div>
                           <span className="text-sm font-bold text-blue-600">{eloScores.performance_score}</span>
                        </div>
-                          <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
+                       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
                           <div className="h-full bg-blue-500 rounded-full" style={{ width: `${eloScores.performance_score}%` }}></div>
                        </div>
                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] sm:text-[10px] text-gray-500">
