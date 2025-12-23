@@ -1,34 +1,61 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicButton } from '@/components/NeumorphicUI';
-import { Upload, Zap } from 'lucide-react';
+import { Upload, Zap, Settings } from 'lucide-react';
 import { getRedirectUri, generateState } from '../utils/cTraderUtils';
 
 export default function Connect() {
+  const [selectedScope, setSelectedScope] = useState('accounts');
+
+  // Test function for cTrader playground (temporary)
+  const handleTestCTraderPlayground = () => {
+    const state = generateState();
+    localStorage.setItem('ctrader_state', state);
+
+    // Use playground redirect URI for testing
+    const redirectUri = 'https://connect.spotware.com/apps/19506/playground';
+
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
+      scope: selectedScope,
+      redirect_uri: redirectUri,
+      product: 'web',
+      state: state
+    });
+
+    const authUrl = `https://id.ctrader.com/my/settings/openapi/grantingaccess?${params.toString()}`;
+    console.log('🧪 Testing with playground redirect:', authUrl);
+    window.location.href = authUrl;
+  };
 
   const handleConnectCTrader = () => {
     const state = generateState();
     localStorage.setItem('ctrader_state', state);
 
     const redirectUri = getRedirectUri();
-    // cTrader requires specific URL format with product parameter
-    const authUrl = `https://id.ctrader.com/my/settings/openapi/grantingaccess?` +
-      `client_id=${import.meta.env.VITE_CTRADER_CLIENT_ID}` +
-      `&scope=trading%20accounts` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&product=web` + // Required parameter for cTrader OAuth
-      `&state=${state}`;
 
-    // Alternative using URLSearchParams (also works)
-    // const params = new URLSearchParams({
-    //   client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
-    //   scope: 'trading accounts',
-    //   redirect_uri: redirectUri,
-    //   product: 'web', // Required for cTrader
-    //   state: state
-    // });
-    // const authUrl = `https://id.ctrader.com/my/settings/openapi/grantingaccess?${params.toString()}`;
+    const scope = selectedScope; // Use selected scope from UI
+
+    console.log('🔗 cTrader OAuth URL generation:', {
+      redirectUri,
+      scope,
+      state,
+      clientId: import.meta.env.VITE_CTRADER_CLIENT_ID?.substring(0, 10) + '...'
+    });
+
+    // Use URLSearchParams for proper encoding
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
+      scope: scope,
+      redirect_uri: redirectUri, // URLSearchParams handles encoding
+      product: 'web', // Required for cTrader OAuth
+      state: state
+    });
+
+    const authUrl = `https://id.ctrader.com/my/settings/openapi/grantingaccess?${params.toString()}`;
+
+    console.log('🚀 Redirecting to cTrader OAuth:', authUrl);
     window.location.href = authUrl;
   };
 
@@ -66,6 +93,35 @@ export default function Connect() {
           </NeumorphicButton>
           <p className="text-xs text-gray-500 mt-1 text-center">Connect directly to your cTrader account</p>
         </div>
+
+        {/* Scope selector for testing different permissions */}
+        {import.meta.env.DEV && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              cTrader Scope (for testing):
+            </label>
+            <select
+              value={selectedScope}
+              onChange={(e) => setSelectedScope(e.target.value)}
+              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+            >
+              <option value="accounts">accounts</option>
+              <option value="trading">trading</option>
+              <option value="trading accounts">trading accounts</option>
+            </select>
+          </div>
+        )}
+
+        {/* Temporary test button for debugging */}
+        {import.meta.env.DEV && (
+          <div>
+            <NeumorphicButton onClick={handleTestCTraderPlayground} className="w-full flex items-center justify-center bg-gradient-to-r from-orange-500 to-red-600 text-white border-0">
+              <Settings size={20} className="mr-2" />
+              Test cTrader OAuth ({selectedScope})
+            </NeumorphicButton>
+            <p className="text-xs text-gray-500 mt-1 text-center">Test with playground redirect (dev only)</p>
+          </div>
+        )}
       </div>
 
     </div>

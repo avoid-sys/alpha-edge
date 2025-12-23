@@ -11,6 +11,13 @@ const CTraderCallback = () => {
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
+    console.log('🔄 cTrader OAuth callback received:', {
+      code: code ? 'present' : 'missing',
+      state: state ? 'present' : 'missing',
+      error: error || 'none',
+      url: window.location.href
+    });
+
     if (error) {
       console.error('cTrader OAuth error:', error);
       alert('cTrader connection failed: ' + error);
@@ -20,6 +27,11 @@ const CTraderCallback = () => {
 
     const storedState = localStorage.getItem('ctrader_state');
     if (state !== storedState || !code) {
+      console.error('State validation failed:', {
+        received: state,
+        stored: storedState,
+        hasCode: !!code
+      });
       alert('Invalid state or no authorization code received from cTrader');
       navigate('/connect');
       return;
@@ -27,6 +39,8 @@ const CTraderCallback = () => {
 
     // Exchange authorization code for access token
     const redirectUri = getRedirectUri();
+    console.log('🔑 Starting token exchange with redirectUri:', redirectUri);
+
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
@@ -35,13 +49,20 @@ const CTraderCallback = () => {
       client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
     });
 
+    console.log('📡 Token exchange request to: https://openapi.ctrader.com/apps/token');
+
     fetch('https://openapi.ctrader.com/apps/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body
     })
-      .then(res => res.json())
+      .then(res => {
+        console.log('📡 Token exchange response status:', res.status);
+        return res.json();
+      })
       .then(data => {
+        console.log('📡 Token exchange response:', data);
+
         if (data.error) {
           throw new Error(data.error_description || data.error);
         }
@@ -49,7 +70,7 @@ const CTraderCallback = () => {
         // Store tokens with expiration time
         data.expires_at = Date.now() + (data.expires_in * 1000);
         localStorage.setItem('ctrader_tokens', JSON.stringify(data));
-        console.log('cTrader tokens stored successfully');
+        console.log('✅ cTrader tokens stored successfully');
 
         // Clear state
         localStorage.removeItem('ctrader_state');
@@ -58,7 +79,7 @@ const CTraderCallback = () => {
         navigate('/dashboard');
       })
       .catch(err => {
-        console.error('cTrader token exchange error:', err);
+        console.error('❌ cTrader token exchange error:', err);
         alert('Error exchanging cTrader authorization code: ' + err.message);
         navigate('/connect');
       });
