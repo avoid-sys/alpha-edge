@@ -1,0 +1,67 @@
+// Common.proto - Basic structure for cTrader API
+// This is a placeholder file. Please download the actual proto files from:
+// https://github.com/spotware/OpenAPI/tree/master/proto
+
+syntax = "proto3";
+
+package ProtoOA;
+
+// Basic message types
+message ProtoMessage {
+  uint32 payloadType = 1;
+  bytes payload = 2;
+}
+
+// Placeholder definitions to prevent loading errors
+message ProtoOAApplicationAuthReq {
+  string clientId = 1;
+  string clientSecret = 2;
+}
+
+message ProtoOAApplicationAuthRes {
+  bool result = 1;
+}
+
+message ProtoOAGetAccountListByAccessTokenReq {
+  string accessToken = 1;
+}
+
+message ProtoOAGetAccountListByAccessTokenRes {
+  repeated ProtoOACtidTraderAccount ctidTraderAccount = 1;
+}
+
+message ProtoOACtidTraderAccount {
+  uint64 ctidTraderAccountId = 1;
+}
+
+message ProtoOAAccountAuthReq {
+  uint64 ctidTraderAccountId = 1;
+  string accessToken = 2;
+}
+
+message ProtoOAAccountAuthRes {
+  bool result = 1;
+}
+
+message ProtoOADealListReq {
+  uint64 ctidTraderAccountId = 1;
+  int64 fromTimestamp = 2;
+  int64 toTimestamp = 3;
+}
+
+message ProtoOADealListRes {
+  repeated ProtoOADeal deal = 1;
+}
+
+message ProtoOADeal {
+  uint64 positionId = 1;
+  string symbolId = 2;
+  double volume = 3;
+  double executedPrice = 4;
+  double profit = 5;
+  string dealStatus = 6;
+  int64 createTimestamp = 7;
+  int64 closeTimestamp = 8;
+  string tradeSide = 9;
+  double net_profit = 10;
+}

@@ -1,0 +1,8 @@
+// OpenApi.proto - Placeholder
+// Download actual file from cTrader OpenAPI repository
+
+syntax = "proto3";
+
+package ProtoOA;
+
+// Placeholder content

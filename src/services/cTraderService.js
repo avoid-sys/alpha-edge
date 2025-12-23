@@ -5,13 +5,19 @@ let protoRoot = null;
 // Load proto files (run once on init)
 const loadProtos = async () => {
   if (protoRoot) return protoRoot;
-  protoRoot = await protobuf.load([
-    'src/proto/Common.proto',
-    'src/proto/OpenApi.proto',
-    'src/proto/OpenApiMessages.proto',
-    'src/proto/OpenApiModelMessages.proto'
-  ]);
-  return protoRoot;
+
+  try {
+    protoRoot = await protobuf.load([
+      'src/proto/Common.proto',
+      'src/proto/OpenApi.proto',
+      'src/proto/OpenApiMessages.proto',
+      'src/proto/OpenApiModelMessages.proto'
+    ]);
+    return protoRoot;
+  } catch (error) {
+    console.error('Failed to load cTrader proto files:', error);
+    throw new Error('cTrader proto files not found. Please download the actual proto files from https://github.com/spotware/OpenAPI/tree/master/proto and place them in src/proto/');
+  }
 };
 
 // Helper to send message over WS
@@ -49,11 +55,12 @@ const refreshToken = async () => {
 
 // Main function to fetch trades and analyze
 const fetchAndAnalyzeTrades = async (isDemo = true) => {
-  let tokens = getTokens();
-  if (Date.now() > tokens.expires_at) { // Assume you store expires_at = Date.now() + expires_in * 1000
-    tokens = await refreshToken();
-  }
-  const root = await loadProtos();
+  try {
+    let tokens = getTokens();
+    if (Date.now() > tokens.expires_at) { // Assume you store expires_at = Date.now() + expires_in * 1000
+      tokens = await refreshToken();
+    }
+    const root = await loadProtos();
   const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
   const ws = new WebSocket(wsUrl);
 
@@ -136,6 +143,10 @@ const fetchAndAnalyzeTrades = async (isDemo = true) => {
     ws.onerror = reject;
     ws.onclose = () => console.log('WS closed');
   });
+  } catch (error) {
+    console.error('cTrader integration error:', error);
+    throw new Error('cTrader is not properly configured. Please ensure proto files are downloaded and try again.');
+  }
 };
 
 export { fetchAndAnalyzeTrades, refreshToken };
