@@ -25,7 +25,7 @@ const CTraderCallback = () => {
       redirect_uri: redirectUri
     });
 
-    fetch(import.meta.env.VITE_CTRADER_TOKEN_URL, {
+    fetch('https://connect.spotware.com/apps/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body

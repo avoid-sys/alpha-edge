@@ -7,10 +7,20 @@ import { Upload, Zap } from 'lucide-react';
 export default function Connect() {
 
   const handleConnectCTrader = () => {
-    const state = Math.random().toString(36).substring(2);
+    const state = crypto.randomUUID(); // More secure than Math.random
     localStorage.setItem('ctrader_state', state);
-    const redirectUri = encodeURIComponent(window.location.protocol + '//' + window.location.host + '/auth/ctrader/callback');
-    const authUrl = `${import.meta.env.VITE_CTRADER_AUTH_URL}?client_id=${import.meta.env.VITE_CTRADER_CLIENT_ID}&redirect_uri=${redirectUri}&scope=accounts&response_type=code&state=${state}`;
+
+    const redirectUri = window.location.protocol + '//' + window.location.host + '/auth/ctrader/callback';
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
+      redirect_uri: encodeURIComponent(redirectUri),
+      scope: 'trading accounts', // Important: trading for deals access, accounts for account list
+      state: state
+    });
+
+    // Updated auth URL
+    const authUrl = `https://connect.spotware.com/apps/auth?${params.toString()}`;
     window.location.href = authUrl;
   };
 
