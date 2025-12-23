@@ -3,23 +3,23 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicButton } from '@/components/NeumorphicUI';
 import { Upload, Zap } from 'lucide-react';
+import { getRedirectUri, generateState } from '../utils/cTraderUtils';
 
 export default function Connect() {
 
   const handleConnectCTrader = () => {
-    const state = crypto.randomUUID(); // More secure than Math.random
+    const state = generateState();
     localStorage.setItem('ctrader_state', state);
 
-    const redirectUri = window.location.protocol + '//' + window.location.host + '/auth/ctrader/callback';
+    const redirectUri = getRedirectUri();
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
-      redirect_uri: encodeURIComponent(redirectUri),
-      scope: 'trading accounts', // Important: trading for deals access, accounts for account list
+      redirect_uri: redirectUri, // Exact match required - no encodeURIComponent needed with URLSearchParams
+      scope: 'trading accounts', // Critical: trading for deals access, accounts for account list
       state: state
     });
 
-    // Updated auth URL
     const authUrl = `https://connect.spotware.com/apps/auth?${params.toString()}`;
     window.location.href = authUrl;
   };

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { getRedirectUri } from '../utils/cTraderUtils';
 
 const CTraderCallback = () => {
   const [searchParams] = useSearchParams();
@@ -16,13 +17,13 @@ const CTraderCallback = () => {
       return;
     }
 
-    const redirectUri = window.location.protocol + '//' + window.location.host + '/auth/ctrader/callback';
+    const redirectUri = getRedirectUri(); // Must match exactly with authorization request
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
       client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
       client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET,
-      redirect_uri: redirectUri
+      redirect_uri: redirectUri // Exact match required by OAuth2 spec
     });
 
     fetch('https://connect.spotware.com/apps/token', {
