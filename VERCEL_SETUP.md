@@ -19,7 +19,7 @@ VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJz
 
 #### cTrader Configuration (Client-side)
 ```
-VITE_CTRADER_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
+VITE_CTRADER_CLIENT_ID=19506  # SHORT numeric ID only (before underscore)
 VITE_CTRADER_AUTH_URL=https://id.ctrader.com/my/settings/openapi/grantingaccess
 VITE_CTRADER_WS_DEMO=wss://demo.ctraderapi.com:5035
 VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
@@ -27,10 +27,23 @@ VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
 
 #### cTrader Server-side (for Vercel serverless functions)
 ```
-CTRADER_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
+CTRADER_CLIENT_ID=19506  # SHORT numeric ID only (not the full key with underscore)
 CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
+
+#### ⚠️ IMPORTANT: cTrader Client ID Format
+**cTrader uses SHORT numeric ID, not the full key!**
+
+- ❌ WRONG: `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF`
+- ✅ CORRECT: `19506` (only the number before underscore)
+
+**To find your correct Client ID:**
+1. Go to https://connect.spotware.com/apps or https://openapi.ctrader.com/apps
+2. Find your "Alpha Edge" app
+3. Click "View" or "Credentials"
+4. **Client ID** = short number (e.g., `19506`)
+5. **Client Secret** = full long string (keep as-is)
 
 ### Настройки:
 - **Environment:** Production
