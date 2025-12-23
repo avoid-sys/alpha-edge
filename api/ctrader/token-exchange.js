@@ -34,12 +34,12 @@ export default async function handler(req, res) {
     clientIdLength: process.env.CTRADER_CLIENT_ID?.length,
     hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET,
     clientSecretLength: process.env.CTRADER_CLIENT_SECRET?.length,
-    tokenUrl: process.env.CTRADER_TOKEN_URL || 'https://openapi.ctrader.com/apps/token'
+    tokenUrl: process.env.CTRADER_TOKEN_URL || 'https://connect.spotware.com/apps/token'
   });
 
   // Prepare token exchange request
-  // Try different endpoints if one fails
-  const tokenUrl = process.env.CTRADER_TOKEN_URL || 'https://connect.spotware.com/apps/token';
+  // Try different endpoints if one fails - user suggested openapi.ctrader.com
+  const tokenUrl = process.env.CTRADER_TOKEN_URL || 'https://openapi.ctrader.com/apps/token';
   console.log('🎯 Using token endpoint:', tokenUrl);
 
   const body = new URLSearchParams({
@@ -51,7 +51,12 @@ export default async function handler(req, res) {
   });
 
   try {
-    console.log('📡 Making token exchange request to:', tokenUrl);
+    console.log('🔄 cTrader token exchange request:', {
+      code: code.substring(0, 20) + '...', // Don't log full code
+      redirect_uri,
+      client_id: process.env.CTRADER_CLIENT_ID?.substring(0, 20) + '...',
+      tokenUrl
+    });
 
     const response = await fetch(tokenUrl, {
       method: 'POST',
@@ -64,15 +69,12 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    console.log('📡 Token exchange response status:', response.status);
-    console.log('📡 Raw token exchange response:', JSON.stringify(data, null, 2));
-    console.log('📡 Token exchange response summary:', {
-      hasAccessToken: !!data.access_token,
-      hasRefreshToken: !!data.refresh_token,
-      tokenType: data.token_type,
-      expiresIn: data.expires_in,
-      error: data.error,
-      errorDescription: data.error_description
+    // Log FULL response from Spotware (even if error)
+    console.log('📡 Spotware response:', {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+      headers: Object.fromEntries(response.headers.entries())
     });
 
     if (!response.ok) {
@@ -80,7 +82,7 @@ export default async function handler(req, res) {
       return res.status(response.status).json({
         error: 'Token exchange failed',
         details: data,
-        message: data.error_description || data.error || 'Unknown error from cTrader'
+        spotware_status: response.status
       });
     }
 

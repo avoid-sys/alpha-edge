@@ -56,16 +56,10 @@ const CTraderCallback = () => {
         return res.json();
       })
       .then(data => {
-        console.log('📡 Server response data:', {
-          hasAccessToken: !!data.access_token,
-          hasRefreshToken: !!data.refresh_token,
-          tokenType: data.token_type,
-          expiresIn: data.expires_in,
-          expiresAt: data.expires_at,
-          error: data.error
-        });
+        console.log('📡 Server response data:', data); // Log full response for debugging
 
         if (data.error) {
+          console.error('❌ Token exchange error from server:', data);
           throw new Error(data.message || data.details?.error_description || data.error);
         }
 
