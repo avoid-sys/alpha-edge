@@ -13,14 +13,14 @@ export default function Connect() {
 
     const redirectUri = getRedirectUri();
     const params = new URLSearchParams({
-      response_type: 'token', // Use implicit flow instead of authorization code
+      response_type: 'code', // Authorization Code Flow (not implicit)
       client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
       redirect_uri: redirectUri,
-      scope: 'accounts', // Simplified scope
+      scope: 'trading accounts', // Full access to trades and accounts
       state: state
     });
 
-    const authUrl = `https://connect.spotware.com/oauth/v2/authorize?${params.toString()}`;
+    const authUrl = `${import.meta.env.VITE_CTRADER_AUTH_URL}?${params.toString()}`;
     window.location.href = authUrl;
   };
 

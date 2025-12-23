@@ -7,15 +7,9 @@ const CTraderCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // For implicit flow, access_token comes in URL hash fragment
-    const hash = window.location.hash.substring(1);
-    const hashParams = new URLSearchParams(hash);
-
-    const accessToken = hashParams.get('access_token');
-    const tokenType = hashParams.get('token_type');
-    const expiresIn = hashParams.get('expires_in');
-    const state = hashParams.get('state');
-    const error = hashParams.get('error');
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const error = searchParams.get('error');
 
     if (error) {
       console.error('cTrader OAuth error:', error);
@@ -25,30 +19,50 @@ const CTraderCallback = () => {
     }
 
     const storedState = localStorage.getItem('ctrader_state');
-    if (state !== storedState || !accessToken) {
-      alert('Invalid state or no access token received from cTrader');
+    if (state !== storedState || !code) {
+      alert('Invalid state or no authorization code received from cTrader');
       navigate('/connect');
       return;
     }
 
-    // Store tokens (implicit flow gives access_token directly)
-    const tokens = {
-      access_token: accessToken,
-      token_type: tokenType || 'Bearer',
-      expires_in: parseInt(expiresIn) || 3600,
-      expires_at: Date.now() + (parseInt(expiresIn) || 3600) * 1000
-    };
+    // Exchange authorization code for access token
+    const redirectUri = getRedirectUri();
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri, // Must match exactly
+      client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
+      client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
+    });
 
-    localStorage.setItem('ctrader_tokens', JSON.stringify(tokens));
-    console.log('cTrader access token stored successfully via implicit flow');
+    fetch(import.meta.env.VITE_CTRADER_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          throw new Error(data.error_description || data.error);
+        }
 
-    // Clear state and hash from URL
-    localStorage.removeItem('ctrader_state');
-    window.history.replaceState(null, null, window.location.pathname);
+        // Store tokens with expiration time
+        data.expires_at = Date.now() + (data.expires_in * 1000);
+        localStorage.setItem('ctrader_tokens', JSON.stringify(data));
+        console.log('cTrader tokens stored successfully');
 
-    // Navigate to dashboard
-    navigate('/dashboard');
-  }, [navigate]);
+        // Clear state
+        localStorage.removeItem('ctrader_state');
+
+        // Navigate to dashboard
+        navigate('/dashboard');
+      })
+      .catch(err => {
+        console.error('cTrader token exchange error:', err);
+        alert('Error exchanging cTrader authorization code: ' + err.message);
+        navigate('/connect');
+      });
+  }, [searchParams, navigate]);
 
   return (
     <div className="min-h-screen bg-[#e0e5ec] flex items-center justify-center">
