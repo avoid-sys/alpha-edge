@@ -34,9 +34,9 @@ export const supabase = createClient(finalUrl, supabaseAnonKey, {
   global: {
     headers: {
       'X-Client-Info': 'alpha-edge-web',
-      'apikey': supabaseAnonKey,
-      'Authorization': `Bearer ${supabaseAnonKey}`,
-      'Content-Type': 'application/json'
+      'apikey': supabaseAnonKey
+      // Remove Authorization header - Supabase handles auth automatically
+      // Remove Content-Type header - causes issues with form-data requests
     }
   },
   db: {
