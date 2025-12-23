@@ -69,7 +69,7 @@ export default function Dashboard() {
       try {
         let fetchedProfile = null;
         let fetchedTrades = [];
-        
+
         if (profileId) {
           fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
@@ -87,6 +87,36 @@ export default function Dashboard() {
             }
           } catch (e) {
             // Not logged in or no profile
+          }
+
+          // If no profile found but cTrader tokens exist, try to create profile from cTrader
+          if (!fetchedProfile && localStorage.getItem('ctrader_tokens')) {
+            console.log('🔄 cTrader tokens found but no profile - attempting to create profile from cTrader data');
+            try {
+              // Import fetchAndAnalyzeTrades dynamically to avoid circular dependency
+              const { fetchAndAnalyzeTrades } = await import('@/services/cTraderService');
+              const trades = await fetchAndAnalyzeTrades(false); // false for live account
+
+              if (trades && trades.length > 0) {
+                // Profile should be created by fetchAndAnalyzeTrades
+                // Reload data to get the new profile
+                const user = await localDataService.getCurrentUser();
+                if (user) {
+                  const profiles = await localDataService.entities.TraderProfile.filter({
+                    created_by: user.email
+                  });
+                  if (profiles.length > 0) {
+                    fetchedProfile = profiles[0];
+                    fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
+                    console.log('✅ Profile created from cTrader data');
+                    // Force reload of data
+                    setDataVersion(prev => prev + 1);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('❌ Failed to create profile from cTrader data:', error);
+            }
           }
         }
         
