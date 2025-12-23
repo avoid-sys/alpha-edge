@@ -9,7 +9,7 @@ export default function Connect() {
   const handleConnectCTrader = () => {
     const state = Math.random().toString(36).substring(2);
     localStorage.setItem('ctrader_state', state);
-    const redirectUri = encodeURIComponent('http://localhost:3008/auth/ctrader/callback'); // Adjust for your Vite port
+    const redirectUri = encodeURIComponent(window.location.protocol + '//' + window.location.host + '/auth/ctrader/callback');
     const authUrl = `${import.meta.env.VITE_CTRADER_AUTH_URL}?client_id=${import.meta.env.VITE_CTRADER_CLIENT_ID}&redirect_uri=${redirectUri}&scope=accounts&response_type=code&state=${state}`;
     window.location.href = authUrl;
   };

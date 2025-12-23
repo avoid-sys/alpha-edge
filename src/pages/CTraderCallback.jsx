@@ -16,7 +16,7 @@ const CTraderCallback = () => {
       return;
     }
 
-    const redirectUri = 'http://localhost:3008/auth/ctrader/callback'; // Update for production
+    const redirectUri = window.location.protocol + '//' + window.location.host + '/auth/ctrader/callback';
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code,

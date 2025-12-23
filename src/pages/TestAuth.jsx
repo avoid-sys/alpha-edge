@@ -191,8 +191,8 @@ const TestAuth = () => {
               <ol className="text-sm text-yellow-700 list-decimal list-inside space-y-1">
                 <li>Open: <a href="https://app.supabase.com/project/lwgnyerzimcajauxzowx" target="_blank" rel="noopener noreferrer" className="underline">Supabase Dashboard</a></li>
                 <li>Go to: Authentication → Settings → URL Configuration</li>
-                <li>Add <code className="bg-yellow-100 px-1 rounded">http://localhost:3008</code> to "Additional Redirect URLs"</li>
-                <li>Set "Site URL" to <code className="bg-yellow-100 px-1 rounded">http://localhost:3008</code></li>
+                <li>Add <code className="bg-yellow-100 px-1 rounded">https://alphaedge.vc</code> to "Additional Redirect URLs"</li>
+                <li>Set "Site URL" to <code className="bg-yellow-100 px-1 rounded">https://alphaedge.vc</code></li>
                 <li>Save changes</li>
               </ol>
             </div>
