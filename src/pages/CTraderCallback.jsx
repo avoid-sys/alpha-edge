@@ -37,40 +37,41 @@ const CTraderCallback = () => {
       return;
     }
 
-    // Exchange authorization code for access token
+    // Exchange authorization code for access token via serverless API
     const redirectUri = getRedirectUri();
-    console.log('🔑 Starting token exchange with redirectUri:', redirectUri);
+    console.log('🔑 Starting server-side token exchange with redirectUri:', redirectUri);
 
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri, // Must match exactly
-      client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
-      client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
-    });
+    console.log('📡 Making request to: /api/ctrader/token-exchange');
 
-    console.log('📡 Token exchange request to: https://openapi.ctrader.com/apps/token');
-
-    fetch('https://openapi.ctrader.com/apps/token', {
+    fetch('/api/ctrader/token-exchange', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        redirect_uri: redirectUri // Must match exactly
+      })
     })
       .then(res => {
-        console.log('📡 Token exchange response status:', res.status);
+        console.log('📡 Server response status:', res.status);
         return res.json();
       })
       .then(data => {
-        console.log('📡 Token exchange response:', data);
+        console.log('📡 Server response data:', {
+          hasAccessToken: !!data.access_token,
+          hasRefreshToken: !!data.refresh_token,
+          tokenType: data.token_type,
+          expiresIn: data.expires_in,
+          expiresAt: data.expires_at,
+          error: data.error
+        });
 
         if (data.error) {
-          throw new Error(data.error_description || data.error);
+          throw new Error(data.message || data.details?.error_description || data.error);
         }
 
-        // Store tokens with expiration time
-        data.expires_at = Date.now() + (data.expires_in * 1000);
+        // Store tokens (already includes expires_at from server)
         localStorage.setItem('ctrader_tokens', JSON.stringify(data));
-        console.log('✅ cTrader tokens stored successfully');
+        console.log('✅ cTrader tokens stored successfully via serverless API');
 
         // Clear state
         localStorage.removeItem('ctrader_state');

@@ -17,14 +17,19 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Z255ZXJ6aW1jYWphdXh6b3d4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjAzNTY2NSwiZXhwItoyMDgxNjExNjY1fQ.gSBYUj0nRxmV9vJZBAS8Pg15averueduNWL9p99h4oo
 ```
 
-#### cTrader Configuration
+#### cTrader Configuration (Client-side)
 ```
 VITE_CTRADER_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
-VITE_CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 VITE_CTRADER_AUTH_URL=https://id.ctrader.com/my/settings/openapi/grantingaccess
-VITE_CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 VITE_CTRADER_WS_DEMO=wss://demo.ctraderapi.com:5035
 VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
+```
+
+#### cTrader Server-side (for Vercel serverless functions)
+```
+CTRADER_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
+CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
 
 ### Настройки:
@@ -61,6 +66,27 @@ https://localhost:3008/*
 ```
 
 ### Сохрани изменения
+
+## Serverless Functions Setup
+
+### cTrader Token Exchange API
+
+Проект включает serverless функцию для безопасного обмена OAuth токенов:
+
+- **Endpoint:** `/api/ctrader/token-exchange`
+- **Method:** POST
+- **Purpose:** Обмен authorization code на access_token + refresh_token
+- **Security:** Client secret хранится только на сервере
+
+### Environment Variables для Serverless
+
+Убедись что на Vercel добавлены server-side переменные (без префикса VITE_):
+
+```
+CTRADER_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
+CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
+```
 
 ## Проверка работы
 
