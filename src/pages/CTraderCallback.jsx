@@ -35,7 +35,7 @@ const CTraderCallback = () => {
       client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
     });
 
-    fetch(import.meta.env.VITE_CTRADER_TOKEN_URL, {
+    fetch('https://openapi.ctrader.com/apps/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body

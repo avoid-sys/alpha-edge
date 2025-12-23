@@ -42,7 +42,7 @@ const refreshToken = async () => {
     client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
     client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
   });
-  const response = await fetch('https://connect.spotware.com/apps/token', {
+  const response = await fetch('https://openapi.ctrader.com/apps/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body

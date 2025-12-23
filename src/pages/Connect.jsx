@@ -12,15 +12,23 @@ export default function Connect() {
     localStorage.setItem('ctrader_state', state);
 
     const redirectUri = getRedirectUri();
-    const params = new URLSearchParams({
-      response_type: 'code', // Authorization Code Flow (not implicit)
-      client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
-      redirect_uri: redirectUri,
-      scope: 'trading accounts', // Full access to trades and accounts
-      state: state
-    });
+    // cTrader requires specific URL format with product parameter
+    const authUrl = `https://id.ctrader.com/my/settings/openapi/grantingaccess?` +
+      `client_id=${import.meta.env.VITE_CTRADER_CLIENT_ID}` +
+      `&scope=trading%20accounts` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&product=web` + // Required parameter for cTrader OAuth
+      `&state=${state}`;
 
-    const authUrl = `${import.meta.env.VITE_CTRADER_AUTH_URL}?${params.toString()}`;
+    // Alternative using URLSearchParams (also works)
+    // const params = new URLSearchParams({
+    //   client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
+    //   scope: 'trading accounts',
+    //   redirect_uri: redirectUri,
+    //   product: 'web', // Required for cTrader
+    //   state: state
+    // });
+    // const authUrl = `https://id.ctrader.com/my/settings/openapi/grantingaccess?${params.toString()}`;
     window.location.href = authUrl;
   };
 
