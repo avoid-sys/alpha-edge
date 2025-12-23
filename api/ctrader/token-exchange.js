@@ -28,8 +28,19 @@ export default async function handler(req, res) {
     timestamp: new Date().toISOString()
   });
 
+  // Log environment variables (without secrets)
+  console.log('🔧 Environment check:', {
+    hasClientId: !!process.env.CTRADER_CLIENT_ID,
+    clientIdLength: process.env.CTRADER_CLIENT_ID?.length,
+    hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET,
+    clientSecretLength: process.env.CTRADER_CLIENT_SECRET?.length,
+    tokenUrl: process.env.CTRADER_TOKEN_URL || 'https://openapi.ctrader.com/apps/token'
+  });
+
   // Prepare token exchange request
-  const tokenUrl = process.env.CTRADER_TOKEN_URL || 'https://openapi.ctrader.com/apps/token';
+  // Try different endpoints if one fails
+  const tokenUrl = process.env.CTRADER_TOKEN_URL || 'https://connect.spotware.com/apps/token';
+  console.log('🎯 Using token endpoint:', tokenUrl);
 
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -54,12 +65,14 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     console.log('📡 Token exchange response status:', response.status);
-    console.log('📡 Token exchange response:', {
+    console.log('📡 Raw token exchange response:', JSON.stringify(data, null, 2));
+    console.log('📡 Token exchange response summary:', {
       hasAccessToken: !!data.access_token,
       hasRefreshToken: !!data.refresh_token,
       tokenType: data.token_type,
       expiresIn: data.expires_in,
-      error: data.error
+      error: data.error,
+      errorDescription: data.error_description
     });
 
     if (!response.ok) {

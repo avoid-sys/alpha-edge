@@ -1,8 +1,51 @@
-// OpenApiMessages.proto - Placeholder
-// Download actual file from cTrader OpenAPI repository
+// Placeholder OpenApiMessages.proto for cTrader OpenAPI
+// Download real proto files from: https://github.com/spotware/OpenAPI/tree/master/proto
 
 syntax = "proto3";
 
 package ProtoOA;
 
-// Placeholder content
+message ProtoOAGetAccountListByAccessTokenReq {
+  string accessToken = 1;
+}
+
+message ProtoOAGetAccountListByAccessTokenRes {
+  repeated ProtoOATraderAccount ctidTraderAccount = 1;
+}
+
+message ProtoOATraderAccount {
+  uint64 ctidTraderAccountId = 1;
+  string accountId = 2;
+}
+
+message ProtoOAAccountAuthReq {
+  uint64 ctidTraderAccountId = 1;
+  string accessToken = 2;
+}
+
+message ProtoOAAccountAuthRes {
+  bool result = 1;
+}
+
+message ProtoOADealListReq {
+  uint64 ctidTraderAccountId = 1;
+  int64 fromTimestamp = 2;
+  int64 toTimestamp = 3;
+}
+
+message ProtoOADealListRes {
+  repeated ProtoOADeal deal = 1;
+}
+
+message ProtoOADeal {
+  uint64 dealId = 1;
+  uint64 positionId = 2;
+  uint64 volume = 3;
+  string symbolId = 4;
+  double executedPrice = 5;
+  double profit = 6;
+  string dealStatus = 7;
+  string tradeSide = 8;
+  int64 createTimestamp = 9;
+  int64 closeTimestamp = 10;
+}

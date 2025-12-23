@@ -1,8 +1,15 @@
-// OpenApi.proto - Placeholder
-// Download actual file from cTrader OpenAPI repository
+// Placeholder OpenApi.proto for cTrader OpenAPI
+// Download real proto files from: https://github.com/spotware/OpenAPI/tree/master/proto
 
 syntax = "proto3";
 
 package ProtoOA;
 
-// Placeholder content
+message ProtoOAApplicationAuthReq {
+  string clientId = 1;
+  string clientSecret = 2;
+}
+
+message ProtoOAApplicationAuthRes {
+  bool result = 1;
+}
