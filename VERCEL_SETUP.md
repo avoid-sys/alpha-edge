@@ -61,6 +61,8 @@ CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 - "Malformed client_id parameter" in OAuth = use SHORT numeric ID
 - "Malformed clientId parameter" in ProtoOAApplicationAuthReq = use FULL public key
 - "Application authentication failed" = wrong WebSocket clientId format
+- "429 Too Many Requests" = rate limit exceeded, wait 5-15 minutes before retrying
+- HTML response instead of JSON = rate limit or authorization code expired
 
 ### Настройки:
 - **Environment:** Production

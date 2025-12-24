@@ -60,6 +60,14 @@ const CTraderCallback = () => {
 
         if (data.error) {
           console.error('❌ Token exchange error from server:', data);
+
+          // Special handling for rate limiting
+          if (data.spotware_status === 429 || data.error === 'Rate limited by Spotware') {
+            alert(`${data.message || 'Превышен лимит запросов к cTrader API.'}\nПодождите ${Math.ceil((data.retry_after || 300) / 60)} минут и попробуйте подключить аккаунт заново.`);
+            navigate('/connect');
+            return;
+          }
+
           throw new Error(data.message || data.details?.error_description || data.error);
         }
 

@@ -93,6 +93,17 @@ export default async function handler(req, res) {
       content_type: contentType
     });
 
+    // Handle specific Spotware errors
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After') || 300; // Default 5 minutes
+      console.warn(`⚠️ Rate limited by Spotware (429). Retry after ${retryAfter} seconds`);
+      return res.status(429).json({
+        error: 'Rate limited by Spotware',
+        retry_after: parseInt(retryAfter),
+        message: 'Превышен лимит запросов. Подождите несколько минут и попробуйте подключить аккаунт заново.'
+      });
+    }
+
     if (!response.ok) {
       console.error('❌ Token exchange failed:', data);
       return res.status(response.status).json({
