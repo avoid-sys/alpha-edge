@@ -8,28 +8,99 @@ const loadProtos = async () => {
 
   try {
     console.log('🔧 Loading cTrader proto files...');
-    protoRoot = await protobuf.load([
-      '/proto/Common.proto',
-      '/proto/OpenApi.proto',
-      '/proto/OpenApiMessages.proto',
-      '/proto/OpenApiModelMessages.proto'
-    ]);
-    console.log('✅ Proto files loaded successfully');
 
-    // Debug: Check if our message types exist
-    try {
-      const appAuthReq = protoRoot.lookupType('ProtoOAApplicationAuthReq');
-      const appAuthRes = protoRoot.lookupType('ProtoOA.ProtoOAApplicationAuthRes');
-      console.log('🔍 Proto types check - ProtoOAApplicationAuthReq:', !!appAuthReq, 'ProtoOA.ProtoOAApplicationAuthRes:', !!appAuthRes);
-      console.log('🔍 ProtoOAApplicationAuthReq payloadType:', appAuthReq?.payloadType);
-    } catch (e) {
-      console.error('❌ Proto type lookup error:', e.message);
-    }
+    // Define proto files inline to avoid loading issues
+    const protoFiles = {
+      'Common.proto': `
+syntax = "proto3";
+package ProtoOA;
+
+message ProtoMessage {
+  uint32 payloadType = 1;
+  bytes payload = 2;
+}
+      `,
+      'OpenApi.proto': `
+syntax = "proto3";
+package ProtoOA;
+
+message ProtoOAApplicationAuthReq {
+  string clientId = 1;
+  string clientSecret = 2;
+}
+
+message ProtoOAApplicationAuthRes {
+  bool result = 1;
+}
+
+message ProtoOAGetAccountListByAccessTokenReq {
+  string accessToken = 1;
+}
+
+message ProtoOAGetAccountListByAccessTokenRes {
+  repeated ProtoOATraderAccount ctidTraderAccount = 1;
+}
+
+message ProtoOATraderAccount {
+  uint64 ctidTraderAccountId = 1;
+  string accountId = 2;
+}
+
+message ProtoOAAccountAuthReq {
+  uint64 ctidTraderAccountId = 1;
+  string accessToken = 2;
+}
+
+message ProtoOAAccountAuthRes {
+  bool result = 1;
+}
+
+message ProtoOADealListReq {
+  uint64 ctidTraderAccountId = 1;
+  int64 fromTimestamp = 2;
+  int64 toTimestamp = 3;
+}
+
+message ProtoOADealListRes {
+  repeated ProtoOADeal deal = 1;
+}
+
+message ProtoOADeal {
+  uint64 dealId = 1;
+  uint64 positionId = 2;
+  uint64 volume = 3;
+  string symbolId = 4;
+  double executedPrice = 5;
+  double profit = 6;
+  string dealStatus = 7;
+  string tradeSide = 8;
+  int64 createTimestamp = 9;
+  int64 closeTimestamp = 10;
+}
+
+message ProtoOAErrorRes {
+  uint32 errorCode = 1;
+  string description = 2;
+  string maintenanceEndTimestamp = 3;
+}
+      `,
+      'OpenApiMessages.proto': `
+syntax = "proto3";
+package ProtoOA;
+      `,
+      'OpenApiModelMessages.proto': `
+syntax = "proto3";
+package ProtoOA;
+      `
+    };
+
+    protoRoot = await protobuf.load(Object.values(protoFiles));
+    console.log('✅ Proto files loaded successfully (inline)');
 
     return protoRoot;
   } catch (error) {
     console.error('❌ Failed to load cTrader proto files:', error);
-    throw new Error('cTrader proto files not found. Please ensure proto files are available in src/proto/');
+    throw new Error('Failed to load cTrader protobuf definitions');
   }
 };
 
@@ -179,7 +250,7 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
           return;
         }
 
-        const payload = root.lookupType('ProtoOA.' + messageType).decode(message.payload);
+        const payload = root.lookupType(messageType).decode(message.payload);
         console.log('📋 Decoded message:', messageType, 'payload:', JSON.stringify(payload, null, 2));
 
         // Handle different message types
