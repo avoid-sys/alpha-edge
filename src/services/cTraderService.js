@@ -9,10 +9,10 @@ const loadProtos = async () => {
   try {
     console.log('🔧 Loading cTrader proto files...');
     protoRoot = await protobuf.load([
-      '/src/proto/Common.proto',
-      '/src/proto/OpenApi.proto',
-      '/src/proto/OpenApiMessages.proto',
-      '/src/proto/OpenApiModelMessages.proto'
+      '/proto/Common.proto',
+      '/proto/OpenApi.proto',
+      '/proto/OpenApiMessages.proto',
+      '/proto/OpenApiModelMessages.proto'
     ]);
     console.log('✅ Proto files loaded successfully');
 

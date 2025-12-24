@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package ProtoOA;
+
+message ProtoMessage {
+  uint32 payloadType = 1;
+  bytes payload = 2;
+}

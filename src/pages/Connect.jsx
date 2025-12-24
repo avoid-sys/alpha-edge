@@ -52,16 +52,25 @@ export default function Connect() {
 
     const scope = selectedScope; // Use selected scope from UI
 
+    // Check if environment variables are set
+    const fullClientId = import.meta.env.VITE_CTRADER_FULL_CLIENT_ID;
+    if (!fullClientId) {
+      alert('❌ cTrader configuration error: VITE_CTRADER_FULL_CLIENT_ID is not set.\n\nPlease add this to your .env file or Vercel environment variables:\nVITE_CTRADER_FULL_CLIENT_ID=your_full_client_id_here');
+      return;
+    }
+
     console.log('🔗 cTrader OAuth URL generation:', {
       redirectUri,
       scope,
       state,
-      clientId: import.meta.env.VITE_CTRADER_CLIENT_ID?.substring(0, 10) + '...'
+      clientId: fullClientId.substring(0, 10) + '...',
+      fullClientId: fullClientId,
+      allEnv: Object.keys(import.meta.env).filter(key => key.includes('CTRADER'))
     });
 
     // Use URLSearchParams for proper encoding
     const params = new URLSearchParams({
-      client_id: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID, // Use full Client ID for consistency
+      client_id: fullClientId, // Use full Client ID for consistency
       scope: scope,
       redirect_uri: redirectUri, // URLSearchParams handles encoding
       product: 'web', // Required for cTrader OAuth

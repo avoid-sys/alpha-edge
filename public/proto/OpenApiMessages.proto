@@ -1,0 +1,4 @@
+// Additional cTrader OpenAPI messages can be added here if needed
+syntax = "proto3";
+
+package ProtoOA;
