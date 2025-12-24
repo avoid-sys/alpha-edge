@@ -68,6 +68,7 @@ export default function Dashboard() {
   }, [refreshParam]);
 
   useEffect(() => {
+    console.log('🔄 Dashboard useEffect triggered, dataVersion:', dataVersion, 'profileId:', profileId);
     const fetchData = async () => {
       // Wait for auth to load
       if (authLoading) {
@@ -169,9 +170,13 @@ export default function Dashboard() {
               const isDemo = accountType === 'demo';
 
               console.log('🚀 Starting cTrader flow for', accountType, 'account...');
+              console.log('🔧 isDemo parameter:', isDemo);
               const trades = await startCtraderFlow(isDemo);
               console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
-              console.log('📊 Trades data:', trades);
+              console.log('📊 Trades data type:', typeof trades, 'isArray:', Array.isArray(trades));
+              if (trades && trades.length > 0) {
+                console.log('📊 First trade sample:', trades[0]);
+              }
 
               if (trades && trades.length > 0) {
                 console.log('🔄 Creating profile from', trades.length, 'cTrader trades...');
@@ -208,8 +213,9 @@ export default function Dashboard() {
                     updated_at: new Date().toISOString()
                   };
 
+                  console.log('📝 Creating cTrader profile with data:', profileData);
                   const newProfile = await localDataService.entities.TraderProfile.create(profileData);
-                  console.log('✅ Created cTrader profile:', newProfile.id);
+                  console.log('✅ Created cTrader profile:', newProfile.id, 'for user:', user.email);
 
                   // Save trades to database
                   for (const trade of trades) {
@@ -227,7 +233,9 @@ export default function Dashboard() {
                   fetchedTrades = trades;
 
                   // Force reload of data
-                  setDataVersion(prev => prev + 1);
+                  const newDataVersion = dataVersion + 1;
+                  console.log('🔄 Setting dataVersion from', dataVersion, 'to', newDataVersion);
+                  setDataVersion(newDataVersion);
                   console.log('🎉 cTrader profile creation completed successfully');
 
                 } catch (profileError) {
@@ -332,18 +340,22 @@ export default function Dashboard() {
           setRank(null); // No rank for demo/file-only accounts
         }
 
-        if (fetchedProfile && fetchedTrades.length > 0) {
-          // Use real data from uploaded files
-        setProfile(fetchedProfile);
-          setTrades(fetchedTrades);
+        if (fetchedProfile) {
+          // Use profile data (can have 0 trades)
+          console.log('🎯 Setting UI state - profile:', fetchedProfile.id, 'trades:', fetchedTrades.length);
+          setProfile(fetchedProfile);
+          setTrades(fetchedTrades || []);
         } else {
-          // Show empty state - no data uploaded yet
+          // Show empty state - no data available
+          console.log('📭 No profile data available, showing empty state');
           setProfile(null);
           setTrades([]);
         }
       } catch (error) {
         console.error("Error fetching data", error);
       } finally {
+        console.log('🏁 Dashboard data loading completed, setting loading to false');
+        console.log('📊 Final state - profile:', fetchedProfile?.id || 'none', 'trades:', fetchedTrades?.length || 0);
         setLoading(false);
       }
     };
