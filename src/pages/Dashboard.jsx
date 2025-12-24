@@ -131,7 +131,8 @@ export default function Dashboard() {
               // Import startCtraderFlow dynamically to avoid circular dependency
               const { startCtraderFlow } = await import('@/services/cTraderService');
               console.log('🚀 Starting cTrader flow...');
-              const trades = await startCtraderFlow(false); // false for live account
+              console.log('🧪 Testing with DEMO account first...');
+              const trades = await startCtraderFlow(true); // true for demo account - easier to test
               console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
               console.log('📊 Trades data:', trades);
 

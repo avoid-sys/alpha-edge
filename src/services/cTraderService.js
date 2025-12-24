@@ -330,6 +330,7 @@ export const startCtraderFlow = async (isDemo = false) => {
   console.log('📚 Protos loaded successfully');
 
   const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
+  console.log('🔌 Connecting to cTrader WS URL:', wsUrl, 'isDemo:', isDemo);
   const ws = new WebSocket(wsUrl);
 
   let accountId = null;
@@ -346,10 +347,26 @@ export const startCtraderFlow = async (isDemo = false) => {
 
     ws.onopen = () => {
       console.log('✅ WS opened successfully — sending app auth');
+
+      const clientId = import.meta.env.VITE_CTRADER_FULL_CLIENT_ID;
+      const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET;
+
+      console.log('🔑 Using clientId:', clientId ? clientId.substring(0, 10) + '...' : 'UNDEFINED');
+      console.log('🔑 Using clientSecret length:', clientSecret ? clientSecret.length : 'UNDEFINED');
+
+      if (!clientId || !clientSecret) {
+        console.error('❌ Missing cTrader credentials!');
+        reject(new Error('cTrader WebSocket credentials not configured'));
+        ws.close();
+        return;
+      }
+
       sendMessage(ws, 'ProtoOAApplicationAuthReq', {
-        clientId: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID,
-        clientSecret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
+        clientId: clientId,
+        clientSecret: clientSecret
       });
+
+      console.log('📤 Application auth message sent, waiting for response...');
     };
 
     ws.onmessage = async (event) => {
@@ -362,7 +379,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         console.log('📨 Received payloadType:', payloadTypeNum);
 
         if (payloadTypeNum === 51 || payloadTypeNum === 2142) {
-          console.log('Heartbeat — connection alive');
+          console.log('💓 Heartbeat received (payloadType:', payloadTypeNum, ') — connection alive');
           return;
         }
 
@@ -376,7 +393,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         const PayloadType = protoRoot.lookupType(`ProtoOA.${typeName}`);
         const payload = PayloadType.decode(message.payload);
 
-        if (payloadTypeNum === 2142) { // ProtoOAApplicationAuthRes - исправлено!
+        if (payloadTypeNum === 2101) { // ProtoOAApplicationAuthRes
           console.log('✅ Application authenticated');
           sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
             accessToken: tokens.access_token
@@ -437,6 +454,11 @@ export const startCtraderFlow = async (isDemo = false) => {
 
     ws.onclose = (event) => {
       console.log('🔌 WS closed:', event.code, event.reason);
+      if (event.code !== 1000) {
+        console.error('💥 WS closed unexpectedly with code:', event.code, 'reason:', event.reason);
+      } else {
+        console.log('✅ WS closed normally with code 1000');
+      }
     };
 
     // Таймаут 120 секунд (на случай очень медленного ответа)
