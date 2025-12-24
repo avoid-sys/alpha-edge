@@ -66,9 +66,9 @@ const fetchAndAnalyzeTrades = async (isDemo = true) => {
 
   return new Promise((resolve, reject) => {
     ws.onopen = () => {
-      // App auth - use SHORT numeric Application ID (not full client key)
+      // App auth - use FULL public client key (not short numeric ID)
       const appPayload = {
-        clientId: import.meta.env.VITE_CTRADER_APP_ID, // Short numeric ID like "19506"
+        clientId: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID || '19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF', // Full public key string
         clientSecret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
       };
       sendMessage(ws, 'ProtoOAApplicationAuthReq', appPayload);

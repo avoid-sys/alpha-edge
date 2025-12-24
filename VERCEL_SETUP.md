@@ -19,7 +19,8 @@ VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJz
 
 #### cTrader Configuration (Client-side)
 ```
-VITE_CTRADER_APP_ID=19506  # SHORT numeric Application ID for WebSocket auth
+VITE_CTRADER_APP_ID=19506  # SHORT numeric ID for OAuth flows
+VITE_CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for WebSocket ProtoOAApplicationAuthReq
 VITE_CTRADER_CLIENT_ID=19506  # SHORT numeric ID for OAuth (same as APP_ID)
 VITE_CTRADER_AUTH_URL=https://id.ctrader.com/my/settings/openapi/grantingaccess
 VITE_CTRADER_WS_DEMO=wss://demo.ctraderapi.com:5035
@@ -28,34 +29,38 @@ VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
 
 #### cTrader Server-side (for Vercel serverless functions)
 ```
-CTRADER_APP_ID=19506  # SHORT numeric Application ID for WebSocket auth
+CTRADER_APP_ID=19506  # SHORT numeric ID for OAuth token exchange
+CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for WebSocket (if needed server-side)
 CTRADER_CLIENT_ID=19506  # SHORT numeric ID for OAuth (same as APP_ID)
 CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
 
-#### ⚠️ IMPORTANT: cTrader ID Formats
-**cTrader uses SHORT numeric IDs, not the full keys!**
+#### ⚠️ CRITICAL: cTrader ID Formats (Updated!)
+**cTrader uses DIFFERENT IDs for different operations!**
 
-**Two different IDs needed:**
-1. **Application ID** (for WebSocket ProtoOAApplicationAuthReq): Short number like `19506`
-2. **Client ID** (for OAuth): Same short number `19506`
-3. **Client Secret**: Full long string
+**Three different identifiers needed:**
+1. **OAuth Client ID**: Short number like `19506` (for authorization code flow)
+2. **WebSocket Application ID**: FULL public key `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF` (for ProtoOAApplicationAuthReq)
+3. **Client Secret**: Full long string (for both OAuth and WebSocket)
 
-- ❌ WRONG: `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF`
-- ✅ CORRECT: `19506` (only the number before underscore)
+**Where to use each ID:**
+- **OAuth flows** (grantingaccess, token exchange): Use SHORT numeric ID (`19506`)
+- **WebSocket ProtoOAApplicationAuthReq**: Use FULL public key string
+- **ProtoOAAccountAuthReq**: Use access_token from OAuth (no client ID needed)
 
-**To find your correct IDs:**
+**To find your IDs:**
 1. Go to https://connect.spotware.com/apps or https://openapi.ctrader.com/apps
 2. Find your "Alpha Edge" app
 3. Click "View" or "Credentials"
-4. **Client ID** = short number (e.g., `19506`) - use for both APP_ID and CLIENT_ID
-5. **Client Secret** = full long string (keep as-is)
+4. **Client ID** = short number (e.g., `19506`) - for OAuth
+5. **Public Key/Client ID** = full string (e.g., `19506_...`) - for WebSocket app auth
+6. **Client Secret** = full long string (keep as-is)
 
-**Critical Error Fix:**
-- "Malformed clientId parameter" in WebSocket auth = wrong Application ID format
-- "Malformed client_id parameter" in OAuth = wrong Client ID format
-- Both require the short numeric ID, not the full key
+**Critical Error Fixes:**
+- "Malformed client_id parameter" in OAuth = use SHORT numeric ID
+- "Malformed clientId parameter" in ProtoOAApplicationAuthReq = use FULL public key
+- "Application authentication failed" = wrong WebSocket clientId format
 
 ### Настройки:
 - **Environment:** Production
