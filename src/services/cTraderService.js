@@ -357,8 +357,7 @@ export const startCtraderFlow = async (isDemo = false) => {
     ctraderResolve = resolve;
     ctraderReject = reject;
 
-    try {
-      let tokens = getTokens();
+    let tokens = getTokens();
       console.log('🔑 Token check - has tokens:', !!tokens.access_token, 'expires_at:', tokens.expires_at ? new Date(tokens.expires_at).toLocaleString() : 'none');
 
       // Auto-refresh token if expired and refresh_token is available
@@ -392,6 +391,7 @@ export const startCtraderFlow = async (isDemo = false) => {
 
       ctraderWS = new WebSocket(wsUrl);
 
+      // Set up WebSocket event handlers
       ctraderWS.onopen = () => {
         console.log('🔌 WebSocket opened successfully');
 
@@ -402,7 +402,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         if (!fullClientId) {
           console.error('❌ VITE_CTRADER_FULL_CLIENT_ID is not set in environment variables');
           ctraderState = 'idle';
-          reject(new Error('cTrader WebSocket client ID not configured. Please set VITE_CTRADER_FULL_CLIENT_ID environment variable.'));
+          ctraderReject(new Error('cTrader WebSocket client ID not configured. Please set VITE_CTRADER_FULL_CLIENT_ID environment variable.'));
           ctraderWS.close();
           return;
         }
@@ -410,7 +410,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         if (!clientSecret) {
           console.error('❌ VITE_CTRADER_CLIENT_SECRET is not set in environment variables');
           ctraderState = 'idle';
-          reject(new Error('cTrader client secret not configured. Please set VITE_CTRADER_CLIENT_SECRET environment variable.'));
+          ctraderReject(new Error('cTrader client secret not configured. Please set VITE_CTRADER_CLIENT_SECRET environment variable.'));
           ctraderWS.close();
           return;
         }
@@ -427,7 +427,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         sendMessage(ctraderWS, 'ProtoOAApplicationAuthReq', appPayload);
       };
 
-    ws.onmessage = async (event) => {
+      ctraderWS.onmessage = async (event) => {
       try {
         // Validate WebSocket connection
         if (!ctraderWS || ctraderWS.readyState !== WebSocket.OPEN) {
@@ -620,64 +620,4 @@ export const startCtraderFlow = async (isDemo = false) => {
         }
       }, 60000);
     });
-  } catch (error) {
-    console.error('cTrader integration error:', error);
-    ctraderState = 'idle';
-    throw error;
-  }
 };
-
-      if (payloadType === root.lookupType('ProtoOAApplicationAuthRes').payloadType) {
-        // App auth success, get account list
-        const accountListPayload = { accessToken: tokens.access_token };
-        sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', accountListPayload);
-      } else if (payloadType === root.lookupType('ProtoOAGetAccountListByAccessTokenRes').payloadType) {
-        // Assume first account
-        const account = payload.ctidTraderAccount[0];
-        const accountAuthPayload = { ctidTraderAccountId: account.ctidTraderAccountId, accessToken: tokens.access_token };
-        sendMessage(ws, 'ProtoOAAccountAuthReq', accountAuthPayload);
-        localStorage.setItem('ctrader_account_id', account.ctidTraderAccountId); // Store for later
-      } else if (payloadType === root.lookupType('ProtoOAAccountAuthRes').payloadType) {
-        // Account auth success, fetch historical deals
-        const from = new Date().getTime() - 365 * 24 * 60 * 60 * 1000; // Last year
-        const to = new Date().getTime();
-        const dealsPayload = {
-          ctidTraderAccountId: localStorage.getItem('ctrader_account_id'),
-          fromTimestamp: from,
-          toTimestamp: to
-        };
-        sendMessage(ws, 'ProtoOADealListReq', dealsPayload);
-      } else if (payloadType === root.lookupType('ProtoOADealListRes').payloadType) {
-        const deals = payload.deal;
-        // Group deals by positionId to reconstruct trades
-        const trades = {};
-        deals.forEach(deal => {
-          const posId = deal.positionId;
-          if (!trades[posId]) trades[posId] = { open: null, close: null, symbol: deal.symbolId, volume: deal.volume };
-          if (deal.dealStatus === 'FILLED') {
-            if (!trades[posId].open) {
-              trades[posId].open = { time: deal.createTimestamp, price: deal.executedPrice, side: deal.tradeSide };
-            } else {
-              trades[posId].close = { time: deal.closeTimestamp, price: deal.executedPrice };
-              trades[posId].profit = deal.profit; // Adjust as needed
-            }
-          }
-        });
-        // Filter complete trades
-        const completeTrades = Object.values(trades).filter(t => t.close);
-
-    };
-
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      ws.close();
-      reject(new Error('WebSocket connection timeout'));
-    }, 30000);
-  });
-  } catch (error) {
-    console.error('cTrader integration error:', error);
-    throw new Error('cTrader is not properly configured. Please ensure proto files are downloaded and try again.');
-  }
-};
-
-export { startCtraderFlow, refreshToken };
