@@ -794,14 +794,19 @@ export default function ImportTrades() {
           full_name: securityService.sanitizeInput('Local Trader', 'text')
         };
         await localDataService.setCurrentUser(user);
+        console.log('📝 Created local user for file import:', user.email);
+      } else {
+        console.log('👤 Using existing local user:', user.email);
       }
 
       // Get or Create Profile
       let profileId;
       const existingProfiles = await localDataService.entities.TraderProfile.filter({ created_by: user.email });
+      console.log('🔍 Looking for profiles created by:', user.email, 'found:', existingProfiles.length);
 
       if (existingProfiles.length > 0) {
         profileId = existingProfiles[0].id;
+        console.log('📂 Using existing profile:', profileId);
       } else {
         const sanitizedName = securityService.sanitizeInput(user.full_name || 'Trader', 'text');
         const newProfile = await localDataService.entities.TraderProfile.create({
@@ -812,6 +817,7 @@ export default function ImportTrades() {
            is_live_account: false // File import, not live account
         });
         profileId = newProfile.id;
+        console.log('🆕 Created new profile:', profileId, 'for user:', user.email);
       }
 
       // Clear existing trades for this profile (replace, don't append)

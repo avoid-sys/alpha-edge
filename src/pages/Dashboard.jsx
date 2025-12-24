@@ -93,13 +93,46 @@ export default function Dashboard() {
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
         } else {
           try {
-            // Use Supabase user instead of localDataService
-            const profiles = await localDataService.entities.TraderProfile.filter({
+            // Try to find profile by current user email
+            console.log('🔍 Searching for profiles for user:', user.email);
+            let profiles = await localDataService.entities.TraderProfile.filter({
               created_by: user.email
             });
+            console.log('📊 Found profiles by user email:', profiles.length);
+
+            // If no profile found by user email, try local email (for file imports)
+            if (profiles.length === 0) {
+              console.log('No profiles found for user email, checking for local imports...');
+              profiles = await localDataService.entities.TraderProfile.filter({
+                created_by: 'local@alphaedge.com'
+              });
+              console.log('📊 Found profiles by local email:', profiles.length);
+            }
+
+            // If still no profiles, try to find any profile (fallback)
+            if (profiles.length === 0) {
+              console.log('No user-specific profiles found, checking for any profiles...');
+              const allProfiles = await localDataService.entities.TraderProfile.getAll();
+              console.log('📊 Total profiles in database:', allProfiles.length);
+              if (allProfiles.length > 0) {
+                profiles = [allProfiles[0]]; // Use first available profile
+                console.log('Using first available profile:', profiles[0].id, 'created by:', profiles[0].created_by);
+              }
+            }
+
             if (profiles.length > 0) {
               fetchedProfile = profiles[0];
+              console.log('📋 Loading trades for profile:', fetchedProfile.id);
               fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
+              console.log('✅ Found profile:', fetchedProfile.id, 'with', fetchedTrades.length, 'trades');
+              console.log('📊 Profile details:', {
+                nickname: fetchedProfile.nickname,
+                broker: fetchedProfile.broker,
+                created_by: fetchedProfile.created_by,
+                is_live_account: fetchedProfile.is_live_account
+              });
+            } else {
+              console.log('⚠️ No profiles found for dashboard');
             }
           } catch (e) {
             console.error('❌ Error fetching profiles:', e);
