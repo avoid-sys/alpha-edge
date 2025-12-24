@@ -29,9 +29,7 @@ VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
 
 #### cTrader Server-side (for Vercel serverless functions)
 ```
-CTRADER_APP_ID=19506  # SHORT numeric ID for OAuth token exchange
-CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for WebSocket (if needed server-side)
-CTRADER_CLIENT_ID=19506  # SHORT numeric ID for OAuth (same as APP_ID)
+CTRADER_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for token exchange
 CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
@@ -40,12 +38,12 @@ CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 **cTrader uses DIFFERENT IDs for different operations!**
 
 **Three different identifiers needed:**
-1. **OAuth Client ID**: Short number like `19506` (for authorization code flow)
+1. **OAuth Client ID**: FULL public key `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF` (for authorization code flow & token exchange)
 2. **WebSocket Application ID**: FULL public key `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF` (for ProtoOAApplicationAuthReq)
 3. **Client Secret**: Full long string (for both OAuth and WebSocket)
 
 **Where to use each ID:**
-- **OAuth flows** (grantingaccess, token exchange): Use SHORT numeric ID (`19506`)
+- **OAuth flows** (grantingaccess, token exchange): Use FULL public key
 - **WebSocket ProtoOAApplicationAuthReq**: Use FULL public key string
 - **ProtoOAAccountAuthReq**: Use access_token from OAuth (no client ID needed)
 
