@@ -7,6 +7,7 @@ import { getRedirectUri, generateState } from '../utils/cTraderUtils';
 
 export default function Connect() {
   const [selectedScope, setSelectedScope] = useState('accounts');
+  const [accountType, setAccountType] = useState('live'); // 'live' or 'demo'
 
   // Test function for cTrader playground (temporary)
   const handleTestCTraderPlayground = () => {
@@ -44,6 +45,9 @@ export default function Connect() {
         console.warn('Invalid token format in localStorage, proceeding with connection');
       }
     }
+
+    // Save account type preference
+    localStorage.setItem('ctrader_account_type', accountType);
 
     const state = generateState();
     localStorage.setItem('ctrader_state', state);
@@ -110,10 +114,45 @@ export default function Connect() {
           </div>
         </div>
 
+        {/* Account Type Selector */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Account Type:
+          </label>
+          <div className="flex gap-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                value="live"
+                checked={accountType === 'live'}
+                onChange={(e) => setAccountType(e.target.value)}
+                className="mr-2"
+              />
+              <span className="text-sm">Live Account</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                value="demo"
+                checked={accountType === 'demo'}
+                onChange={(e) => setAccountType(e.target.value)}
+                className="mr-2"
+              />
+              <span className="text-sm">Demo Account</span>
+            </label>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {accountType === 'live'
+              ? 'Connect to your real trading account with live funds'
+              : 'Connect to demo account for testing and practice'
+            }
+          </p>
+        </div>
+
         <div>
           <NeumorphicButton onClick={handleConnectCTrader} className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0">
             <Zap size={20} className="mr-2" />
-            Connect cTrader Live
+            Connect cTrader {accountType === 'live' ? 'Live' : 'Demo'}
           </NeumorphicButton>
           <p className="text-xs text-gray-500 mt-1 text-center">Connect directly to your cTrader account</p>
         </div>

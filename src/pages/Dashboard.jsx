@@ -130,9 +130,13 @@ export default function Dashboard() {
 
               // Import startCtraderFlow dynamically to avoid circular dependency
               const { startCtraderFlow } = await import('@/services/cTraderService');
-              console.log('🚀 Starting cTrader flow...');
-              console.log('🧪 Testing with DEMO account first...');
-              const trades = await startCtraderFlow(true); // true for demo account - easier to test
+
+              // Get account type from localStorage (default to live)
+              const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+              const isDemo = accountType === 'demo';
+
+              console.log('🚀 Starting cTrader flow for', accountType, 'account...');
+              const trades = await startCtraderFlow(isDemo);
               console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
               console.log('📊 Trades data:', trades);
 
@@ -145,6 +149,10 @@ export default function Dashboard() {
                 // Use Supabase user (already checked above)
                 try {
 
+                  // Get account type for profile naming
+                  const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                  const isLiveAccount = accountType === 'live';
+
                   // Calculate basic metrics for profile creation
                   const totalTrades = trades.length;
                   const winningTrades = trades.filter(t => t.profit > 0).length;
@@ -154,8 +162,8 @@ export default function Dashboard() {
 
                   // Create new profile
                   const profileData = {
-                    name: 'cTrader Live Account',
-                    is_live_account: true,
+                    name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                    is_live_account: isLiveAccount,
                     trader_score: Math.round(winRate * 10), // Simple score based on win rate
                     total_trades: totalTrades,
                     winning_trades: winningTrades,
@@ -201,9 +209,12 @@ export default function Dashboard() {
 
                 // Create empty profile to show metrics (win rate 0%, etc.)
                 try {
+                  const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                  const isLiveAccount = accountType === 'live';
+
                   const emptyProfileData = {
-                    name: 'cTrader Live Account',
-                    is_live_account: true,
+                    name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                    is_live_account: isLiveAccount,
                     trader_score: 0,
                     total_trades: 0,
                     winning_trades: 0,
@@ -1699,9 +1710,18 @@ export default function Dashboard() {
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 text-gray-500">
               <span className="flex items-center gap-1"><Target size={14} /> {profile.broker}</span>
               <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+              {profile.broker === 'cTrader' && (
+                <>
+                  <span className="flex items-center gap-1 text-blue-600 font-medium">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    {profile.is_live_account ? 'Live Account' : 'Demo Account'}
+                  </span>
+                  <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                </>
+              )}
               <span className="flex items-center gap-1 text-orange-600 font-medium">
                 <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                File Imported
+                {profile.broker === 'cTrader' ? 'cTrader Connected' : 'File Imported'}
               </span>
             </div>
           </div>
