@@ -363,12 +363,12 @@ export const startCtraderFlow = async (isDemo = false) => {
         const PayloadType = protoRoot.lookupType(`ProtoOA.${typeName}`);
         const payload = PayloadType.decode(message.payload);
 
-        if (payloadTypeNum === 2101) { // App auth res
+        if (payloadTypeNum === 2142) { // ProtoOAApplicationAuthRes - исправлено!
           console.log('✅ Application authenticated');
           sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
             accessToken: tokens.access_token
           });
-        } else if (payloadTypeNum === 2103) { // Accounts list - исправлено!
+        } else if (payloadTypeNum === 2150) { // ProtoOAGetAccountListByAccessTokenRes
           if (!payload.ctidTraderAccount || payload.ctidTraderAccount.length === 0) {
             reject(new Error('No accounts found'));
             cleanup();
@@ -383,7 +383,7 @@ export const startCtraderFlow = async (isDemo = false) => {
             ctidTraderAccountId: accountId,
             accessToken: tokens.access_token
           });
-        } else if (payloadTypeNum === 2105) { // Account auth res - исправлено!
+        } else if (payloadTypeNum === 2104) { // ProtoOAAccountAuthRes
           console.log('✅ Account authenticated');
           const from = Date.now() - 365 * 24 * 60 * 60 * 1000;
           const to = Date.now();
@@ -392,7 +392,7 @@ export const startCtraderFlow = async (isDemo = false) => {
             fromTimestamp: from,
             toTimestamp: to
           });
-        } else if (payloadTypeNum === 2113) { // Deal list - исправлено!
+        } else if (payloadTypeNum === 2125) { // ProtoOADealListRes
           console.log('📊 Received', payload.deal?.length || 0, 'deals');
           const completeTrades = parseDealsToTrades(payload.deal || []);
           console.log('Stats calculated:', completeTrades.length, 'trades processed');
