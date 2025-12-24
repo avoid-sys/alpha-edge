@@ -19,9 +19,8 @@ VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJz
 
 #### cTrader Configuration (Client-side)
 ```
-VITE_CTRADER_APP_ID=19506  # SHORT numeric ID for OAuth flows
-VITE_CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for WebSocket ProtoOAApplicationAuthReq
-VITE_CTRADER_CLIENT_ID=19506  # SHORT numeric ID for OAuth (same as APP_ID)
+VITE_CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for ALL cTrader operations (OAuth + WebSocket)
+VITE_CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 VITE_CTRADER_AUTH_URL=https://id.ctrader.com/my/settings/openapi/grantingaccess
 VITE_CTRADER_WS_DEMO=wss://demo.ctraderapi.com:5035
 VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
@@ -29,35 +28,32 @@ VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
 
 #### cTrader Server-side (for Vercel serverless functions)
 ```
-CTRADER_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for token exchange
+CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for token exchange (same as client-side)
 CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
 
 #### ⚠️ CRITICAL: cTrader ID Formats (Updated!)
-**cTrader uses DIFFERENT IDs for different operations!**
+**cTrader uses CONSISTENT FULL Client ID for ALL operations!**
 
-**Three different identifiers needed:**
-1. **OAuth Client ID**: FULL public key `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF` (for authorization code flow & token exchange)
-2. **WebSocket Application ID**: FULL public key `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF` (for ProtoOAApplicationAuthReq)
-3. **Client Secret**: Full long string (for both OAuth and WebSocket)
+**Two identifiers needed:**
+1. **Client ID**: FULL public key string `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF` (for ALL operations)
+2. **Client Secret**: Full long string (for both OAuth and WebSocket)
 
-**Where to use each ID:**
-- **OAuth flows** (grantingaccess, token exchange): Use FULL public key
-- **WebSocket ProtoOAApplicationAuthReq**: Use FULL public key string
+**Where to use the Client ID:**
+- **OAuth flows** (grantingaccess, token exchange): FULL public key string
+- **WebSocket ProtoOAApplicationAuthReq**: FULL public key string
 - **ProtoOAAccountAuthReq**: Use access_token from OAuth (no client ID needed)
 
 **To find your IDs:**
 1. Go to https://connect.spotware.com/apps or https://openapi.ctrader.com/apps
 2. Find your "Alpha Edge" app
 3. Click "View" or "Credentials"
-4. **Client ID** = short number (e.g., `19506`) - for OAuth
-5. **Public Key/Client ID** = full string (e.g., `19506_...`) - for WebSocket app auth
-6. **Client Secret** = full long string (keep as-is)
+4. **Client ID/Public Key** = full string (e.g., `19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF`)
+5. **Client Secret** = full long string (keep as-is)
 
 **Critical Error Fixes:**
-- "Malformed client_id parameter" in OAuth = use SHORT numeric ID
-- "Malformed clientId parameter" in ProtoOAApplicationAuthReq = use FULL public key
+- "Malformed clientId parameter" in ProtoOAApplicationAuthReq = use FULL public key string
 - "Application authentication failed" = wrong WebSocket clientId format
 - "429 Too Many Requests" = rate limit exceeded, wait 5-15 minutes before retrying
 - HTML response instead of JSON = rate limit or authorization code expired

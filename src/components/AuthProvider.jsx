@@ -11,13 +11,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     // Check active sessions and loads the localStorage information
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔐 Initial session check:', session ? 'authenticated' : 'not authenticated');
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
     // Listen for changes on auth state (signed in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Auth state change:', event, session ? 'session present' : 'no session');
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

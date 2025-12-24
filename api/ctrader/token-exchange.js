@@ -20,15 +20,15 @@ export default async function handler(req, res) {
     });
   }
 
-  // Validate cTrader credentials
-  if (!process.env.CTRADER_CLIENT_ID || !process.env.CTRADER_CLIENT_SECRET) {
+  // Validate cTrader credentials - use FULL client ID for consistency
+  if (!process.env.CTRADER_FULL_CLIENT_ID || !process.env.CTRADER_CLIENT_SECRET) {
     console.error('❌ Missing cTrader credentials:', {
-      hasClientId: !!process.env.CTRADER_CLIENT_ID,
+      hasFullClientId: !!process.env.CTRADER_FULL_CLIENT_ID,
       hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET
     });
     return res.status(500).json({
       error: 'Server configuration error',
-      message: 'cTrader credentials not configured'
+      message: 'cTrader credentials not configured. Need CTRADER_FULL_CLIENT_ID and CTRADER_CLIENT_SECRET'
     });
   }
 
@@ -42,12 +42,12 @@ export default async function handler(req, res) {
 
   // Log environment variables (without secrets)
   console.log('🔧 Environment check:', {
-    hasClientId: !!process.env.CTRADER_CLIENT_ID,
-    clientIdValue: process.env.CTRADER_CLIENT_ID, // Show actual value for debugging
-    clientIdLength: process.env.CTRADER_CLIENT_ID?.length,
+    hasFullClientId: !!process.env.CTRADER_FULL_CLIENT_ID,
+    fullClientIdValue: process.env.CTRADER_FULL_CLIENT_ID, // Show actual value for debugging
+    fullClientIdLength: process.env.CTRADER_FULL_CLIENT_ID?.length,
     hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET,
     clientSecretLength: process.env.CTRADER_CLIENT_SECRET?.length,
-    tokenUrl: process.env.CTRADER_TOKEN_URL || 'https://connect.spotware.com/apps/token'
+    tokenUrl: process.env.CTRADER_TOKEN_URL || 'https://openapi.ctrader.com/apps/token'
   });
 
   // Prepare token exchange request
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     grant_type: 'authorization_code',
     code,
     redirect_uri,
-    client_id: process.env.CTRADER_CLIENT_ID,
+    client_id: process.env.CTRADER_FULL_CLIENT_ID, // Full public key string for consistency
     client_secret: process.env.CTRADER_CLIENT_SECRET,
   });
 

@@ -15,6 +15,17 @@ const loadProtos = async () => {
       '/src/proto/OpenApiModelMessages.proto'
     ]);
     console.log('✅ Proto files loaded successfully');
+
+    // Debug: Check if our message types exist
+    try {
+      const appAuthReq = protoRoot.lookupType('ProtoOAApplicationAuthReq');
+      const appAuthRes = protoRoot.lookupType('ProtoOA.ProtoOAApplicationAuthRes');
+      console.log('🔍 Proto types check - ProtoOAApplicationAuthReq:', !!appAuthReq, 'ProtoOA.ProtoOAApplicationAuthRes:', !!appAuthRes);
+      console.log('🔍 ProtoOAApplicationAuthReq payloadType:', appAuthReq?.payloadType);
+    } catch (e) {
+      console.error('❌ Proto type lookup error:', e.message);
+    }
+
     return protoRoot;
   } catch (error) {
     console.error('❌ Failed to load cTrader proto files:', error);
@@ -25,9 +36,11 @@ const loadProtos = async () => {
 // Helper to send message over WS
 const sendMessage = (ws, messageType, payload) => {
   const ProtoMessage = protoRoot.lookupType('ProtoMessage');
-  const payloadType = protoRoot.lookupType(messageType).payloadType;
-  const encodedPayload = protoRoot.lookupType(messageType).encode(payload).finish();
+  const fullMessageType = messageType.startsWith('ProtoOA.') ? messageType : 'ProtoOA.' + messageType;
+  const payloadType = protoRoot.lookupType(fullMessageType).payloadType;
+  const encodedPayload = protoRoot.lookupType(fullMessageType).encode(payload).finish();
   const message = ProtoMessage.create({ payloadType, payload: encodedPayload });
+  console.log('📤 Sending message:', fullMessageType, 'payloadType:', payloadType);
   ws.send(ProtoMessage.encode(message).finish());
 };
 
@@ -43,7 +56,7 @@ const refreshToken = async () => {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: tokens.refresh_token,
-    client_id: import.meta.env.VITE_CTRADER_APP_ID, // Use short numeric ID for OAuth
+    client_id: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID, // Use full Client ID for consistency
     client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
   });
 
@@ -75,8 +88,11 @@ const refreshToken = async () => {
 
 // Main function to fetch trades and analyze
 const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for production
+  console.log('🚀 fetchAndAnalyzeTrades called with isDemo:', isDemo);
+
   try {
     let tokens = getTokens();
+    console.log('🔑 Token check - has tokens:', !!tokens.access_token, 'expires_at:', tokens.expires_at ? new Date(tokens.expires_at).toLocaleString() : 'none');
 
     // Auto-refresh token if expired and refresh_token is available
     if (Date.now() > tokens.expires_at) {
@@ -93,21 +109,46 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
         throw new Error('Access token expired. Please reconnect to cTrader.');
       }
     }
+
     const root = await loadProtos();
-  const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
-  const ws = new WebSocket(wsUrl);
+    const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
+    console.log('🔌 Connecting to WebSocket:', wsUrl);
+    const ws = new WebSocket(wsUrl);
 
   return new Promise((resolve, reject) => {
     let selectedAccountId = null; // Store selected account ID for later use
 
     ws.onopen = () => {
       console.log('🔌 WebSocket opened successfully');
-      // App auth - use FULL public client key (not short numeric ID)
+
+      // Check environment variables - use FULL client ID for WebSocket auth
+      const fullClientId = import.meta.env.VITE_CTRADER_FULL_CLIENT_ID;
+      const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET;
+
+      if (!fullClientId) {
+        console.error('❌ VITE_CTRADER_FULL_CLIENT_ID is not set in environment variables');
+        reject(new Error('cTrader WebSocket client ID not configured. Please set VITE_CTRADER_FULL_CLIENT_ID environment variable.'));
+        ws.close();
+        return;
+      }
+
+      if (!clientSecret) {
+        console.error('❌ VITE_CTRADER_CLIENT_SECRET is not set in environment variables');
+        reject(new Error('cTrader client secret not configured. Please set VITE_CTRADER_CLIENT_SECRET environment variable.'));
+        ws.close();
+        return;
+      }
+
+      console.log('🔍 Environment check passed. Using FULL clientId:', fullClientId.substring(0, 20) + '...');
+      console.log('🔍 clientId length:', fullClientId.length, 'clientSecret length:', clientSecret.length);
+
+      // App auth payload - CRITICAL: Use FULL public Client ID string for ProtoOAApplicationAuthReq
       const appPayload = {
-        clientId: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID || '19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF', // Full public key string
-        clientSecret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
+        clientId: fullClientId,  // Full public key string (e.g., 19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF)
+        clientSecret: clientSecret
       };
-      console.log('📡 Sending ProtoOAApplicationAuthReq with clientId:', appPayload.clientId.substring(0, 10) + '...');
+      console.log('📡 Sending ProtoOAApplicationAuthReq with clientId:', appPayload.clientId);
+      console.log('📡 App payload keys:', Object.keys(appPayload));
       sendMessage(ws, 'ProtoOAApplicationAuthReq', appPayload);
     };
 
@@ -118,7 +159,7 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
         const payloadType = message.payloadType;
         console.log('📨 WebSocket message received, payloadType:', payloadType);
 
-        // Map payload types to message types
+        // Map payload types to message types (without ProtoOA. prefix)
         let messageType;
         switch (payloadType) {
           case 2100: messageType = 'ProtoOAApplicationAuthReq'; break;
@@ -129,6 +170,7 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
           case 2104: messageType = 'ProtoOAAccountAuthRes'; break;
           case 2124: messageType = 'ProtoOADealListReq'; break;
           case 2125: messageType = 'ProtoOADealListRes'; break;
+          case 50: messageType = 'ProtoOAErrorRes'; break; // Error response
           default: messageType = null;
         }
 
@@ -138,22 +180,33 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
         }
 
         const payload = root.lookupType('ProtoOA.' + messageType).decode(message.payload);
-        console.log('📋 Decoded message:', messageType, payload);
+        console.log('📋 Decoded message:', messageType, 'payload:', JSON.stringify(payload, null, 2));
 
         // Handle different message types
         if (messageType === 'ProtoOAApplicationAuthRes') {
-          if (payload.result) {
-            console.log('✅ Application authentication successful');
+          if (payload.result === true) {
+            console.log('✅ Application authentication successful (ProtoOAApplicationAuthRes result=true)');
             // Get account list
             const accountListPayload = { accessToken: tokens.access_token };
-            console.log('📡 Requesting account list...');
+            console.log('📡 Requesting account list with accessToken...');
             sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', accountListPayload);
           } else {
-            console.error('❌ Application authentication failed');
-            reject(new Error('Application authentication failed'));
+            console.error('❌ Application authentication failed (ProtoOAApplicationAuthRes result=false or missing)');
+            console.error('❌ Full payload:', JSON.stringify(payload, null, 2));
+            const errorMsg = payload.description || 'Application authentication failed: Malformed clientId parameter or invalid credentials';
+            reject(new Error(errorMsg));
+            ws.close();
           }
+        } else if (messageType === 'ProtoOAErrorRes') {
+          console.error('🚨 Spotware API Error:', payload.errorCode, payload.description);
+          console.error('🚨 Full error payload:', JSON.stringify(payload, null, 2));
+          const errorMsg = payload.description || `cTrader API Error ${payload.errorCode}: Unknown error`;
+          reject(new Error(errorMsg));
+          ws.close();
         } else if (messageType === 'ProtoOAGetAccountListByAccessTokenRes') {
           console.log('📊 Account list received:', payload.ctidTraderAccount?.length || 0, 'accounts');
+          console.log('📊 Full account list:', JSON.stringify(payload.ctidTraderAccount, null, 2));
+
           if (payload.ctidTraderAccount && payload.ctidTraderAccount.length > 0) {
             // Use first account for demo, or find live account
             const account = isDemo ?
@@ -161,16 +214,17 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
               payload.ctidTraderAccount.find(acc => !acc.accountId?.includes('DEMO')) || payload.ctidTraderAccount[0];
 
             selectedAccountId = account.ctidTraderAccountId; // Store for later use
-            console.log('🎯 Using account:', account.accountId, 'ctid:', selectedAccountId);
+            console.log('🎯 Using account:', account.accountId, 'ctid:', selectedAccountId, 'isDemo mode:', isDemo);
 
             // Authenticate account
             const accountAuthPayload = {
               ctidTraderAccountId: selectedAccountId,
               accessToken: tokens.access_token
             };
-            console.log('🔐 Authenticating account...');
+            console.log('🔐 Authenticating account with payload:', JSON.stringify(accountAuthPayload, null, 2));
             sendMessage(ws, 'ProtoOAAccountAuthReq', accountAuthPayload);
           } else {
+            console.error('❌ No trading accounts found in response');
             reject(new Error('No trading accounts found'));
           }
         } else if (messageType === 'ProtoOAAccountAuthRes') {
@@ -180,10 +234,11 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
             const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
             const dealListPayload = {
               ctidTraderAccountId: selectedAccountId, // Use stored account ID
-              fromTimestamp: Math.floor(thirtyDaysAgo / 1000),
-              toTimestamp: Math.floor(Date.now() / 1000)
+              fromTimestamp: Math.floor(thirtyDaysAgo / 1000), // cTrader expects seconds
+              toTimestamp: Math.floor(Date.now() / 1000) // cTrader expects seconds
             };
-            console.log('📈 Requesting trading deals...');
+            console.log('📈 Requesting trading deals from', new Date(thirtyDaysAgo).toLocaleDateString(), 'to now...');
+            console.log('📈 Deal list payload:', JSON.stringify(dealListPayload, null, 2));
             sendMessage(ws, 'ProtoOADealListReq', dealListPayload);
           } else {
             console.error('❌ Account authentication failed');
@@ -191,22 +246,36 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
           }
         } else if (messageType === 'ProtoOADealListRes') {
           console.log('💰 Trading deals received:', payload.deal?.length || 0, 'deals');
+          console.log('💰 First few deals sample:', JSON.stringify(payload.deal?.slice(0, 3), null, 2));
+
           if (payload.deal && payload.deal.length > 0) {
             // Transform deals to our format
-            const trades = payload.deal.map(deal => ({
-              id: deal.dealId.toString(),
-              timestamp: new Date(deal.closeTimestamp * 1000),
-              symbol: deal.symbolId || 'UNKNOWN',
-              side: deal.tradeSide === 1 ? 'buy' : 'sell',
-              volume: deal.volume / 100000, // Convert from base units
-              price: deal.executedPrice / 100000, // Convert from points
-              profit: deal.profit / 100, // Convert from cents
-              commission: 0, // Not provided in basic deal data
-              swap: 0, // Not provided
-              status: 'closed'
-            }));
+            const trades = payload.deal
+              .filter(deal => deal.closeTimestamp && deal.closeTimestamp > 0) // Only closed deals
+              .map(deal => {
+                // Determine if timestamps are in seconds or milliseconds
+                const timestamp = deal.closeTimestamp > 1e10 ? deal.closeTimestamp : deal.closeTimestamp * 1000;
 
-            console.log('✅ Successfully processed', trades.length, 'trades');
+                // Debug deal data
+                console.log('🔍 Processing deal:', deal.dealId, 'symbol:', deal.symbolId, 'side:', deal.tradeSide, 'profit:', deal.profit);
+
+                return {
+                  id: deal.dealId.toString(),
+                  timestamp: new Date(timestamp),
+                  symbol: deal.symbolId || 'UNKNOWN',
+                  side: deal.tradeSide === 1 ? 'buy' : deal.tradeSide === 2 ? 'sell' : 'unknown',
+                  volume: deal.volume / 100000, // Convert from base units (may need adjustment)
+                  price: deal.executedPrice / 100000, // Convert from points (may need adjustment)
+                  profit: deal.profit / 100, // Convert from cents (may need adjustment)
+                  commission: 0, // Not provided in basic deal data
+                  swap: 0, // Not provided
+                  status: 'closed'
+                };
+              });
+
+            console.log('✅ Successfully processed', trades.length, 'closed trades from', payload.deal.length, 'total deals');
+            console.log('📊 Sample processed trade:', JSON.stringify(trades[0], null, 2));
+
             resolve(trades);
           } else {
             console.warn('⚠️ No trading deals found in the last 30 days');

@@ -1,29 +1,50 @@
 import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getRedirectUri } from '../utils/cTraderUtils';
+import { supabase } from '../utils/supabaseClient';
 
 const CTraderCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
-    const error = searchParams.get('error');
+    const initializeCallback = async () => {
+      // First check if user is authenticated in Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    console.log('🔄 cTrader OAuth callback received:', {
-      code: code ? 'present' : 'missing',
-      state: state ? 'present' : 'missing',
-      error: error || 'none',
-      url: window.location.href
-    });
+      if (sessionError) {
+        console.error('❌ Supabase session error:', sessionError);
+        alert('Authentication error. Please log in again.');
+        navigate('/login');
+        return;
+      }
 
-    if (error) {
-      console.error('cTrader OAuth error:', error);
-      alert('cTrader connection failed: ' + error);
-      navigate('/connect');
-      return;
-    }
+      if (!session) {
+        console.warn('⚠️ No Supabase session found, redirecting to login');
+        alert('Please log in first before connecting cTrader.');
+        navigate('/login');
+        return;
+      }
+
+      console.log('✅ Supabase session verified, proceeding with cTrader OAuth');
+
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+
+      console.log('🔄 cTrader OAuth callback received:', {
+        code: code ? 'present' : 'missing',
+        state: state ? 'present' : 'missing',
+        error: error || 'none',
+        url: window.location.href
+      });
+
+      if (error) {
+        console.error('cTrader OAuth error:', error);
+        alert('cTrader connection failed: ' + error);
+        navigate('/connect');
+        return;
+      }
 
     const storedState = localStorage.getItem('ctrader_state');
     if (state !== storedState || !code) {
@@ -98,6 +119,7 @@ const CTraderCallback = () => {
         localStorage.removeItem('ctrader_state');
 
         // Navigate to dashboard
+        console.log('✅ cTrader connection complete, navigating to dashboard');
         navigate('/dashboard');
       })
       .catch(err => {
@@ -105,6 +127,9 @@ const CTraderCallback = () => {
         alert('Error exchanging cTrader authorization code: ' + err.message);
         navigate('/connect');
       });
+    };
+
+    initializeCallback();
   }, [searchParams, navigate]);
 
   return (

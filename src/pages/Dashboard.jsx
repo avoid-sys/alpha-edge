@@ -4,6 +4,7 @@ import { securityService } from '@/services/securityService';
 import { fetchAndAnalyzeTrades } from '@/services/cTraderService';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/components/AuthProvider';
 import html2canvas from 'html2canvas';
 import {
   TrendingUp,
@@ -38,6 +39,7 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState(null);
   const [trades, setTrades] = useState([]);
   const [rank, setRank] = useState(null);
@@ -66,6 +68,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      // Wait for auth to load
+      if (authLoading) {
+        console.log('⏳ Waiting for auth to load...');
+        return;
+      }
+
+      // Check if user is authenticated
+      if (!user) {
+        console.log('❌ No authenticated user, cannot load dashboard data');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ User authenticated:', user.email, 'loading dashboard data...');
+
       try {
         let fetchedProfile = null;
         let fetchedTrades = [];
@@ -75,18 +92,16 @@ export default function Dashboard() {
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
         } else {
           try {
-            const user = await localDataService.getCurrentUser();
-            if (user) {
-              const profiles = await localDataService.entities.TraderProfile.filter({
-                created_by: user.email
-              });
-              if (profiles.length > 0) {
-                fetchedProfile = profiles[0];
-                fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
-              }
+            // Use Supabase user instead of localDataService
+            const profiles = await localDataService.entities.TraderProfile.filter({
+              created_by: user.email
+            });
+            if (profiles.length > 0) {
+              fetchedProfile = profiles[0];
+              fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
             }
           } catch (e) {
-            // Not logged in or no profile
+            console.error('❌ Error fetching profiles:', e);
           }
 
           // If no profile found but cTrader tokens exist, try to create profile from cTrader
@@ -103,24 +118,66 @@ export default function Dashboard() {
 
               // Import fetchAndAnalyzeTrades dynamically to avoid circular dependency
               const { fetchAndAnalyzeTrades } = await import('@/services/cTraderService');
+              console.log('🚀 Starting cTrader data fetch...');
               const trades = await fetchAndAnalyzeTrades(false); // false for live account
+              console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
 
               if (trades && trades.length > 0) {
-                // Profile should be created by fetchAndAnalyzeTrades
-                // Reload data to get the new profile
-                const user = await localDataService.getCurrentUser();
-                if (user) {
-                  const profiles = await localDataService.entities.TraderProfile.filter({
-                    created_by: user.email
-                  });
-                  if (profiles.length > 0) {
-                    fetchedProfile = profiles[0];
-                    fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
-                    console.log('✅ Profile created from cTrader data');
-                    // Force reload of data
-                    setDataVersion(prev => prev + 1);
+                console.log('🔄 Creating profile from', trades.length, 'cTrader trades...');
+
+                // Use Supabase user (already checked above)
+                try {
+
+                  // Calculate basic metrics for profile creation
+                  const totalTrades = trades.length;
+                  const winningTrades = trades.filter(t => t.profit > 0).length;
+                  const losingTrades = totalTrades - winningTrades;
+                  const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
+                  const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+                  // Create new profile
+                  const profileData = {
+                    name: 'cTrader Live Account',
+                    is_live_account: true,
+                    trader_score: Math.round(winRate * 10), // Simple score based on win rate
+                    total_trades: totalTrades,
+                    winning_trades: winningTrades,
+                    losing_trades: losingTrades,
+                    total_profit: totalProfit,
+                    win_rate: winRate,
+                    created_by: user.email, // user is from Supabase auth
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+
+                  const newProfile = await localDataService.entities.TraderProfile.create(profileData);
+                  console.log('✅ Created cTrader profile:', newProfile.id);
+
+                  // Save trades to database
+                  for (const trade of trades) {
+                    await localDataService.entities.Trade.create({
+                      ...trade,
+                      trader_profile_id: newProfile.id,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString()
+                    });
                   }
+                  console.log('✅ Saved', trades.length, 'trades to database');
+
+                  // Set as current profile
+                  fetchedProfile = newProfile;
+                  fetchedTrades = trades;
+
+                  // Force reload of data
+                  setDataVersion(prev => prev + 1);
+                  console.log('🎉 cTrader profile creation completed successfully');
+
+                } catch (profileError) {
+                  console.error('❌ Failed to create profile from trades:', profileError);
+                  throw profileError;
                 }
+              } else {
+                console.log('⚠️ No trades received from cTrader, skipping profile creation');
               }
             } catch (error) {
               console.error('❌ Failed to create profile from cTrader data:', error);
@@ -160,7 +217,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, [profileId, dataVersion]);
+  }, [profileId, dataVersion, user, authLoading]);
 
   // Initialize security and load connected platforms on component mount
   useEffect(() => {

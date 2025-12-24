@@ -61,7 +61,7 @@ export default function Connect() {
 
     // Use URLSearchParams for proper encoding
     const params = new URLSearchParams({
-      client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
+      client_id: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID, // Use full Client ID for consistency
       scope: scope,
       redirect_uri: redirectUri, // URLSearchParams handles encoding
       product: 'web', // Required for cTrader OAuth
