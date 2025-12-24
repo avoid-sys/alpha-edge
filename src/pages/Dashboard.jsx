@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
 import { startCtraderFlow } from '@/services/cTraderService';
@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
   const refreshParam = searchParams.get('refresh');
+  const ctraderStartedRef = useRef(false);
 
   // Check if user is viewing their own profile or someone else's
   const isOwnProfile = !profileId; // No profileId means viewing own profile
@@ -107,6 +108,13 @@ export default function Dashboard() {
           // If no profile found but cTrader tokens exist, try to create profile from cTrader
           if (!fetchedProfile && localStorage.getItem('ctrader_tokens')) {
             console.log('🔄 cTrader tokens found but no profile - attempting to create profile from cTrader data');
+
+            // Prevent multiple simultaneous cTrader flows
+            if (ctraderStartedRef.current) {
+              console.log('⚠️ cTrader flow already started, skipping');
+              return;
+            }
+
             try {
               // Check if tokens are still valid
               const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
@@ -116,6 +124,8 @@ export default function Dashboard() {
                 return;
               }
 
+              ctraderStartedRef.current = true;
+
               // Import startCtraderFlow dynamically to avoid circular dependency
               const { startCtraderFlow } = await import('@/services/cTraderService');
               console.log('🚀 Starting cTrader flow...');
@@ -124,6 +134,9 @@ export default function Dashboard() {
 
               if (trades && trades.length > 0) {
                 console.log('🔄 Creating profile from', trades.length, 'cTrader trades...');
+
+                // Reset flag on success
+                ctraderStartedRef.current = false;
 
                 // Use Supabase user (already checked above)
                 try {
@@ -181,6 +194,8 @@ export default function Dashboard() {
               }
             } catch (error) {
               console.error('❌ Failed to create profile from cTrader data:', error);
+              // Reset flag on error
+              ctraderStartedRef.current = false;
               // If tokens are expired, don't show error - just skip profile creation
               if (!error.message.includes('expired')) {
                 // Show other errors to user

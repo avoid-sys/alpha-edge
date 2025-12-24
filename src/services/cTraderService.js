@@ -361,6 +361,44 @@ const parseDealsToTrades = (deals) => {
 export const startCtraderFlow = async (isDemo = false) => {
   console.log('🚀 STARTING CTRADER FLOW, isDemo:', isDemo);
 
+  // Singleton guard - prevent multiple simultaneous flows
+  if (ctraderWS && ctraderWS.readyState === WebSocket.OPEN) {
+    console.warn('⚠️ WS already open, waiting for existing flow to complete');
+    return new Promise((resolve, reject) => {
+      const checkInterval = setInterval(() => {
+        if (ctraderState === 'idle') {
+          clearInterval(checkInterval);
+          resolve([]); // Return empty array if no data
+        }
+      }, 500);
+      // Timeout after 30 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        reject(new Error('Timeout waiting for existing cTrader flow'));
+      }, 30000);
+    });
+  }
+
+  if (ctraderState !== 'idle') {
+    console.warn('⚠️ cTrader flow already in progress, state:', ctraderState);
+    return new Promise((resolve, reject) => {
+      // Wait for current flow to complete
+      const checkInterval = setInterval(() => {
+        if (ctraderState === 'idle') {
+          clearInterval(checkInterval);
+          resolve([]);
+        }
+      }, 500);
+      // Timeout after 30 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        ctraderState = 'idle'; // Force reset
+        ctraderWS = null;
+        resolve([]);
+      }, 30000);
+    });
+  }
+
   const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
   if (!tokens.access_token) throw new Error('No access token');
 
@@ -368,20 +406,24 @@ export const startCtraderFlow = async (isDemo = false) => {
   const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
   console.log('🔌 Connecting to WS URL:', wsUrl);
   const ws = new WebSocket(wsUrl);
+  ctraderWS = ws; // Store globally
+  ctraderState = 'connecting'; // Reset global state
 
   let accountId = null;
-  let currentState = 'connecting';
 
   return new Promise((resolve, reject) => {
+    ctraderResolve = resolve;
+    ctraderReject = reject;
+
     ws.onopen = () => {
       console.log('✅ WS OPENED SUCCESSFULLY');
-      currentState = 'app_auth_sending';
+      ctraderState = 'app_auth_sending';
       console.log('📤 Sending ProtoOAApplicationAuthReq...');
       sendMessage(ws, 'ProtoOAApplicationAuthReq', {
         clientId: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID,
         clientSecret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
       });
-      currentState = 'waiting_app_auth';
+      ctraderState = 'waiting_app_auth';
     };
 
     ws.onmessage = async (event) => {
@@ -391,7 +433,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         const ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
         const message = ProtoMessage.decode(uint8Array);
         const payloadTypeNum = message.payloadType;
-        console.log('📨 MESSAGE RECEIVED - payloadType:', payloadTypeNum, 'currentState:', currentState);
+        console.log('📨 MESSAGE RECEIVED - payloadType:', payloadTypeNum, 'currentState:', ctraderState);
 
         // Игнорируем heartbeat
         if (payloadTypeNum === 51 || payloadTypeNum === 2142) {
@@ -415,12 +457,12 @@ export const startCtraderFlow = async (isDemo = false) => {
 
         if (payloadTypeNum === 2101) { // ProtoOAApplicationAuthRes
           console.log('✅ APPLICATION AUTH SUCCESS');
-          currentState = 'getting_accounts';
+          ctraderState = 'getting_accounts';
           console.log('📤 Requesting account list...');
           sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
             accessToken: tokens.access_token
           });
-          currentState = 'waiting_accounts';
+          ctraderState = 'waiting_accounts';
         } else if (payloadTypeNum === 2150) { // ProtoOAGetAccountListByAccessTokenRes
           console.log('📋 ACCOUNT LIST RECEIVED, accounts:', payload.ctidTraderAccount?.length || 0);
           if (!payload.ctidTraderAccount?.length) {
@@ -442,7 +484,7 @@ export const startCtraderFlow = async (isDemo = false) => {
           currentState = 'waiting_account_auth';
         } else if (payloadTypeNum === 2104) { // ProtoOAAccountAuthRes
           console.log('✅ ACCOUNT AUTH SUCCESS');
-          currentState = 'deal_list_sending';
+          ctraderState = 'deal_list_sending';
           console.log('📤 Requesting deal list...');
           const from = Date.now() - 365 * 24 * 60 * 60 * 1000;
           const to = Date.now();
@@ -451,17 +493,21 @@ export const startCtraderFlow = async (isDemo = false) => {
             fromTimestamp: from,
             toTimestamp: to
           });
-          currentState = 'waiting_deals';
+          ctraderState = 'waiting_deals';
         } else if (payloadTypeNum === 2125 || payloadTypeNum === 2142) { // ProtoOADealListRes (trying both possible values)
           console.log('🎉 DEAL LIST RECEIVED! payloadType:', payloadTypeNum, 'deals count:', payload.deal?.length || 0);
           const completeTrades = parseDealsToTrades(payload.deal || []);
           console.log('✅ Processing complete - trades:', completeTrades.length);
 
           console.log('🔄 RESOLVING PROMISE with', completeTrades.length, 'trades');
+          ctraderState = 'idle'; // Reset state
+          ctraderWS = null; // Clear WS reference
           resolve(completeTrades);
           ws.close(); // Закрываем ТОЛЬКО после получения сделок
         } else if (payloadTypeNum === 50) { // ProtoOAErrorRes
           console.error('Spotware error:', payload.description);
+          ctraderState = 'idle';
+          ctraderWS = null;
           reject(new Error(payload.description || 'Unknown error'));
           ws.close();
         }
@@ -474,21 +520,28 @@ export const startCtraderFlow = async (isDemo = false) => {
 
     ws.onerror = (err) => {
       console.error('WS error:', err);
+      ctraderState = 'idle';
+      ctraderWS = null;
       reject(err);
     };
 
     ws.onclose = (event) => {
       console.log('WS closed:', event.code, event.reason);
+      ctraderState = 'idle';
+      ctraderWS = null;
       if (event.code !== 1000) {
-        reject(new Error('WS closed unexpectedly'));
+        // Only reject if we haven't already resolved/rejected
+        if (ctraderReject) {
+          ctraderReject(new Error('WS closed unexpectedly'));
+        }
       }
     };
 
-    // Таймаут на весь процесс (30 сек) - только reject, НЕ закрываем WS!
+    // Таймаут на весь процесс (60 сек) - Spotware иногда медленный
     setTimeout(() => {
-      console.error('⏰ TIMEOUT: No response from cTrader within 30 seconds');
+      console.error('⏰ TIMEOUT: No response from cTrader within 60 seconds — possible slow server response');
       reject(new Error('Timeout waiting for data from cTrader'));
-      // НЕ закрываем WS здесь - пусть он закроется сам или в reject обработчике
-    }, 30000);
+      ws.close();
+    }, 60000);
   });
 };
