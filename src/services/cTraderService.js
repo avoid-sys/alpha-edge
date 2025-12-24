@@ -249,6 +249,8 @@ import "Common.proto";
 
 const sendMessage = (ws, messageTypeName, payloadObj) => {
   try {
+    console.log(`🔧 Preparing to send ${messageTypeName} with payload:`, payloadObj);
+
     // Get payload type from enum
     const payloadTypeEnum = protoRoot.lookupEnum('ProtoOA.ProtoOAPayloadType').values;
 
@@ -260,18 +262,19 @@ const sendMessage = (ws, messageTypeName, payloadObj) => {
       'ProtoOADealListReq': payloadTypeEnum.PROTO_OA_DEAL_LIST_REQ, // 2124
     };
 
-    console.log('🔍 Available payload types:', Object.keys(payloadTypeMap));
-    console.log('🔍 Requested message type:', messageTypeName);
-
     const payloadType = payloadTypeMap[messageTypeName];
     if (typeof payloadType !== 'number') {
       throw new Error(`Unknown message type: ${messageTypeName}`);
     }
 
+    console.log(`🔢 Using payloadType: ${payloadType} for ${messageTypeName}`);
+
     // Find and encode the message type
     const fullMessageType = messageTypeName.startsWith('ProtoOA.') ? messageTypeName : 'ProtoOA.' + messageTypeName;
     const MessageType = protoRoot.lookupType(fullMessageType);
     const encodedPayload = MessageType.encode(payloadObj).finish();
+
+    console.log(`📦 Encoded payload size: ${encodedPayload.length} bytes`);
 
     // Create wrapper message
     const ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
@@ -282,11 +285,14 @@ const sendMessage = (ws, messageTypeName, payloadObj) => {
 
     // Encode and send
     const buffer = ProtoMessage.encode(wrapper).finish();
+    console.log(`📤 Sending buffer of size: ${buffer.length} bytes`);
     ws.send(buffer);
 
-    console.log(`✅ Sent ${messageTypeName} (payloadType: ${payloadType})`);
+    console.log(`✅ Successfully sent ${messageTypeName} (payloadType: ${payloadType})`);
+    return true;
   } catch (err) {
     console.error(`❌ Failed to send ${messageTypeName}:`, err);
+    return false;
   }
 };
 
@@ -326,10 +332,33 @@ export const startCtraderFlow = async (isDemo = false) => {
   return new Promise((resolve, reject) => {
     ws.onopen = () => {
       console.log('WS opened — sending app auth');
-      sendMessage(ws, 'ProtoOAApplicationAuthReq', {
-        clientId: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID,
-        clientSecret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
+
+      const clientId = import.meta.env.VITE_CTRADER_FULL_CLIENT_ID;
+      const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET;
+
+      console.log('🔑 Using clientId for WS:', clientId ? clientId.substring(0, 10) + '...' : 'UNDEFINED');
+      console.log('🔑 Using clientSecret length:', clientSecret ? clientSecret.length : 'UNDEFINED');
+
+      if (!clientId || !clientSecret) {
+        console.error('❌ Missing cTrader WebSocket credentials!');
+        reject(new Error('cTrader WebSocket credentials not configured'));
+        ws.close();
+        return;
+      }
+
+      const success = sendMessage(ws, 'ProtoOAApplicationAuthReq', {
+        clientId: clientId,
+        clientSecret: clientSecret
       });
+
+      if (!success) {
+        console.error('❌ Failed to send application auth message');
+        reject(new Error('Failed to send application auth'));
+        ws.close();
+        return;
+      }
+
+      console.log('📤 Application auth message sent, waiting for response...');
     };
 
     ws.onmessage = async (event) => {
@@ -411,7 +440,13 @@ export const startCtraderFlow = async (isDemo = false) => {
     };
 
     ws.onclose = (event) => {
-      console.log('WS closed:', event.code, event.reason);
+      console.log('🔌 WS closed with code:', event.code, 'reason:', event.reason);
+
+      if (event.code === 1000) {
+        console.log('✅ WS closed normally');
+      } else {
+        console.error('❌ WS closed abnormally with code:', event.code, 'reason:', event.reason);
+      }
     };
 
     setTimeout(() => {
