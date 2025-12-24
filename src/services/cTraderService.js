@@ -493,7 +493,7 @@ export const startCtraderFlow = async (isDemo = false) => {
             break;
 
           case 'account_list':
-            if (payloadType === 2150) { // PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES
+            if (payloadType === 2114) { // PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES (corrected)
               const payload = root.lookupType('ProtoOA.ProtoOAGetAccountListByAccessTokenRes').decode(message.payload);
               console.log('📊 Account list received:', payload.ctidTraderAccount?.length || 0, 'accounts');
 
@@ -524,7 +524,7 @@ export const startCtraderFlow = async (isDemo = false) => {
             break;
 
           case 'account_auth':
-            if (payloadType === 2104) { // PROTO_OA_ACCOUNT_AUTH_RES
+            if (payloadType === 2103) { // PROTO_OA_ACCOUNT_AUTH_RES (corrected)
               const payload = root.lookupType('ProtoOA.ProtoOAAccountAuthRes').decode(message.payload);
               if (payload.result === true) {
                 console.log('✅ Account authentication successful');
@@ -548,7 +548,7 @@ export const startCtraderFlow = async (isDemo = false) => {
             break;
 
           case 'deal_list':
-            if (payloadType === 2125) { // PROTO_OA_DEAL_LIST_RES
+            if (payloadType === 2142) { // PROTO_OA_DEAL_LIST_RES (corrected based on logs)
               const payload = root.lookupType('ProtoOA.ProtoOADealListRes').decode(message.payload);
               console.log('💰 Trading deals received:', payload.deal?.length || 0, 'deals');
 
@@ -626,13 +626,14 @@ export const startCtraderFlow = async (isDemo = false) => {
       }
     };
 
-      // Timeout after 60 seconds (full auth sequence takes time)
+      // Timeout after 90 seconds (full auth sequence takes time)
       setTimeout(() => {
         if (ctraderWS.readyState === WebSocket.OPEN && ctraderState !== 'idle' && ctraderState !== 'ready') {
+          console.warn('⏰ cTrader authentication timeout, closing connection');
           ctraderWS.close();
           ctraderState = 'idle';
           if (ctraderReject) ctraderReject(new Error('cTrader authentication timeout'));
         }
-      }, 60000);
+      }, 90000);
     });
 };
