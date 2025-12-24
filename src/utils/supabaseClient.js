@@ -9,6 +9,8 @@ const isLocalhost = typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const finalUrl = isLocalhost ? 'http://localhost:3008/supabase-api' : supabaseUrl;
 
+console.log('🔧 Creating Supabase client (should happen only once)');
+
 export const supabase = typeof window !== 'undefined' ? createClient(finalUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,

@@ -262,6 +262,9 @@ const sendMessage = (ws, messageTypeName, payloadObj) => {
       'ProtoOADealListReq': payloadTypeEnum.PROTO_OA_DEAL_LIST_REQ, // 2124
     };
 
+    console.log('🔍 Available payload types:', Object.keys(payloadTypeMap));
+    console.log('🔍 Requested message type:', messageTypeName);
+
     const payloadType = payloadTypeMap[messageTypeName];
     if (typeof payloadType !== 'number') {
       throw new Error(`Unknown message type: ${messageTypeName}`);
@@ -419,7 +422,7 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
         }
 
         const payloadType = message.payloadType;
-        console.log('📨 WebSocket message received, payloadType:', payloadType);
+        console.log('📨 WebSocket message received, payloadType:', payloadType, 'message:', message);
 
         // Map payload types to message types using enum values
         const payloadTypeEnum = root.lookupEnum('ProtoOA.ProtoOAPayloadType');
