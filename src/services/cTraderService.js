@@ -249,15 +249,44 @@ import "Common.proto";
 };
 
 // Helper to send message over WS
-const sendMessage = (ws, messageType, payload) => {
-  const ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
-  const fullMessageType = messageType.startsWith('ProtoOA.') ? messageType : 'ProtoOA.' + messageType;
-  const messageTypeObj = protoRoot.lookupType(fullMessageType);
-  const payloadType = messageTypeObj.payloadType;
-  const encodedPayload = messageTypeObj.encode(payload).finish();
-  const message = ProtoMessage.create({ payloadType, payload: encodedPayload });
-  console.log('📤 Sending message:', fullMessageType, 'payloadType:', payloadType);
-  ws.send(ProtoMessage.encode(message).finish());
+const sendMessage = (ws, messageTypeName, payloadObj) => {
+  try {
+    // Get payload type from enum
+    const payloadTypeEnum = protoRoot.lookupEnum('ProtoOA.ProtoOAPayloadType').values;
+
+    // Map message type names to payload type numbers
+    const payloadTypeMap = {
+      'ProtoOAApplicationAuthReq': payloadTypeEnum.PROTO_OA_APPLICATION_AUTH_REQ, // 2100
+      'ProtoOAGetAccountListByAccessTokenReq': payloadTypeEnum.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ, // 2149
+      'ProtoOAAccountAuthReq': payloadTypeEnum.PROTO_OA_ACCOUNT_AUTH_REQ, // 2103
+      'ProtoOADealListReq': payloadTypeEnum.PROTO_OA_DEAL_LIST_REQ, // 2124
+    };
+
+    const payloadType = payloadTypeMap[messageTypeName];
+    if (typeof payloadType !== 'number') {
+      throw new Error(`Unknown message type: ${messageTypeName}`);
+    }
+
+    // Find and encode the message type
+    const fullMessageType = messageTypeName.startsWith('ProtoOA.') ? messageTypeName : 'ProtoOA.' + messageTypeName;
+    const MessageType = protoRoot.lookupType(fullMessageType);
+    const encodedPayload = MessageType.encode(payloadObj).finish();
+
+    // Create wrapper message
+    const ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
+    const wrapper = ProtoMessage.create({
+      payloadType: payloadType,
+      payload: encodedPayload
+    });
+
+    // Encode and send
+    const buffer = ProtoMessage.encode(wrapper).finish();
+    ws.send(buffer);
+
+    console.log(`✅ Sent ${messageTypeName} (payloadType: ${payloadType})`);
+  } catch (err) {
+    console.error(`❌ Failed to send ${messageTypeName}:`, err);
+  }
 };
 
 // Get tokens from localStorage (encrypted as per your securityService)
