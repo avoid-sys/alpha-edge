@@ -359,22 +359,29 @@ const parseDealsToTrades = (deals) => {
 
 // Simplified cTrader flow starter
 export const startCtraderFlow = async (isDemo = false) => {
+  console.log('🚀 STARTING CTRADER FLOW, isDemo:', isDemo);
+
   const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
   if (!tokens.access_token) throw new Error('No access token');
 
   await loadProtos(); // Ensure protos are loaded
   const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
+  console.log('🔌 Connecting to WS URL:', wsUrl);
   const ws = new WebSocket(wsUrl);
 
   let accountId = null;
+  let currentState = 'connecting';
 
   return new Promise((resolve, reject) => {
     ws.onopen = () => {
-      console.log('WS opened — sending app auth');
+      console.log('✅ WS OPENED SUCCESSFULLY');
+      currentState = 'app_auth_sending';
+      console.log('📤 Sending ProtoOAApplicationAuthReq...');
       sendMessage(ws, 'ProtoOAApplicationAuthReq', {
         clientId: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID,
         clientSecret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
       });
+      currentState = 'waiting_app_auth';
     };
 
     ws.onmessage = async (event) => {
@@ -384,7 +391,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         const ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
         const message = ProtoMessage.decode(uint8Array);
         const payloadTypeNum = message.payloadType;
-        console.log('📨 Received payloadType:', payloadTypeNum);
+        console.log('📨 MESSAGE RECEIVED - payloadType:', payloadTypeNum, 'currentState:', currentState);
 
         // Игнорируем heartbeat
         if (payloadTypeNum === 51 || payloadTypeNum === 2142) {
@@ -395,39 +402,48 @@ export const startCtraderFlow = async (isDemo = false) => {
         // Находим имя типа по номеру
         const payloadTypeEnum = protoRoot.lookupEnum('ProtoOA.ProtoOAPayloadType');
         const typeName = payloadTypeEnum.valuesById[payloadTypeNum];
+        console.log('🔍 Looking for payloadType:', payloadTypeNum, 'found typeName:', typeName);
+
         if (!typeName) {
-          console.warn('Unknown payloadType:', payloadTypeNum);
+          console.warn('Unknown payloadType:', payloadTypeNum, '- ignoring');
           return;
         }
 
         const PayloadType = protoRoot.lookupType(`ProtoOA.${typeName}`);
         const payload = PayloadType.decode(message.payload);
-        console.log('Payload:', typeName, payload);
+        console.log('📦 Decoded payload for', typeName, ':', payload);
 
         if (payloadTypeNum === 2101) { // ProtoOAApplicationAuthRes
-          console.log('✅ Application authenticated');
-          // Запрашиваем список аккаунтов
+          console.log('✅ APPLICATION AUTH SUCCESS');
+          currentState = 'getting_accounts';
+          console.log('📤 Requesting account list...');
           sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
             accessToken: tokens.access_token
           });
+          currentState = 'waiting_accounts';
         } else if (payloadTypeNum === 2150) { // ProtoOAGetAccountListByAccessTokenRes
+          console.log('📋 ACCOUNT LIST RECEIVED, accounts:', payload.ctidTraderAccount?.length || 0);
           if (!payload.ctidTraderAccount?.length) {
+            console.error('❌ No trader accounts found');
             reject(new Error('No trader accounts found'));
             ws.close();
             return;
           }
           accountId = payload.ctidTraderAccount[0].ctidTraderAccountId;
-          console.log('Account ID:', accountId);
+          console.log('🎯 Using account ID:', accountId);
           localStorage.setItem('ctrader_account_id', accountId);
 
-          // Аутентифицируем аккаунт
+          currentState = 'account_auth_sending';
+          console.log('📤 Sending account auth...');
           sendMessage(ws, 'ProtoOAAccountAuthReq', {
             ctidTraderAccountId: accountId,
             accessToken: tokens.access_token
           });
+          currentState = 'waiting_account_auth';
         } else if (payloadTypeNum === 2104) { // ProtoOAAccountAuthRes
-          console.log('✅ Account authenticated');
-          // Запрашиваем историю сделок за последний год
+          console.log('✅ ACCOUNT AUTH SUCCESS');
+          currentState = 'deal_list_sending';
+          console.log('📤 Requesting deal list...');
           const from = Date.now() - 365 * 24 * 60 * 60 * 1000;
           const to = Date.now();
           sendMessage(ws, 'ProtoOADealListReq', {
@@ -435,11 +451,13 @@ export const startCtraderFlow = async (isDemo = false) => {
             fromTimestamp: from,
             toTimestamp: to
           });
-        } else if (payloadTypeNum === 2125) { // ProtoOADealListRes
-          console.log('📊 Received', payload.deal?.length || 0, 'deals');
+          currentState = 'waiting_deals';
+        } else if (payloadTypeNum === 2125 || payloadTypeNum === 2142) { // ProtoOADealListRes (trying both possible values)
+          console.log('🎉 DEAL LIST RECEIVED! payloadType:', payloadTypeNum, 'deals count:', payload.deal?.length || 0);
           const completeTrades = parseDealsToTrades(payload.deal || []);
-          console.log('Calculated stats:', completeTrades.length, 'trades processed');
+          console.log('✅ Processing complete - trades:', completeTrades.length);
 
+          console.log('🔄 RESOLVING PROMISE with', completeTrades.length, 'trades');
           resolve(completeTrades);
           ws.close(); // Закрываем ТОЛЬКО после получения сделок
         } else if (payloadTypeNum === 50) { // ProtoOAErrorRes
@@ -466,10 +484,11 @@ export const startCtraderFlow = async (isDemo = false) => {
       }
     };
 
-    // Таймаут на весь процесс (30 сек)
+    // Таймаут на весь процесс (30 сек) - только reject, НЕ закрываем WS!
     setTimeout(() => {
+      console.error('⏰ TIMEOUT: No response from cTrader within 30 seconds');
       reject(new Error('Timeout waiting for data from cTrader'));
-      ws.close();
+      // НЕ закрываем WS здесь - пусть он закроется сам или в reject обработчике
     }, 30000);
   });
 };
