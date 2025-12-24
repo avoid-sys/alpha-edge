@@ -351,7 +351,11 @@ export const startCtraderFlow = async (isDemo = false) => {
     return;
   }
 
+  // Initialize state
   ctraderState = 'connecting';
+  ctraderResolve = null;
+  ctraderReject = null;
+  selectedAccountId = null;
 
   return new Promise(async (resolve, reject) => {
     ctraderResolve = resolve;
@@ -402,7 +406,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         if (!fullClientId) {
           console.error('❌ VITE_CTRADER_FULL_CLIENT_ID is not set in environment variables');
           ctraderState = 'idle';
-          ctraderReject(new Error('cTrader WebSocket client ID not configured. Please set VITE_CTRADER_FULL_CLIENT_ID environment variable.'));
+          if (ctraderReject) ctraderReject(new Error('cTrader WebSocket client ID not configured. Please set VITE_CTRADER_FULL_CLIENT_ID environment variable.'));
           ctraderWS.close();
           return;
         }
@@ -410,7 +414,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         if (!clientSecret) {
           console.error('❌ VITE_CTRADER_CLIENT_SECRET is not set in environment variables');
           ctraderState = 'idle';
-          ctraderReject(new Error('cTrader client secret not configured. Please set VITE_CTRADER_CLIENT_SECRET environment variable.'));
+          if (ctraderReject) ctraderReject(new Error('cTrader client secret not configured. Please set VITE_CTRADER_CLIENT_SECRET environment variable.'));
           ctraderWS.close();
           return;
         }
@@ -462,7 +466,7 @@ export const startCtraderFlow = async (isDemo = false) => {
           const errorPayload = root.lookupType('ProtoOA.ProtoOAErrorRes').decode(message.payload);
           console.error('🚨 Spotware API Error:', errorPayload.errorCode, errorPayload.description);
           ctraderState = 'idle';
-          ctraderReject(new Error(`cTrader API Error ${errorPayload.errorCode}: ${errorPayload.description}`));
+          if (ctraderReject) ctraderReject(new Error(`cTrader API Error ${errorPayload.errorCode}: ${errorPayload.description}`));
           ctraderWS.close();
           return;
         }
@@ -482,7 +486,7 @@ export const startCtraderFlow = async (isDemo = false) => {
               } else {
                 console.error('❌ Application authentication failed');
                 ctraderState = 'idle';
-                ctraderReject(new Error('Application authentication failed'));
+                if (ctraderReject) ctraderReject(new Error('Application authentication failed'));
                 ctraderWS.close();
               }
             }
@@ -513,7 +517,7 @@ export const startCtraderFlow = async (isDemo = false) => {
               } else {
                 console.error('❌ No trading accounts found');
                 ctraderState = 'idle';
-                ctraderReject(new Error('No trading accounts found'));
+                if (ctraderReject) ctraderReject(new Error('No trading accounts found'));
                 ctraderWS.close();
               }
             }
@@ -537,7 +541,7 @@ export const startCtraderFlow = async (isDemo = false) => {
               } else {
                 console.error('❌ Account authentication failed');
                 ctraderState = 'idle';
-                ctraderReject(new Error('Account authentication failed'));
+                if (ctraderReject) ctraderReject(new Error('Account authentication failed'));
                 ctraderWS.close();
               }
             }
@@ -548,37 +552,45 @@ export const startCtraderFlow = async (isDemo = false) => {
               const payload = root.lookupType('ProtoOA.ProtoOADealListRes').decode(message.payload);
               console.log('💰 Trading deals received:', payload.deal?.length || 0, 'deals');
 
-              ctraderState = 'ready';
+                ctraderState = 'ready';
 
-              if (payload.deal && payload.deal.length > 0) {
-                // Transform deals to our format
-                const trades = payload.deal
-                  .filter(deal => deal.closeTimestamp && deal.closeTimestamp > 0) // Only closed deals
-                  .map(deal => {
-                    const timestamp = deal.closeTimestamp > 1e10 ? deal.closeTimestamp : deal.closeTimestamp * 1000;
-                    return {
-                      id: deal.dealId.toString(),
-                      timestamp: new Date(timestamp),
-                      symbol: deal.symbolId || 'UNKNOWN',
-                      side: deal.tradeSide === 1 ? 'buy' : deal.tradeSide === 2 ? 'sell' : 'unknown',
-                      volume: deal.volume / 100000,
-                      price: deal.executedPrice / 100000,
-                      profit: deal.profit / 100,
-                      commission: 0,
-                      swap: 0,
-                      status: 'closed'
-                    };
-                  });
+                if (payload.deal && payload.deal.length > 0) {
+                  // Transform deals to our format
+                  const trades = payload.deal
+                    .filter(deal => deal.closeTimestamp && deal.closeTimestamp > 0) // Only closed deals
+                    .map(deal => {
+                      const timestamp = deal.closeTimestamp > 1e10 ? deal.closeTimestamp : deal.closeTimestamp * 1000;
+                      return {
+                        id: deal.dealId.toString(),
+                        timestamp: new Date(timestamp),
+                        symbol: deal.symbolId || 'UNKNOWN',
+                        side: deal.tradeSide === 1 ? 'buy' : deal.tradeSide === 2 ? 'sell' : 'unknown',
+                        volume: deal.volume / 100000,
+                        price: deal.executedPrice / 100000,
+                        profit: deal.profit / 100,
+                        commission: 0,
+                        swap: 0,
+                        status: 'closed'
+                      };
+                    });
 
-                console.log('✅ Successfully processed', trades.length, 'trades');
-                ctraderState = 'idle';
-                ctraderResolve(trades);
-              } else {
-                console.warn('⚠️ No trading deals found');
-                ctraderState = 'idle';
-                ctraderResolve([]);
-              }
-              ctraderWS.close(); // Close after getting deals
+                  console.log('✅ Successfully processed', trades.length, 'trades');
+                  ctraderState = 'idle';
+                  if (ctraderResolve) {
+                    ctraderResolve(trades);
+                    ctraderResolve = null;
+                    ctraderReject = null;
+                  }
+                } else {
+                  console.warn('⚠️ No trading deals found');
+                  ctraderState = 'idle';
+                  if (ctraderResolve) {
+                    ctraderResolve([]);
+                    ctraderResolve = null;
+                    ctraderReject = null;
+                  }
+                }
+                ctraderWS.close(); // Close after getting deals
             }
             break;
 
@@ -592,31 +604,34 @@ export const startCtraderFlow = async (isDemo = false) => {
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('🚨 WebSocket error:', error);
-      reject(new Error('WebSocket connection failed: ' + error.message));
+    ctraderWS.onclose = (event) => {
+      console.log('🔌 WebSocket closed:', event.code, event.reason);
+      if (event.code !== 1000 && ctraderState !== 'idle' && ctraderState !== 'ready') {
+        ctraderState = 'idle';
+        if (ctraderReject) {
+          if (ctraderReject) ctraderReject(new Error(`WebSocket closed unexpectedly: ${event.code} ${event.reason}`));
+          ctraderResolve = null;
+          ctraderReject = null;
+        }
+      }
     };
 
-      ctraderWS.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code, event.reason);
-        if (event.code !== 1000 && ctraderState !== 'idle' && ctraderState !== 'ready') {
-          ctraderState = 'idle';
-          ctraderReject(new Error(`WebSocket closed unexpectedly: ${event.code} ${event.reason}`));
-        }
-      };
-
-      ctraderWS.onerror = (error) => {
-        console.error('🚨 WebSocket error:', error);
-        ctraderState = 'idle';
-        ctraderReject(new Error('WebSocket connection error'));
-      };
+    ctraderWS.onerror = (error) => {
+      console.error('🚨 WebSocket error:', error);
+      ctraderState = 'idle';
+      if (ctraderReject) {
+        if (ctraderReject) ctraderReject(new Error('WebSocket connection error'));
+        ctraderResolve = null;
+        ctraderReject = null;
+      }
+    };
 
       // Timeout after 60 seconds (full auth sequence takes time)
       setTimeout(() => {
         if (ctraderWS.readyState === WebSocket.OPEN && ctraderState !== 'idle' && ctraderState !== 'ready') {
           ctraderWS.close();
           ctraderState = 'idle';
-          ctraderReject(new Error('cTrader authentication timeout'));
+          if (ctraderReject) ctraderReject(new Error('cTrader authentication timeout'));
         }
       }, 60000);
     });
