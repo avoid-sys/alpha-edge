@@ -1,6 +1,8 @@
 import protobuf from 'protobufjs';
 
+// Global state for singleton cTrader flow
 let protoRoot = null;
+let isConnecting = false;
 
 const loadProtos = async () => {
   if (protoRoot) return protoRoot;
@@ -319,12 +321,40 @@ const parseDealsToTrades = (deals) => {
 };
 
 export const startCtraderFlow = async (isDemo = false) => {
+  // Prevent multiple simultaneous flows
+  if (isConnecting) {
+    console.warn('⚠️ cTrader flow already in progress, skipping');
+    return new Promise((resolve) => resolve([])); // Return empty to avoid errors
+  }
+  isConnecting = true;
+
+  console.log('🚀 Starting cTrader flow for', isDemo ? 'DEMO' : 'LIVE', 'account');
+
   const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
-  if (!tokens.access_token) throw new Error('No access token');
+  if (!tokens.access_token) {
+    isConnecting = false;
+    throw new Error('No access token');
+  }
 
   await loadProtos();
 
-  const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
+  // CRITICAL: Match WS endpoint to account type
+  const wsUrl = isDemo
+    ? "wss://demo.ctraderapi.com:5035"
+    : "wss://live.ctraderapi.com:5035";
+
+  console.log('🔌 Connecting to cTrader WS:', wsUrl, '(isDemo:', isDemo, ')');
+
+  // Validate endpoint matches account type
+  if (isDemo && wsUrl.includes('live')) {
+    isConnecting = false;
+    throw new Error('DEMO account used with LIVE cTrader endpoint - mismatch!');
+  }
+  if (!isDemo && wsUrl.includes('demo')) {
+    isConnecting = false;
+    throw new Error('LIVE account used with DEMO cTrader endpoint - mismatch!');
+  }
+
   const ws = new WebSocket(wsUrl);
 
   let accountId = null;
@@ -419,15 +449,18 @@ export const startCtraderFlow = async (isDemo = false) => {
           const completeTrades = parseDealsToTrades(payload.deal || []);
           console.log('✅ Stats calculated:', completeTrades.length, 'trades');
 
+          isConnecting = false; // Reset flag on success
           resolve(completeTrades);
           ws.close();
         } else if (payloadTypeNum === 50) { // Error
           console.error('Spotware error:', payload.description);
+          isConnecting = false; // Reset flag on error
           reject(new Error(payload.description || 'cTrader error'));
           ws.close();
         }
       } catch (err) {
         console.error('Processing error:', err);
+        isConnecting = false; // Reset flag on error
         reject(err);
         ws.close();
       }
@@ -435,12 +468,14 @@ export const startCtraderFlow = async (isDemo = false) => {
 
     ws.onerror = (err) => {
       console.error('WS error:', err);
+      isConnecting = false; // Reset flag on error
       reject(err);
       ws.close();
     };
 
     ws.onclose = (event) => {
       console.log('🔌 WS closed with code:', event.code, 'reason:', event.reason);
+      isConnecting = false; // Reset flag on close
 
       if (event.code === 1000) {
         console.log('✅ WS closed normally');
@@ -450,8 +485,9 @@ export const startCtraderFlow = async (isDemo = false) => {
     };
 
     setTimeout(() => {
-      console.log('Timeout after 90 seconds');
-      reject(new Error('Timeout'));
+      console.log('⏰ Timeout after 90 seconds');
+      isConnecting = false; // Reset flag on timeout
+      reject(new Error('Timeout waiting for cTrader response'));
       ws.close();
     }, 90000);
   });
