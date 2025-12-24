@@ -30,6 +30,21 @@ export default function Connect() {
   };
 
   const handleConnectCTrader = () => {
+    // Check if we already have valid tokens
+    const existingTokens = localStorage.getItem('ctrader_tokens');
+    if (existingTokens) {
+      try {
+        const tokens = JSON.parse(existingTokens);
+        if (tokens.expires_at && Date.now() < tokens.expires_at) {
+          alert('✅ You are already connected to cTrader!\n\nYour tokens are still valid until ' + new Date(tokens.expires_at).toLocaleString() + '.\n\nIf you want to reconnect, first reset the connection using the "Reset cTrader Connection" button.');
+          return;
+        }
+      } catch (e) {
+        // Invalid token format, continue with connection
+        console.warn('Invalid token format in localStorage, proceeding with connection');
+      }
+    }
+
     const state = generateState();
     localStorage.setItem('ctrader_state', state);
 
@@ -122,6 +137,22 @@ export default function Connect() {
             <p className="text-xs text-gray-500 mt-1 text-center">Test with playground redirect (dev only)</p>
           </div>
         )}
+
+        {/* Reset cTrader state button */}
+        <div>
+          <NeumorphicButton
+            onClick={() => {
+              localStorage.removeItem('ctrader_tokens');
+              localStorage.removeItem('ctrader_state');
+              alert('cTrader state cleared. You can try connecting again.');
+            }}
+            className="w-full flex items-center justify-center bg-gradient-to-r from-gray-500 to-gray-600 text-white border-0"
+          >
+            <Trash2 size={20} className="mr-2" />
+            Reset cTrader Connection
+          </NeumorphicButton>
+          <p className="text-xs text-gray-500 mt-1 text-center">Clear stored tokens and try again</p>
+        </div>
       </div>
 
     </div>

@@ -63,7 +63,16 @@ const CTraderCallback = () => {
 
           // Special handling for rate limiting
           if (data.spotware_status === 429 || data.error === 'Rate limited by Spotware') {
-            alert(`${data.message || 'Превышен лимит запросов к cTrader API.'}\nПодождите ${Math.ceil((data.retry_after || 300) / 60)} минут и попробуйте подключить аккаунт заново.`);
+            const retryMinutes = Math.ceil((data.retry_after || 300) / 60);
+            const message = `🚫 cTrader API Rate Limit Exceeded\n\n` +
+              `Превышен лимит запросов к cTrader API.\n` +
+              `Подождите ${retryMinutes} минут и попробуйте подключить аккаунт заново.\n\n` +
+              `Если проблема persists, попробуйте:\n` +
+              `1. Очистить состояние (кнопка "Reset cTrader Connection")\n` +
+              `2. Подождать 15-30 минут\n` +
+              `3. Попробовать в другое время`;
+
+            alert(message);
             navigate('/connect');
             return;
           }
