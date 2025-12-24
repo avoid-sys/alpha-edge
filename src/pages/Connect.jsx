@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicButton } from '@/components/NeumorphicUI';
-import { Upload, Zap, Settings } from 'lucide-react';
+import { Upload, Zap, Settings, Trash2 } from 'lucide-react';
 import { getRedirectUri, generateState } from '../utils/cTraderUtils';
 
 export default function Connect() {

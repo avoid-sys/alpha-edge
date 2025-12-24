@@ -92,32 +92,61 @@ const getTokens = () => JSON.parse(localStorage.getItem('ctrader_tokens') || '{}
 // Refresh token if expired
 const refreshToken = async () => {
   const tokens = getTokens();
-  if (!tokens.refresh_token) throw new Error('No refresh token');
+  if (!tokens.refresh_token) throw new Error('No refresh token available. Please reconnect to cTrader.');
+
+  console.log('🔄 Refreshing cTrader access token...');
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: tokens.refresh_token,
-    client_id: import.meta.env.VITE_CTRADER_CLIENT_ID,
+    client_id: import.meta.env.VITE_CTRADER_APP_ID, // Use short numeric ID for OAuth
     client_secret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
   });
-  const response = await fetch('https://openapi.ctrader.com/apps/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body
-  });
-  const data = await response.json();
-  if (data.error) throw new Error(data.error_description);
-  localStorage.setItem('ctrader_tokens', JSON.stringify(data));
-  return data;
+
+  try {
+    const response = await fetch('https://openapi.ctrader.com/apps/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      console.error('❌ Token refresh failed:', data);
+      throw new Error(data.error_description || data.error);
+    }
+
+    // Add expiration time
+    data.expires_at = Date.now() + data.expires_in * 1000;
+    localStorage.setItem('ctrader_tokens', JSON.stringify(data));
+    console.log('✅ Token refreshed successfully');
+    return data;
+  } catch (error) {
+    console.error('❌ Token refresh error:', error);
+    // If refresh fails, clear tokens to force reconnection
+    localStorage.removeItem('ctrader_tokens');
+    throw error;
+  }
 };
 
 // Main function to fetch trades and analyze
 const fetchAndAnalyzeTrades = async (isDemo = true) => {
   try {
     let tokens = getTokens();
-    // Note: Implicit flow tokens don't have refresh_token, so we can't auto-refresh
-    // If token is expired, user needs to re-authenticate manually
+
+    // Auto-refresh token if expired and refresh_token is available
     if (Date.now() > tokens.expires_at) {
-      throw new Error('Access token expired. Please reconnect to cTrader.');
+      console.log('⚠️ Access token expired, attempting refresh...');
+      if (tokens.refresh_token) {
+        try {
+          tokens = await refreshToken();
+          console.log('✅ Token refreshed automatically');
+        } catch (refreshError) {
+          console.warn('❌ Token refresh failed:', refreshError.message);
+          throw new Error('Access token expired and refresh failed. Please reconnect to cTrader.');
+        }
+      } else {
+        throw new Error('Access token expired. Please reconnect to cTrader.');
+      }
     }
     const root = await loadProtos();
   const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
