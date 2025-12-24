@@ -85,9 +85,10 @@ export default function Dashboard() {
 
       console.log('✅ User authenticated:', user.email, 'loading dashboard data...');
 
+      let fetchedProfile = null;
+      let fetchedTrades = [];
+
       try {
-        let fetchedProfile = null;
-        let fetchedTrades = [];
 
         if (profileId) {
           fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
@@ -139,9 +140,10 @@ export default function Dashboard() {
             console.error('❌ Error fetching profiles:', e);
           }
 
-          // If no profile found but cTrader tokens exist, try to create profile from cTrader
-          if (!fetchedProfile && localStorage.getItem('ctrader_tokens')) {
-            console.log('🔄 cTrader tokens found but no profile - attempting to create profile from cTrader data');
+          // If cTrader tokens exist, try to create/update profile from cTrader (even if file profile exists)
+          if (localStorage.getItem('ctrader_tokens')) {
+            console.log('🔄 cTrader tokens found - attempting to create/update profile from cTrader data');
+            console.log('📊 Current profile status:', fetchedProfile ? `file profile ${fetchedProfile.id} exists` : 'no profile');
 
             // Prevent multiple simultaneous cTrader flows
             if (ctraderStartedRef.current) {
