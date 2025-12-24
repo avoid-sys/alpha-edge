@@ -1,8 +1,5 @@
-// Placeholder OpenApiModelMessages.proto for cTrader OpenAPI
-// Download real proto files from: https://github.com/spotware/OpenAPI/tree/master/proto
-
 syntax = "proto3";
 
 package ProtoOA;
 
-// Additional model messages if needed
+// Additional model messages can be added here if needed

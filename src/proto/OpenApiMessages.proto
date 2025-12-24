@@ -1,6 +1,3 @@
-// Placeholder OpenApiMessages.proto for cTrader OpenAPI
-// Download real proto files from: https://github.com/spotware/OpenAPI/tree/master/proto
-
 syntax = "proto3";
 
 package ProtoOA;

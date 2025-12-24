@@ -57,8 +57,10 @@ const refreshToken = async () => {
 const fetchAndAnalyzeTrades = async (isDemo = true) => {
   try {
     let tokens = getTokens();
-    if (Date.now() > tokens.expires_at) { // Assume you store expires_at = Date.now() + expires_in * 1000
-      tokens = await refreshToken();
+    // Note: Implicit flow tokens don't have refresh_token, so we can't auto-refresh
+    // If token is expired, user needs to re-authenticate manually
+    if (Date.now() > tokens.expires_at) {
+      throw new Error('Access token expired. Please reconnect to cTrader.');
     }
     const root = await loadProtos();
   const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
