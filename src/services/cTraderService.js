@@ -313,10 +313,21 @@ const parseDealsToTrades = (deals) => {
 };
 
 export const startCtraderFlow = async (isDemo = false) => {
+  console.log('🔄 startCtraderFlow called with isDemo:', isDemo);
+
   const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
-  if (!tokens.access_token) throw new Error('No access token');
+  console.log('🔑 Tokens check:', {
+    hasAccessToken: !!tokens.access_token,
+    hasRefreshToken: !!tokens.refresh_token,
+    expiresAt: tokens.expires_at ? new Date(tokens.expires_at).toLocaleString() : 'none'
+  });
+
+  if (!tokens.access_token) {
+    throw new Error('No access token');
+  }
 
   await loadProtos();
+  console.log('📚 Protos loaded successfully');
 
   const wsUrl = isDemo ? import.meta.env.VITE_CTRADER_WS_DEMO : import.meta.env.VITE_CTRADER_WS_LIVE;
   const ws = new WebSocket(wsUrl);
@@ -324,6 +335,8 @@ export const startCtraderFlow = async (isDemo = false) => {
   let accountId = null;
 
   return new Promise((resolve, reject) => {
+    console.log('🔗 Creating Promise for cTrader flow');
+
     const cleanup = () => {
       ws.onmessage = null;
       ws.onopen = null;
@@ -332,7 +345,7 @@ export const startCtraderFlow = async (isDemo = false) => {
     };
 
     ws.onopen = () => {
-      console.log('WS opened — sending app auth');
+      console.log('✅ WS opened successfully — sending app auth');
       sendMessage(ws, 'ProtoOAApplicationAuthReq', {
         clientId: import.meta.env.VITE_CTRADER_FULL_CLIENT_ID,
         clientSecret: import.meta.env.VITE_CTRADER_CLIENT_SECRET
@@ -397,17 +410,18 @@ export const startCtraderFlow = async (isDemo = false) => {
           const completeTrades = parseDealsToTrades(payload.deal || []);
           console.log('Stats calculated:', completeTrades.length, 'trades processed');
 
+          console.log('🎯 RESOLVING with trades:', completeTrades);
           resolve(completeTrades);
           cleanup();
           ws.close(); // Закрываем ТОЛЬКО здесь!
         } else if (payloadTypeNum === 50) { // Error
-          console.error('Spotware error:', payload.description);
+          console.error('🚨 Spotware error:', payload.description);
           reject(new Error(payload.description || 'Unknown error'));
           cleanup();
           ws.close();
         }
       } catch (err) {
-        console.error('Processing error:', err);
+        console.error('💥 Processing error:', err);
         reject(err);
         cleanup();
         ws.close();
@@ -415,19 +429,19 @@ export const startCtraderFlow = async (isDemo = false) => {
     };
 
     ws.onerror = (err) => {
-      console.error('WS error:', err);
+      console.error('💥 WS error:', err);
       reject(err);
       cleanup();
       ws.close();
     };
 
     ws.onclose = (event) => {
-      console.log('WS closed:', event.code, event.reason);
+      console.log('🔌 WS closed:', event.code, event.reason);
     };
 
     // Таймаут 120 секунд (на случай очень медленного ответа)
     setTimeout(() => {
-      console.log('⏰ Timeout after 120 seconds');
+      console.log('⏰ TIMEOUT after 120 seconds - rejecting promise');
       reject(new Error('Timeout waiting for cTrader response'));
       cleanup();
       ws.close();

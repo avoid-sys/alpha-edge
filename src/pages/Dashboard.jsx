@@ -120,6 +120,8 @@ export default function Dashboard() {
               const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
               if (Date.now() > tokens.expires_at) {
                 console.log('⚠️ cTrader tokens expired, user needs to reconnect');
+                // Reset flag on expired tokens
+                ctraderStartedRef.current = false;
                 // Don't try to create profile with expired tokens
                 return;
               }
@@ -131,6 +133,7 @@ export default function Dashboard() {
               console.log('🚀 Starting cTrader flow...');
               const trades = await startCtraderFlow(false); // false for live account
               console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
+              console.log('📊 Trades data:', trades);
 
               if (trades && trades.length > 0) {
                 console.log('🔄 Creating profile from', trades.length, 'cTrader trades...');
@@ -190,7 +193,75 @@ export default function Dashboard() {
                   throw profileError;
                 }
               } else {
-                console.log('⚠️ No trades received from cTrader, skipping profile creation');
+                console.log('⚠️ No trades received from cTrader, creating empty profile for metrics display');
+
+                // Reset flag even for empty trades
+                ctraderStartedRef.current = false;
+
+                // Create empty profile to show metrics (win rate 0%, etc.)
+                try {
+                  const emptyProfileData = {
+                    name: 'cTrader Live Account',
+                    is_live_account: true,
+                    trader_score: 0,
+                    total_trades: 0,
+                    winning_trades: 0,
+                    losing_trades: 0,
+                    total_profit: 0,
+                    total_loss: 0,
+                    win_rate: 0,
+                    avg_win: 0,
+                    avg_loss: 0,
+                    largest_win: 0,
+                    largest_loss: 0,
+                    profit_factor: 0,
+                    expectancy: 0,
+                    sharpe_ratio: 0,
+                    max_drawdown: 0,
+                    recovery_factor: 0,
+                    calmar_ratio: 0,
+                    total_trading_days: 0,
+                    avg_trades_per_day: 0,
+                    best_day: 0,
+                    worst_day: 0,
+                    consecutive_wins: 0,
+                    consecutive_losses: 0,
+                    max_consecutive_wins: 0,
+                    max_consecutive_losses: 0,
+                    total_fees: 0,
+                    net_profit: 0,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+
+                  const { data: newProfile, error: profileError } = await supabase
+                    .from('profiles')
+                    .insert(emptyProfileData)
+                    .select()
+                    .single();
+
+                  if (profileError) throw profileError;
+
+                  // Save empty trades array
+                  const { error: tradesError } = await supabase
+                    .from('trades')
+                    .insert([]);
+
+                  if (tradesError) {
+                    console.warn('Warning: Could not save empty trades:', tradesError);
+                  }
+
+                  fetchedProfile = newProfile;
+                  fetchedTrades = [];
+
+                  // Force reload of data
+                  setDataVersion(prev => prev + 1);
+                  console.log('🎉 Empty cTrader profile created successfully');
+
+                } catch (emptyProfileError) {
+                  console.error('❌ Failed to create empty cTrader profile:', emptyProfileError);
+                  // Don't throw - just log the error
+                }
               }
             } catch (error) {
               console.error('❌ Failed to create profile from cTrader data:', error);
