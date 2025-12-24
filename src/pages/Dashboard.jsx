@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
-import { fetchAndAnalyzeTrades } from '@/services/cTraderService';
+import { startCtraderFlow } from '@/services/cTraderService';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
@@ -116,10 +116,10 @@ export default function Dashboard() {
                 return;
               }
 
-              // Import fetchAndAnalyzeTrades dynamically to avoid circular dependency
-              const { fetchAndAnalyzeTrades } = await import('@/services/cTraderService');
-              console.log('🚀 Starting cTrader data fetch...');
-              const trades = await fetchAndAnalyzeTrades(false); // false for live account
+              // Import startCtraderFlow dynamically to avoid circular dependency
+              const { startCtraderFlow } = await import('@/services/cTraderService');
+              console.log('🚀 Starting cTrader flow...');
+              const trades = await startCtraderFlow(false); // false for live account
               console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
 
               if (trades && trades.length > 0) {
