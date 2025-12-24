@@ -9,6 +9,14 @@ const CTraderCallback = () => {
 
   useEffect(() => {
     const initializeCallback = async () => {
+      // Check if supabase client is available
+      if (!supabase) {
+        console.error('❌ Supabase client not available');
+        alert('Application error. Please refresh the page.');
+        navigate('/login');
+        return;
+      }
+
       // First check if user is authenticated in Supabase
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 

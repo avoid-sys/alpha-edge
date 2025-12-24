@@ -9,6 +9,13 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
+    // Only run on client side
+    if (!supabase) {
+      console.log('⚠️ Supabase client not available, skipping auth initialization');
+      setLoading(false);
+      return;
+    }
+
     // Check active sessions and loads the localStorage information
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('🔐 Initial session check:', session ? 'authenticated' : 'not authenticated');
