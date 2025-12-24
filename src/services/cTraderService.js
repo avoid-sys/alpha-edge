@@ -370,29 +370,54 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
 
     ws.onmessage = async (event) => {
       try {
-        const ProtoMessage = root.lookupType('ProtoMessage');
-        const message = ProtoMessage.decode(new Uint8Array(await event.data.arrayBuffer()));
+        // Validate WebSocket connection
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          console.error('❌ WebSocket is not connected, ignoring message');
+          return;
+        }
+
+        // Decode the protobuf message
+        const arrayBuffer = await event.data.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        const ProtoMessage = root.lookupType('ProtoOA.ProtoMessage');
+        const message = ProtoMessage.decode(uint8Array);
+
+        // Validate message structure
+        if (!message || typeof message.payloadType === 'undefined') {
+          console.error('❌ Invalid cTrader message structure:', message);
+          return;
+        }
+
         const payloadType = message.payloadType;
         console.log('📨 WebSocket message received, payloadType:', payloadType);
 
-        // Map payload types to message types (without ProtoOA. prefix)
-        let messageType;
-        switch (payloadType) {
-          case 2100: messageType = 'ProtoOAApplicationAuthReq'; break;
-          case 2101: messageType = 'ProtoOAApplicationAuthRes'; break;
-          case 2149: messageType = 'ProtoOAGetAccountListByAccessTokenReq'; break;
-          case 2150: messageType = 'ProtoOAGetAccountListByAccessTokenRes'; break;
-          case 2103: messageType = 'ProtoOAAccountAuthReq'; break;
-          case 2104: messageType = 'ProtoOAAccountAuthRes'; break;
-          case 2124: messageType = 'ProtoOADealListReq'; break;
-          case 2125: messageType = 'ProtoOADealListRes'; break;
-          case 50: messageType = 'ProtoOAErrorRes'; break; // Error response
-          default: messageType = null;
-        }
+        // Map payload types to message types using enum values
+        const payloadTypeEnum = root.lookupEnum('ProtoOA.ProtoOAPayloadType');
+        let messageType = null;
 
-        if (!messageType) {
-          console.warn('⚠️ Unknown payload type:', payloadType);
-          return;
+        switch (payloadType) {
+          case payloadTypeEnum.values.PROTO_OA_APPLICATION_AUTH_REQ:
+            messageType = 'ProtoOAApplicationAuthReq'; break;
+          case payloadTypeEnum.values.PROTO_OA_APPLICATION_AUTH_RES:
+            messageType = 'ProtoOAApplicationAuthRes'; break;
+          case payloadTypeEnum.values.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ:
+            messageType = 'ProtoOAGetAccountListByAccessTokenReq'; break;
+          case payloadTypeEnum.values.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES:
+            messageType = 'ProtoOAGetAccountListByAccessTokenRes'; break;
+          case payloadTypeEnum.values.PROTO_OA_ACCOUNT_AUTH_REQ:
+            messageType = 'ProtoOAAccountAuthReq'; break;
+          case payloadTypeEnum.values.PROTO_OA_ACCOUNT_AUTH_RES:
+            messageType = 'ProtoOAAccountAuthRes'; break;
+          case payloadTypeEnum.values.PROTO_OA_DEAL_LIST_REQ:
+            messageType = 'ProtoOADealListReq'; break;
+          case payloadTypeEnum.values.PROTO_OA_DEAL_LIST_RES:
+            messageType = 'ProtoOADealListRes'; break;
+          case payloadTypeEnum.values.PROTO_OA_ERROR_RES:
+            messageType = 'ProtoOAErrorRes'; break;
+          default:
+            console.warn('⚠️ Unknown payload type:', payloadType);
+            return;
         }
 
         const payload = root.lookupType('ProtoOA.' + messageType).decode(message.payload);
