@@ -7,22 +7,128 @@ const loadProtos = async () => {
   if (protoRoot) return protoRoot;
 
   try {
-    console.log('🔧 Loading cTrader proto files...');
+    console.log('🔧 Loading cTrader proto definitions from inline strings...');
 
-    // Define proto files inline to avoid loading issues
-    const protoFiles = {
-      'Common.proto': `
+    // Complete proto definitions from spotware/OpenAPI
+    const protoDefinitions = {
+      Common: `
 syntax = "proto3";
 package ProtoOA;
+
+import "google/protobuf/timestamp.proto";
 
 message ProtoMessage {
   uint32 payloadType = 1;
   bytes payload = 2;
 }
+
+enum ProtoOAPayloadType {
+  PROTO_MESSAGE = 0;
+
+  PROTO_OA_APPLICATION_AUTH_REQ = 2100;
+  PROTO_OA_APPLICATION_AUTH_RES = 2101;
+  PROTO_OA_ACCOUNT_AUTH_REQ = 2103;
+  PROTO_OA_ACCOUNT_AUTH_RES = 2104;
+  PROTO_OA_ERROR_RES = 50;
+  PROTO_OA_CLIENT_DISCONNECT_EVENT = 2107;
+
+  PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ = 2149;
+  PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES = 2150;
+
+  PROTO_OA_GET_ACCOUNT_AUTHORIZED_DATA_REQ = 2155;
+  PROTO_OA_GET_ACCOUNT_AUTHORIZED_DATA_RES = 2156;
+
+  PROTO_OA_SUBSCRIBE_SPOTS_REQ = 52;
+  PROTO_OA_SUBSCRIBE_SPOTS_RES = 53;
+  PROTO_OA_UNSUBSCRIBE_SPOTS_REQ = 54;
+  PROTO_OA_UNSUBSCRIBE_SPOTS_RES = 55;
+  PROTO_OA_SPOT_EVENT = 56;
+
+  PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ = 60;
+  PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_RES = 61;
+  PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQ = 62;
+  PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_RES = 63;
+  PROTO_OA_GET_TRENDBAR_REQ = 64;
+  PROTO_OA_GET_TRENDBAR_RES = 65;
+
+  PROTO_OA_SYMBOLS_LIST_REQ = 67;
+  PROTO_OA_SYMBOLS_LIST_RES = 68;
+  PROTO_OA_SYMBOL_BY_ID_REQ = 69;
+  PROTO_OA_SYMBOL_BY_ID_RES = 70;
+  PROTO_OA_SYMBOLS_FOR_CONVERSION_REQ = 71;
+  PROTO_OA_SYMBOLS_FOR_CONVERSION_RES = 72;
+
+  PROTO_OA_ASSET_LIST_REQ = 75;
+  PROTO_OA_ASSET_LIST_RES = 76;
+  PROTO_OA_ASSET_CLASS_LIST_REQ = 77;
+  PROTO_OA_ASSET_CLASS_LIST_RES = 78;
+
+  PROTO_OA_GET_TICKDATA_REQ = 79;
+  PROTO_OA_GET_TICKDATA_RES = 80;
+
+  PROTO_OA_TRADER_REQ = 81;
+  PROTO_OA_TRADER_RES = 82;
+  PROTO_OA_TRADER_UPDATE_EVENT = 83;
+
+  PROTO_OA_RECONCILE_REQ = 84;
+  PROTO_OA_RECONCILE_RES = 85;
+
+  PROTO_OA_EXECUTION_EVENT = 86;
+
+  PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_REQ = 87;
+  PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_RES = 88;
+  PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_REQ = 89;
+  PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_RES = 90;
+  PROTO_OA_DEPTH_EVENT = 91;
+
+  PROTO_OA_GET_CASH_FLOW_HISTORY_REQ = 92;
+  PROTO_OA_GET_CASH_FLOW_HISTORY_RES = 93;
+
+  PROTO_OA_ORDER_LIST_REQ = 94;
+  PROTO_OA_ORDER_LIST_RES = 95;
+
+  PROTO_OA_NEW_ORDER_REQ = 96;
+  PROTO_OA_NEW_ORDER_RES = 97;
+  PROTO_OA_CANCEL_ORDER_REQ = 98;
+  PROTO_OA_CANCEL_ORDER_RES = 99;
+  PROTO_OA_AMEND_ORDER_REQ = 100;
+  PROTO_OA_AMEND_ORDER_RES = 101;
+  PROTO_OA_CLOSE_POSITION_REQ = 102;
+  PROTO_OA_CLOSE_POSITION_RES = 103;
+
+  PROTO_OA_DEAL_LIST_REQ = 2124;
+  PROTO_OA_DEAL_LIST_RES = 2125;
+
+  PROTO_OA_SUBSCRIBE_DEALS_REQ = 2126;
+  PROTO_OA_SUBSCRIBE_DEALS_RES = 2127;
+  PROTO_OA_UNSUBSCRIBE_DEALS_REQ = 2128;
+  PROTO_OA_UNSUBSCRIBE_DEALS_RES = 2129;
+  PROTO_OA_DEAL_LIST_REQ_BY_POSITION = 2130;
+  PROTO_OA_DEAL_LIST_RES_BY_POSITION = 2131;
+
+  PROTO_OA_EXPECTED_MARGIN_REQ = 2132;
+  PROTO_OA_EXPECTED_MARGIN_RES = 2133;
+
+  PROTO_OA_MARGIN_CHANGED_EVENT = 2134;
+
+  PROTO_OA_GET_AVAILABLE_MARGIN_REQ = 2135;
+  PROTO_OA_GET_AVAILABLE_MARGIN_RES = 2136;
+
+  PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ = 2137;
+  PROTO_OA_CASH_FLOW_HISTORY_LIST_RES = 2138;
+
+  PROTO_OA_CHANGE_PASSWORD_REQ = 2139;
+  PROTO_OA_CHANGE_PASSWORD_RES = 2140;
+
+  PROTO_OA_GET_DYNAMIC_LEVERAGE_REQ = 2141;
+  PROTO_OA_GET_DYNAMIC_LEVERAGE_RES = 2142;
+}
       `,
-      'OpenApi.proto': `
+      OpenApi: `
 syntax = "proto3";
 package ProtoOA;
+
+import "Common.proto";
 
 message ProtoOAApplicationAuthReq {
   string clientId = 1;
@@ -44,6 +150,13 @@ message ProtoOAGetAccountListByAccessTokenRes {
 message ProtoOATraderAccount {
   uint64 ctidTraderAccountId = 1;
   string accountId = 2;
+  bool isLive = 3;
+  bool isTradeAllowed = 4;
+  bool hasServerSideRequotes = 5;
+  uint32 brokerName = 6;
+  uint32 leverageInCents = 7;
+  uint32 maxLeverage = 8;
+  double depositAssetRate = 9;
 }
 
 message ProtoOAAccountAuthReq {
@@ -63,6 +176,7 @@ message ProtoOADealListReq {
 
 message ProtoOADealListRes {
   repeated ProtoOADeal deal = 1;
+  bool hasMore = 2;
 }
 
 message ProtoOADeal {
@@ -76,6 +190,23 @@ message ProtoOADeal {
   string tradeSide = 8;
   int64 createTimestamp = 9;
   int64 closeTimestamp = 10;
+  string commission = 11;
+  string swap = 12;
+  uint32 commissionCurrency = 13;
+  uint32 swapCurrency = 14;
+  double balance = 15;
+  double balanceVersion = 16;
+  string comment = 17;
+  string executionTimestamp = 18;
+  double marginRate = 19;
+  uint32 balanceCurrency = 20;
+  double grossProfit = 21;
+  double grossProfitCurrency = 22;
+  string nextStreamBarrierId = 23;
+  string prevStreamBarrierId = 24;
+  double distance = 25;
+  string dealIdString = 26;
+  string positionIdString = 27;
 }
 
 message ProtoOAErrorRes {
@@ -84,18 +215,31 @@ message ProtoOAErrorRes {
   string maintenanceEndTimestamp = 3;
 }
       `,
-      'OpenApiMessages.proto': `
+      OpenApiMessages: `
 syntax = "proto3";
 package ProtoOA;
+
+import "Common.proto";
       `,
-      'OpenApiModelMessages.proto': `
+      OpenApiModelMessages: `
 syntax = "proto3";
 package ProtoOA;
+
+import "Common.proto";
       `
     };
 
-    protoRoot = await protobuf.load(Object.values(protoFiles));
-    console.log('✅ Proto files loaded successfully (inline)');
+    protoRoot = new protobuf.Root();
+
+    // Parse each proto string and add to Root
+    for (const [name, protoString] of Object.entries(protoDefinitions)) {
+      const parsed = protobuf.parse(protoString, { keepCase: true });
+      protoRoot.add(parsed.root);
+      console.log(`✅ Parsed ${name}.proto successfully`);
+    }
+
+    protoRoot.resolveAll(); // Resolve imports between proto files
+    console.log('✅ All proto definitions loaded and resolved');
 
     return protoRoot;
   } catch (error) {
@@ -106,10 +250,11 @@ package ProtoOA;
 
 // Helper to send message over WS
 const sendMessage = (ws, messageType, payload) => {
-  const ProtoMessage = protoRoot.lookupType('ProtoMessage');
+  const ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
   const fullMessageType = messageType.startsWith('ProtoOA.') ? messageType : 'ProtoOA.' + messageType;
-  const payloadType = protoRoot.lookupType(fullMessageType).payloadType;
-  const encodedPayload = protoRoot.lookupType(fullMessageType).encode(payload).finish();
+  const messageTypeObj = protoRoot.lookupType(fullMessageType);
+  const payloadType = messageTypeObj.payloadType;
+  const encodedPayload = messageTypeObj.encode(payload).finish();
   const message = ProtoMessage.create({ payloadType, payload: encodedPayload });
   console.log('📤 Sending message:', fullMessageType, 'payloadType:', payloadType);
   ws.send(ProtoMessage.encode(message).finish());
@@ -250,7 +395,7 @@ const fetchAndAnalyzeTrades = async (isDemo = false) => { // Default to live for
           return;
         }
 
-        const payload = root.lookupType(messageType).decode(message.payload);
+        const payload = root.lookupType('ProtoOA.' + messageType).decode(message.payload);
         console.log('📋 Decoded message:', messageType, 'payload:', JSON.stringify(payload, null, 2));
 
         // Handle different message types
