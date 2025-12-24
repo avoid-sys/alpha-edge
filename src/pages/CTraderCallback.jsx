@@ -58,8 +58,9 @@ const CTraderCallback = () => {
       .then(data => {
         console.log('📡 Server response data:', data); // Log full response for debugging
 
-        if (data.error) {
-          console.error('❌ Token exchange error from server:', data);
+        // Check for errors first
+        if (data.error || !data.access_token) {
+          console.error('❌ Token exchange failed:', data);
 
           // Special handling for rate limiting
           if (data.spotware_status === 429 || data.error === 'Rate limited by Spotware') {
@@ -77,7 +78,16 @@ const CTraderCallback = () => {
             return;
           }
 
-          throw new Error(data.message || data.details?.error_description || data.error);
+          // Handle malformed client_id or other Spotware errors
+          const errorMessage = data.details?.description ||
+                              data.details?.error_description ||
+                              data.message ||
+                              data.error ||
+                              'Unknown error during token exchange';
+
+          alert(`❌ Ошибка подключения cTrader:\n${errorMessage}\n\nПопробуйте переподключить аккаунт.`);
+          navigate('/connect');
+          return;
         }
 
         // Store tokens (already includes expires_at from server)

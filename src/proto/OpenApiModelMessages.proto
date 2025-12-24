@@ -1,5 +1,4 @@
+// Additional cTrader model messages can be added here if needed
 syntax = "proto3";
 
 package ProtoOA;
-
-// Additional model messages can be added here if needed

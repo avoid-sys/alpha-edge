@@ -20,6 +20,18 @@ export default async function handler(req, res) {
     });
   }
 
+  // Validate cTrader credentials
+  if (!process.env.CTRADER_CLIENT_ID || !process.env.CTRADER_CLIENT_SECRET) {
+    console.error('❌ Missing cTrader credentials:', {
+      hasClientId: !!process.env.CTRADER_CLIENT_ID,
+      hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET
+    });
+    return res.status(500).json({
+      error: 'Server configuration error',
+      message: 'cTrader credentials not configured'
+    });
+  }
+
   // Log request for debugging (without sensitive data)
   console.log('🔄 cTrader token exchange request received:', {
     hasCode: !!code,
@@ -31,6 +43,7 @@ export default async function handler(req, res) {
   // Log environment variables (without secrets)
   console.log('🔧 Environment check:', {
     hasClientId: !!process.env.CTRADER_CLIENT_ID,
+    clientIdValue: process.env.CTRADER_CLIENT_ID, // Show actual value for debugging
     clientIdLength: process.env.CTRADER_CLIENT_ID?.length,
     hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET,
     clientSecretLength: process.env.CTRADER_CLIENT_SECRET?.length,
