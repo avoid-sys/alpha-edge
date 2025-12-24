@@ -7,12 +7,69 @@ const loadProtos = async () => {
   if (protoRoot) return protoRoot;
 
   try {
-    protoRoot = await protobuf.load([
-      'src/proto/Common.proto',
-      'src/proto/OpenApi.proto',
-      'src/proto/OpenApiMessages.proto',
-      'src/proto/OpenApiModelMessages.proto'
-    ]);
+    // Load proto files - in production these need to be available
+    // For now, we'll create the root manually with our definitions
+    protoRoot = new protobuf.Root();
+
+    // Add basic message types that we need
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoMessage")
+      .add(new protobuf.Field("payloadType", 1, "uint32"))
+      .add(new protobuf.Field("payload", 2, "bytes")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOAApplicationAuthReq")
+      .add(new protobuf.Field("clientId", 1, "string"))
+      .add(new protobuf.Field("clientSecret", 2, "string")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOAApplicationAuthRes")
+      .add(new protobuf.Field("result", 1, "bool")));
+
+    // Add other message types as needed
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOAGetAccountListByAccessTokenReq")
+      .add(new protobuf.Field("accessToken", 1, "string")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOAGetAccountListByAccessTokenRes")
+      .add(new protobuf.Field("ctidTraderAccount", 1, "ProtoOATraderAccount", "repeated")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOATraderAccount")
+      .add(new protobuf.Field("ctidTraderAccountId", 1, "uint64"))
+      .add(new protobuf.Field("accountId", 2, "string")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOAAccountAuthReq")
+      .add(new protobuf.Field("ctidTraderAccountId", 1, "uint64"))
+      .add(new protobuf.Field("accessToken", 2, "string")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOAAccountAuthRes")
+      .add(new protobuf.Field("result", 1, "bool")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOADealListReq")
+      .add(new protobuf.Field("ctidTraderAccountId", 1, "uint64"))
+      .add(new protobuf.Field("fromTimestamp", 2, "int64"))
+      .add(new protobuf.Field("toTimestamp", 3, "int64")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOADealListRes")
+      .add(new protobuf.Field("deal", 1, "ProtoOADeal", "repeated")));
+
+    protoRoot.define("ProtoOA").add(new protobuf.Type("ProtoOADeal")
+      .add(new protobuf.Field("dealId", 1, "uint64"))
+      .add(new protobuf.Field("positionId", 2, "uint64"))
+      .add(new protobuf.Field("volume", 3, "uint64"))
+      .add(new protobuf.Field("symbolId", 4, "string"))
+      .add(new protobuf.Field("executedPrice", 5, "double"))
+      .add(new protobuf.Field("profit", 6, "double"))
+      .add(new protobuf.Field("dealStatus", 7, "string"))
+      .add(new protobuf.Field("tradeSide", 8, "string"))
+      .add(new protobuf.Field("createTimestamp", 9, "int64"))
+      .add(new protobuf.Field("closeTimestamp", 10, "int64")));
+
+    // Set up payload type mappings
+    protoRoot.lookupType("ProtoOA.ProtoOAApplicationAuthReq").payloadType = 2100;
+    protoRoot.lookupType("ProtoOA.ProtoOAApplicationAuthRes").payloadType = 2101;
+    protoRoot.lookupType("ProtoOA.ProtoOAGetAccountListByAccessTokenReq").payloadType = 2149;
+    protoRoot.lookupType("ProtoOA.ProtoOAGetAccountListByAccessTokenRes").payloadType = 2150;
+    protoRoot.lookupType("ProtoOA.ProtoOAAccountAuthReq").payloadType = 2103;
+    protoRoot.lookupType("ProtoOA.ProtoOAAccountAuthRes").payloadType = 2104;
+    protoRoot.lookupType("ProtoOA.ProtoOADealListReq").payloadType = 2124;
+    protoRoot.lookupType("ProtoOA.ProtoOADealListRes").payloadType = 2125;
     return protoRoot;
   } catch (error) {
     console.error('Failed to load cTrader proto files:', error);

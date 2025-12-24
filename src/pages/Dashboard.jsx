@@ -93,6 +93,14 @@ export default function Dashboard() {
           if (!fetchedProfile && localStorage.getItem('ctrader_tokens')) {
             console.log('🔄 cTrader tokens found but no profile - attempting to create profile from cTrader data');
             try {
+              // Check if tokens are still valid
+              const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
+              if (Date.now() > tokens.expires_at) {
+                console.log('⚠️ cTrader tokens expired, user needs to reconnect');
+                // Don't try to create profile with expired tokens
+                return;
+              }
+
               // Import fetchAndAnalyzeTrades dynamically to avoid circular dependency
               const { fetchAndAnalyzeTrades } = await import('@/services/cTraderService');
               const trades = await fetchAndAnalyzeTrades(false); // false for live account
@@ -116,6 +124,11 @@ export default function Dashboard() {
               }
             } catch (error) {
               console.error('❌ Failed to create profile from cTrader data:', error);
+              // If tokens are expired, don't show error - just skip profile creation
+              if (!error.message.includes('expired')) {
+                // Show other errors to user
+                console.warn('cTrader profile creation failed:', error.message);
+              }
             }
           }
         }
