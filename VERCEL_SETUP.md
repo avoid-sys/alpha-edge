@@ -28,10 +28,12 @@ VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
 
 #### cTrader Server-side (for Vercel serverless functions)
 ```
-CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for token exchange (same as client-side)
-CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for token exchange (REQUIRED!)
+CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe       # Client secret (REQUIRED!)
 CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
+
+**🚨 CRITICAL: These variables MUST be set in Vercel for cTrader to work!**
 
 #### ⚠️ CRITICAL: cTrader ID Formats (Updated!)
 **cTrader uses CONSISTENT FULL Client ID for ALL operations!**
