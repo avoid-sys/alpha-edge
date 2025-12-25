@@ -88,9 +88,7 @@ export default function Dashboard() {
       let fetchedProfile = null;
       let fetchedTrades = [];
 
-      try {
-
-        // Check if we have cTrader tokens - if yes, prioritize cTrader data
+      // Check if we have cTrader tokens - if yes, prioritize cTrader data
         const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
 
         if (profileId) {
@@ -674,8 +672,6 @@ export default function Dashboard() {
           setProfile(null);
           setTrades([]);
         }
-      } catch (error) {
-        console.error("Error fetching data", error);
       } finally {
         console.log('🏁 Dashboard data loading completed, setting loading to false');
         console.log('📊 Final state - profile:', fetchedProfile?.id || 'none', 'trades:', fetchedTrades?.length || 0);
