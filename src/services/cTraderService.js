@@ -458,7 +458,20 @@ export const startCtraderFlow = async (isDemo = false) => {
       try {
         const arrayBuffer = await event.data.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-        const ProtoMessage = protoRoot.lookupType('ProtoMessage');
+
+        // Try to find ProtoMessage type
+        let ProtoMessage;
+        try {
+          ProtoMessage = protoRoot.lookupType('ProtoMessage');
+        } catch (e) {
+          try {
+            ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
+          } catch (e2) {
+            console.error('❌ Cannot find ProtoMessage type for decoding incoming message');
+            return;
+          }
+        }
+
         const message = ProtoMessage.decode(uint8Array);
         const payloadTypeNum = message.payloadType;
         console.log('📨 Received payloadType:', payloadTypeNum);
