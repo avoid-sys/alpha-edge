@@ -117,7 +117,7 @@ export default function Dashboard() {
               ctraderStartedRef.current = false;
               fetchedProfile = null;
               fetchedTrades = [];
-              return;
+              // Continue to UI state setting
             }
 
             ctraderStartedRef.current = true;
@@ -352,7 +352,7 @@ export default function Dashboard() {
             }
           }
 
-          return; // Exit early - we've handled cTrader data
+          // Continue to UI state setting below
         } else {
           try {
             // Try to find profile by current user email
@@ -403,11 +403,13 @@ export default function Dashboard() {
             console.log('🔄 cTrader tokens found - attempting to create/update profile from cTrader data');
             console.log('📊 Current profile status:', fetchedProfile ? `file profile ${fetchedProfile.id} exists` : 'no profile');
 
-            // Prevent multiple simultaneous cTrader flows
-            if (ctraderStartedRef.current) {
-              console.log('⚠️ cTrader flow already started, skipping');
-              return;
-            }
+          // Prevent multiple simultaneous cTrader flows
+          if (ctraderStartedRef.current) {
+            console.log('⚠️ cTrader flow already started, skipping');
+            fetchedProfile = null;
+            fetchedTrades = [];
+            // Continue to UI state setting
+          }
 
             try {
               // Check if tokens are still valid
