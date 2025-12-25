@@ -1472,8 +1472,9 @@ export default function Dashboard() {
       localStorage.removeItem('ctrader_account_id');
       console.log('🧹 Cleared cTrader data from localStorage');
 
-      // Refresh the page to show empty state
-      window.location.reload();
+      // Redirect to connect page to start fresh
+      console.log('🔄 Redirecting to connect page after data unlink');
+      window.location.href = '/connect';
 
     } catch (error) {
       console.error('Error unlinking data:', error);
