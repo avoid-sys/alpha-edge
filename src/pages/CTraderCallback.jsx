@@ -9,6 +9,8 @@ const CTraderCallback = () => {
 
   useEffect(() => {
     const initializeCallback = async () => {
+      console.log('🔄 cTrader OAuth callback started');
+
       // Check if supabase client is available
       if (!supabase) {
         console.error('❌ Supabase client not available');
@@ -16,6 +18,8 @@ const CTraderCallback = () => {
         navigate('/login');
         return;
       }
+
+      console.log('✅ Supabase client available, checking session...');
 
       // First check if user is authenticated in Supabase
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -47,21 +51,38 @@ const CTraderCallback = () => {
         url: window.location.href
       });
 
+      console.log('🔍 URL parameters check:', {
+        fullUrl: window.location.href,
+        searchParams: window.location.search,
+        codeLength: code?.length,
+        stateValue: state,
+        errorValue: error
+      });
+
       if (error) {
-        console.error('cTrader OAuth error:', error);
+        console.error('❌ cTrader OAuth error from URL:', error);
         alert('cTrader connection failed: ' + error);
+        console.log('🔄 Redirecting to /connect due to OAuth error');
         navigate('/connect');
         return;
       }
 
     const storedState = localStorage.getItem('ctrader_state');
+    console.log('🔐 State validation:', {
+      received: state,
+      stored: storedState,
+      match: state === storedState,
+      hasCode: !!code
+    });
+
     if (state !== storedState || !code) {
-      console.error('State validation failed:', {
+      console.error('❌ State validation failed:', {
         received: state,
         stored: storedState,
         hasCode: !!code
       });
       alert('Invalid state or no authorization code received from cTrader');
+      console.log('🔄 Redirecting to /connect due to state validation failure');
       navigate('/connect');
       return;
     }
@@ -69,6 +90,7 @@ const CTraderCallback = () => {
     // Exchange authorization code for access token via serverless API
     const redirectUri = getRedirectUri();
     console.log('🔑 Starting server-side token exchange with redirectUri:', redirectUri);
+    console.log('📡 Preparing token exchange request...');
 
     console.log('📡 Making request to: /api/ctrader/token-exchange');
 
