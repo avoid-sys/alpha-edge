@@ -75,7 +75,13 @@ CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 - "Application authentication failed" = wrong WebSocket clientId format
 - "429 Too Many Requests" = rate limit exceeded, wait 5-15 minutes before retrying
 - HTML response instead of JSON = rate limit or authorization code expired
-- WebSocket closes immediately = demo accounts may not support OpenAPI (create separate demo app)
+- WebSocket closes immediately = check credentials and account setup
+
+**Multiple Accounts Support:**
+- ✅ Platform processes ALL user accounts (demo + live) automatically
+- ✅ Combines trades and calculates unified statistics
+- ✅ Shows account count in UI when multiple accounts detected
+- ✅ Works with any combination of demo/live accounts
 
 **Demo Account Setup:**
 1. Create separate cTrader app for demo accounts: https://connect.spotware.com/apps
