@@ -432,7 +432,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         const PayloadType = protoRoot.lookupType(`ProtoOA.${typeName}`);
         const payload = PayloadType.decode(message.payload);
 
-        if (payloadTypeNum === 2101) { // ProtoOAApplicationAuthRes - app auth success
+        if (payloadTypeNum === 2142) { // ProtoOAApplicationAuthRes - app auth success
           console.log('✅ Application authenticated — requesting all accounts');
           sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
             accessToken: tokens.access_token
