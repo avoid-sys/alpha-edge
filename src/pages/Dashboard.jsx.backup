@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { localDataService } from '@/services/localDataService';
 import { securityService } from '@/services/securityService';
+import { startCtraderFlow } from '@/services/cTraderService';
 import { createPageUrl } from '@/utils';
-import { eloApi } from '@/backend/ELOApi';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/components/AuthProvider';
+import html2canvas from 'html2canvas';
 import {
   TrendingUp,
   TrendingDown,
@@ -17,7 +19,10 @@ import {
   HelpCircle,
   X,
   Edit2,
-  Check
+  Check,
+  Zap,
+  Trash2,
+  Share2
 } from 'lucide-react';
 import { NeumorphicCard, StatBox, NeumorphicButton } from '@/components/NeumorphicUI';
 import {
@@ -34,6 +39,7 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState(null);
   const [trades, setTrades] = useState([]);
   const [rank, setRank] = useState(null);
@@ -43,16 +49,16 @@ export default function Dashboard() {
   const [helpPopup, setHelpPopup] = useState(null); // Current help popup
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
-  const [eloData, setEloData] = useState(null);
-  const [eloLoading, setEloLoading] = useState(false);
 
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
-  console.log('Dashboard component initialized, profileId from URL:', profileId);
   const refreshParam = searchParams.get('refresh');
+  const ctraderStartedRef = useRef(false);
 
   // Check if user is viewing their own profile or someone else's
   const isOwnProfile = !profileId; // No profileId means viewing own profile
+
+  // Check authentication
 
   // Force data refresh when refresh parameter is detected
   useEffect(() => {
@@ -62,29 +68,585 @@ export default function Dashboard() {
   }, [refreshParam]);
 
   useEffect(() => {
+    console.log('🔄 Dashboard useEffect triggered, dataVersion:', dataVersion, 'profileId:', profileId);
+
+    // Wait for auth to load
+    if (authLoading) {
+      console.log('⏳ Waiting for auth to load...');
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!user) {
+      console.log('❌ No authenticated user, cannot load dashboard data');
+      setLoading(false);
+      return;
+    }
+
+    console.log('✅ User authenticated:', user.email, 'loading dashboard data...');
+
     const fetchData = async () => {
-      try {
-        let fetchedProfile = null;
-        let fetchedTrades = [];
-        
+      let fetchedProfile = null;
+      let fetchedTrades = [];
+
+      // Check if we have cTrader tokens - if yes, prioritize cTrader data
+        const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
+
         if (profileId) {
           fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
-        } else {
+        } else if (hasCTraderTokens) {
+          // If we have cTrader tokens, skip profile search and run cTrader flow
+          console.log('🔄 cTrader tokens detected - will load cTrader data instead of existing profiles');
+
+          // Prevent multiple simultaneous cTrader flows
+          if (ctraderStartedRef.current) {
+            console.log('⚠️ cTrader flow already started, skipping');
+            fetchedProfile = null;
+            fetchedTrades = [];
+            return;
+          }
+
           try {
-            const user = await localDataService.getCurrentUser();
-            if (user) {
-              const profiles = await localDataService.entities.TraderProfile.filter({
-                created_by: user.email
-              });
-              if (profiles.length > 0) {
-                fetchedProfile = profiles[0];
-                fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
+            // Check if tokens are still valid
+            const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
+            if (Date.now() > tokens.expires_at) {
+              console.log('⚠️ cTrader tokens expired, user needs to reconnect');
+              // Reset flag on expired tokens
+              ctraderStartedRef.current = false;
+              fetchedProfile = null;
+              fetchedTrades = [];
+              // Continue to UI state setting
+            }
+
+            ctraderStartedRef.current = true;
+
+            // Import startCtraderFlow dynamically to avoid circular dependency
+            const { startCtraderFlow } = await import('@/services/cTraderService');
+
+            // Get account type from localStorage (default to live)
+            const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+            const isDemo = accountType === 'demo';
+
+            console.log('🚀 Starting cTrader flow for', accountType, 'account...');
+            console.log('🔧 isDemo parameter:', isDemo);
+            const trades = await startCtraderFlow(isDemo);
+            console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
+            console.log('📊 Trades data type:', typeof trades, 'isArray:', Array.isArray(trades));
+            if (trades && trades.length > 0) {
+              console.log('📊 First trade sample:', trades[0]);
+            }
+
+            // Process successful cTrader data
+            if (trades && trades.length > 0) {
+              console.log('🔄 Creating profile from', trades.length, 'cTrader trades...');
+
+              // Reset flag on success
+              ctraderStartedRef.current = false;
+
+              // Use Supabase user (already checked above)
+              try {
+
+                // Get account type for profile naming
+                const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                const isLiveAccount = accountType === 'live';
+
+                // Calculate basic metrics for profile creation
+                const totalTrades = trades.length;
+                const winningTrades = trades.filter(t => t.profit > 0).length;
+                const losingTrades = totalTrades - winningTrades;
+                const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
+                const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+                // Create new profile
+                const profileData = {
+                  name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  is_live_account: isLiveAccount,
+                  trader_score: Math.round(winRate * 10), // Simple score based on win rate
+                  total_trades: totalTrades,
+                  winning_trades: winningTrades,
+                  losing_trades: losingTrades,
+                  total_profit: totalProfit,
+                  win_rate: winRate,
+                  created_by: user.email, // user is from Supabase auth
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+
+                console.log('📝 Creating cTrader profile with data:', profileData);
+                const newProfile = await localDataService.entities.TraderProfile.create(profileData);
+
+                console.log('✅ Created cTrader profile:', newProfile.id, 'for user:', user.email);
+
+                // Save trades to database
+                for (const trade of trades) {
+                  await localDataService.entities.Trade.create({
+                    ...trade,
+                    trader_profile_id: newProfile.id,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  });
+                }
+                console.log('✅ Saved', trades.length, 'trades to database');
+
+                // Set as current profile
+                fetchedProfile = newProfile;
+                fetchedTrades = trades;
+
+                // Force reload of data
+                const newDataVersion = dataVersion + 1;
+                console.log('🔄 Setting dataVersion from', dataVersion, 'to', newDataVersion);
+                setDataVersion(newDataVersion);
+                console.log('🎉 cTrader profile creation completed successfully');
+
+              } catch (profileError) {
+                console.error('❌ Failed to create profile from trades:', profileError);
+                throw profileError;
+              }
+            } else {
+              console.log('⚠️ No trades received from cTrader, creating empty profile for metrics display');
+
+              // Reset flag even for empty trades
+              ctraderStartedRef.current = false;
+
+              // Create empty profile to show metrics (win rate 0%, etc.)
+              try {
+                const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                const isLiveAccount = accountType === 'live';
+
+                const emptyProfileData = {
+                  name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  is_live_account: isLiveAccount,
+                  trader_score: 0,
+                  total_trades: 0,
+                  winning_trades: 0,
+                  losing_trades: 0,
+                  total_profit: 0,
+                  total_loss: 0,
+                  win_rate: 0,
+                  avg_win: 0,
+                  avg_loss: 0,
+                  largest_win: 0,
+                  largest_loss: 0,
+                  profit_factor: 0,
+                  expectancy: 0,
+                  sharpe_ratio: 0,
+                  max_drawdown: 0,
+                  recovery_factor: 0,
+                  calmar_ratio: 0,
+                  total_trading_days: 0,
+                  avg_trades_per_day: 0,
+                  best_day: 0,
+                  worst_day: 0,
+                  consecutive_wins: 0,
+                  consecutive_losses: 0,
+                  max_consecutive_wins: 0,
+                  max_consecutive_losses: 0,
+                  total_fees: 0,
+                  net_profit: 0,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+
+                const { data: newProfile, error: profileError } = await supabase
+                  .from('profiles')
+                  .insert(emptyProfileData)
+                  .select()
+                  .single();
+
+                if (profileError) throw profileError;
+
+                // Save empty trades array
+                const { error: tradesError } = await supabase
+                  .from('trades')
+                  .insert([]);
+
+                if (tradesError) {
+                  console.warn('Warning: Could not save empty trades:', tradesError);
+                }
+
+                fetchedProfile = newProfile;
+                fetchedTrades = [];
+
+                // Force reload of data
+                setDataVersion(prev => prev + 1);
+                console.log('🎉 Empty cTrader profile created successfully');
+
+              } catch (emptyProfileError) {
+                console.error('❌ Failed to create empty cTrader profile:', emptyProfileError);
+                // Don't throw - just log the error
               }
             }
-          } catch (e) {
-            // Not logged in or no profile
+
+          } catch (error) {
+            console.error('❌ Failed to create profile from cTrader data:', error);
+            // Reset flag on error
+            ctraderStartedRef.current = false;
+
+            // Even on error, create empty cTrader profile to show metrics
+            console.log('⚠️ cTrader flow failed, creating empty profile anyway...');
+            try {
+              const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+              const isLiveAccount = accountType === 'live';
+
+              const emptyProfileData = {
+                name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                is_live_account: isLiveAccount,
+                trader_score: 0,
+                total_trades: 0,
+                winning_trades: 0,
+                losing_trades: 0,
+                total_profit: 0,
+                total_loss: 0,
+                win_rate: 0,
+                avg_win: 0,
+                avg_loss: 0,
+                largest_win: 0,
+                largest_loss: 0,
+                profit_factor: 0,
+                expectancy: 0,
+                sharpe_ratio: 0,
+                max_drawdown: 0,
+                recovery_factor: 0,
+                calmar_ratio: 0,
+                total_trading_days: 0,
+                avg_trades_per_day: 0,
+                best_day: 0,
+                worst_day: 0,
+                consecutive_wins: 0,
+                consecutive_losses: 0,
+                max_consecutive_wins: 0,
+                max_consecutive_losses: 0,
+                total_fees: 0,
+                net_profit: 0,
+                created_by: user.email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+
+              console.log('📝 Creating empty cTrader profile due to error:', emptyProfileData);
+              const { data: newProfile, error: profileError } = await supabase
+                .from('profiles')
+                .insert(emptyProfileData)
+                .select()
+                .single();
+
+              if (profileError) throw profileError;
+
+              fetchedProfile = newProfile;
+              fetchedTrades = [];
+
+              // Force reload of data
+              setDataVersion(prev => prev + 1);
+              console.log('🎉 Empty cTrader profile created despite error');
+
+            } catch (emptyProfileError) {
+              console.error('❌ Failed to create empty cTrader profile on error:', emptyProfileError);
+            }
+
+            // If tokens are expired, don't show error - just skip profile creation
+            if (!error.message.includes('expired')) {
+              // Show other errors to user
+              console.warn('cTrader profile creation failed:', error.message);
+            }
           }
+
+          // Continue to UI state setting below
+        } else {
+          try {
+            // Try to find profile by current user email
+            console.log('🔍 Searching for profiles for user:', user.email);
+            let profiles = await localDataService.entities.TraderProfile.filter({
+              created_by: user.email
+            });
+            console.log('📊 Found profiles by user email:', profiles.length);
+
+            // If no profile found by user email, try local email (for file imports)
+            if (profiles.length === 0) {
+              console.log('No profiles found for user email, checking for local imports...');
+              profiles = await localDataService.entities.TraderProfile.filter({
+                created_by: 'local@alphaedge.com'
+              });
+              console.log('📊 Found profiles by local email:', profiles.length);
+            }
+
+            // If still no profiles, try to find any profile (fallback)
+            if (profiles.length === 0) {
+              console.log('No user-specific profiles found, checking for any profiles...');
+              const allProfiles = await localDataService.entities.TraderProfile.getAll();
+              console.log('📊 Total profiles in database:', allProfiles.length);
+              if (allProfiles.length > 0) {
+                profiles = [allProfiles[0]]; // Use first available profile
+                console.log('Using first available profile:', profiles[0].id, 'created by:', profiles[0].created_by);
+              }
+            }
+
+            if (profiles.length > 0) {
+              fetchedProfile = profiles[0];
+              console.log('📋 Loading trades for profile:', fetchedProfile.id);
+              fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
+              console.log('✅ Found profile:', fetchedProfile.id, 'with', fetchedTrades.length, 'trades');
+              console.log('📊 Profile details:', {
+                nickname: fetchedProfile.nickname,
+                broker: fetchedProfile.broker,
+                created_by: fetchedProfile.created_by,
+                is_live_account: fetchedProfile.is_live_account
+              });
+            } else {
+              console.log('⚠️ No profiles found for dashboard');
+            }
+          } catch (e) {
+            console.error('❌ Error fetching profiles:', e);
+          }
+
+            console.log('🔄 cTrader tokens found - attempting to create/update profile from cTrader data');
+            console.log('📊 Current profile status:', fetchedProfile ? `file profile ${fetchedProfile.id} exists` : 'no profile');
+
+          // Prevent multiple simultaneous cTrader flows
+          if (ctraderStartedRef.current) {
+            console.log('⚠️ cTrader flow already started, skipping');
+            fetchedProfile = null;
+            fetchedTrades = [];
+            // Continue to UI state setting
+          }
+
+            try {
+              // Check if tokens are still valid
+              const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
+              if (Date.now() > tokens.expires_at) {
+                console.log('⚠️ cTrader tokens expired, user needs to reconnect');
+                // Reset flag on expired tokens
+                ctraderStartedRef.current = false;
+                // Don't try to create profile with expired tokens
+                return;
+              }
+
+              ctraderStartedRef.current = true;
+
+              // Import startCtraderFlow dynamically to avoid circular dependency
+              const { startCtraderFlow } = await import('@/services/cTraderService');
+
+              // Get account type from localStorage (default to live)
+              const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+              const isDemo = accountType === 'demo';
+
+              console.log('🚀 Starting cTrader flow for', accountType, 'account...');
+              console.log('🔧 isDemo parameter:', isDemo);
+              const trades = await startCtraderFlow(isDemo);
+              console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
+              console.log('📊 Trades data type:', typeof trades, 'isArray:', Array.isArray(trades));
+              if (trades && trades.length > 0) {
+                console.log('📊 First trade sample:', trades[0]);
+              }
+
+              if (trades && trades.length > 0) {
+                console.log('🔄 Creating profile from', trades.length, 'cTrader trades...');
+
+                // Reset flag on success
+                ctraderStartedRef.current = false;
+
+                // Use Supabase user (already checked above)
+                try {
+
+                  // Get account type for profile naming
+                  const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                  const isLiveAccount = accountType === 'live';
+
+                  // Calculate basic metrics for profile creation
+                  const totalTrades = trades.length;
+                  const winningTrades = trades.filter(t => t.profit > 0).length;
+                  const losingTrades = totalTrades - winningTrades;
+                  const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
+                  const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+                  // Create new profile
+                  const profileData = {
+                    name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                    is_live_account: isLiveAccount,
+                    trader_score: Math.round(winRate * 10), // Simple score based on win rate
+                    total_trades: totalTrades,
+                    winning_trades: winningTrades,
+                    losing_trades: losingTrades,
+                    total_profit: totalProfit,
+                    win_rate: winRate,
+                    created_by: user.email, // user is from Supabase auth
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+
+                  console.log('📝 Creating cTrader profile with data:', profileData);
+                  const newProfile = await localDataService.entities.TraderProfile.create(profileData);
+                  console.log('✅ Created cTrader profile:', newProfile.id, 'for user:', user.email);
+
+                  // Save trades to database
+                  for (const trade of trades) {
+                    await localDataService.entities.Trade.create({
+                      ...trade,
+                      trader_profile_id: newProfile.id,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString()
+                    });
+                  }
+                  console.log('✅ Saved', trades.length, 'trades to database');
+
+                  // Set as current profile
+                  fetchedProfile = newProfile;
+                  fetchedTrades = trades;
+
+                  // Force reload of data
+                  const newDataVersion = dataVersion + 1;
+                  console.log('🔄 Setting dataVersion from', dataVersion, 'to', newDataVersion);
+                  setDataVersion(newDataVersion);
+                  console.log('🎉 cTrader profile creation completed successfully');
+
+                } catch (profileError) {
+                  console.error('❌ Failed to create profile from trades:', profileError);
+                  throw profileError;
+                }
+              } else {
+                console.log('⚠️ No trades received from cTrader, creating empty profile for metrics display');
+
+                // Reset flag even for empty trades
+                ctraderStartedRef.current = false;
+
+                // Create empty profile to show metrics (win rate 0%, etc.)
+                try {
+                  const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                  const isLiveAccount = accountType === 'live';
+
+                  const emptyProfileData = {
+                    name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                    is_live_account: isLiveAccount,
+                    trader_score: 0,
+                    total_trades: 0,
+                    winning_trades: 0,
+                    losing_trades: 0,
+                    total_profit: 0,
+                    total_loss: 0,
+                    win_rate: 0,
+                    avg_win: 0,
+                    avg_loss: 0,
+                    largest_win: 0,
+                    largest_loss: 0,
+                    profit_factor: 0,
+                    expectancy: 0,
+                    sharpe_ratio: 0,
+                    max_drawdown: 0,
+                    recovery_factor: 0,
+                    calmar_ratio: 0,
+                    total_trading_days: 0,
+                    avg_trades_per_day: 0,
+                    best_day: 0,
+                    worst_day: 0,
+                    consecutive_wins: 0,
+                    consecutive_losses: 0,
+                    max_consecutive_wins: 0,
+                    max_consecutive_losses: 0,
+                    total_fees: 0,
+                    net_profit: 0,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+
+                  const { data: newProfile, error: profileError } = await supabase
+                    .from('profiles')
+                    .insert(emptyProfileData)
+                    .select()
+                    .single();
+
+                  if (profileError) throw profileError;
+
+                  // Save empty trades array
+                  const { error: tradesError } = await supabase
+                    .from('trades')
+                    .insert([]);
+
+                  if (tradesError) {
+                    console.warn('Warning: Could not save empty trades:', tradesError);
+                  }
+
+                  fetchedProfile = newProfile;
+                  fetchedTrades = [];
+
+                  // Force reload of data
+                  setDataVersion(prev => prev + 1);
+                  console.log('🎉 Empty cTrader profile created successfully');
+
+                } catch (emptyProfileError) {
+                  console.error('❌ Failed to create empty cTrader profile:', emptyProfileError);
+                  // Don't throw - just log the error
+                }
+              }
+            } catch (error) {
+              console.error('❌ Failed to create profile from cTrader data:', error);
+              // Reset flag on error
+              ctraderStartedRef.current = false;
+
+              // Even on error, create empty cTrader profile to show metrics
+              console.log('⚠️ cTrader flow failed, creating empty profile anyway...');
+              try {
+                const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                const isLiveAccount = accountType === 'live';
+
+                const emptyProfileData = {
+                  name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  is_live_account: isLiveAccount,
+                  trader_score: 0,
+                  total_trades: 0,
+                  winning_trades: 0,
+                  losing_trades: 0,
+                  total_profit: 0,
+                  total_loss: 0,
+                  win_rate: 0,
+                  avg_win: 0,
+                  avg_loss: 0,
+                  largest_win: 0,
+                  largest_loss: 0,
+                  profit_factor: 0,
+                  expectancy: 0,
+                  sharpe_ratio: 0,
+                  max_drawdown: 0,
+                  recovery_factor: 0,
+                  calmar_ratio: 0,
+                  total_trading_days: 0,
+                  avg_trades_per_day: 0,
+                  best_day: 0,
+                  worst_day: 0,
+                  consecutive_wins: 0,
+                  consecutive_losses: 0,
+                  max_consecutive_wins: 0,
+                  max_consecutive_losses: 0,
+                  total_fees: 0,
+                  net_profit: 0,
+                  created_by: user.email,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+
+                console.log('📝 Creating empty cTrader profile due to error:', emptyProfileData);
+                const { data: newProfile, error: profileError } = await supabase
+                  .from('profiles')
+                  .insert(emptyProfileData)
+                  .select()
+                  .single();
+
+                if (profileError) throw profileError;
+
+                fetchedProfile = newProfile;
+                fetchedTrades = [];
+
+                // Force reload of data
+                setDataVersion(prev => prev + 1);
+                console.log('🎉 Empty cTrader profile created despite error');
+
+              } catch (emptyProfileError) {
+                console.error('❌ Failed to create empty cTrader profile on error:', emptyProfileError);
+              }
+
+              // If tokens are expired, don't show error - just skip profile creation
+              if (!error.message.includes('expired')) {
+                // Show other errors to user
+                console.warn('cTrader profile creation failed:', error.message);
         }
         
         // Calculate rank based on trader score - only for live connected accounts
@@ -98,25 +660,28 @@ export default function Dashboard() {
           setRank(null); // No rank for demo/file-only accounts
         }
 
-        if (fetchedProfile && fetchedTrades.length > 0) {
-          // Use real data from uploaded files
-          console.log('Setting profile with real data:', fetchedProfile.name);
+        if (fetchedProfile) {
+          // Use profile data (can have 0 trades)
+          console.log('🎯 Setting UI state - profile:', fetchedProfile.id, 'trades:', fetchedTrades.length);
+          console.log('🎯 Profile data:', fetchedProfile);
+          console.log('🎯 Trades data:', fetchedTrades);
           setProfile(fetchedProfile);
-          setTrades(fetchedTrades);
+          setTrades(fetchedTrades || []);
         } else {
-          // Show empty state - no data uploaded yet
-          console.log('No profile data found, setting to null');
+          // Show empty state - no data available
+          console.log('📭 No profile data available, showing empty state');
           setProfile(null);
           setTrades([]);
         }
-      } catch (error) {
-        console.error("Error fetching data", error);
       } finally {
+        console.log('🏁 Dashboard data loading completed, setting loading to false');
+        console.log('📊 Final state - profile:', fetchedProfile?.id || 'none', 'trades:', fetchedTrades?.length || 0);
         setLoading(false);
       }
     };
+
     fetchData();
-  }, [profileId, dataVersion]);
+  }, [profileId, dataVersion, user, authLoading]);
 
   // Initialize security and load connected platforms on component mount
   useEffect(() => {
@@ -124,238 +689,526 @@ export default function Dashboard() {
     securityService.logSecurityEvent('dashboard_accessed', { profileId });
   }, []);
 
-  const loadELOData = async () => {
-    console.log('loadELOData called with profileId:', profileId, 'profile:', !!profile);
-    setEloLoading(true);
+  // Calculate comprehensive trading metrics based on Python implementation
+  const calculateMetricsFromData = (trades, profile) => {
+    console.log('🔢 calculateMetricsFromData called with:', {
+      tradesCount: trades?.length || 0,
+      hasProfile: !!profile,
+      profileId: profile?.id || 'none'
+    });
+
+    if (!trades || trades.length === 0 || !profile) {
+      console.log('📊 Returning zero metrics (empty data)');
+      return {
+        totalReturn: 0,
+        winRate: 0,
+        profitFactor: 0,
+        expectancy: 0,
+        bestTrade: 0,
+        worstTrade: 0,
+        sharpeRatio: 0,
+        sortinoRatio: 0,
+        calmarRatio: 0,
+        maxDrawdown: 0,
+        avgDrawdown: 0,
+        volatility: 0,
+        annualizedReturn: 0,
+        totalTrades: 0,
+        avgRiskTrade: 0,
+        roughness: 0,
+        positiveMonths: 0,
+        freqStd: 0,
+        exposureTime: 0,
+        sqn: 0,
+        recoveryFactor: 0,
+        accountAge: 0,
+        tradingDays: 0,
+        activityRate: 0
+      };
+    }
+
     try {
-      // Always show ELO data - either from profile or mock data
-      let elo = null;
+      // Sort trades by close time
+      const sortedTrades = [...trades].sort((a, b) =>
+        new Date(a.close_time || a.time || 0) - new Date(b.close_time || b.time || 0)
+      );
 
-      if (profileId && profile) {
-        console.log('Loading ELO data for profile:', profileId, 'profile name:', profile.name);
-        // First try to get existing ELO data
-        elo = await eloApi.getTraderELO(profile.id);
-        console.log('ELO data received:', elo);
+      // Calculate initial balance from first trade
+      const firstTrade = sortedTrades[0];
+      const initialBalance = parseFloat(firstTrade.balance || 10000) - parseFloat(firstTrade.net_profit || firstTrade.profit_loss || 0);
 
-        // If no ELO data exists, calculate it automatically
-        if (!elo && profile) {
-          console.log('No existing ELO data, calculating...');
+      // Build equity curve with PROPER COMPOUNDING (like Python)
+      let currentBalance = initialBalance;
+      const balanceSeries = [];
+      const tradeDates = [];
+      const tradeReturns = [];
 
-          // Prepare trade data from profile
-          const tradeData = [];
-          if (profile.trades && profile.trades.length > 0) {
-            profile.trades.forEach(trade => {
-              tradeData.push({
-                openTime: new Date(trade.open_time),
-                closeTime: new Date(trade.close_time),
-                pnl: trade.profit_loss,
-                entryPrice: trade.entry_price,
-                exitPrice: trade.exit_price,
-                positionSize: trade.position_size
-              });
-            });
-          }
+      sortedTrades.forEach(trade => {
+        const pnl = parseFloat(trade.net_profit || trade.profit_loss || 0);
+        const prevBalance = currentBalance;
+        // Compounding: multiply by (1 + return), not add PnL
+        const tradeReturn = prevBalance > 0 ? pnl / prevBalance : 0;
+        currentBalance = prevBalance * (1 + tradeReturn);
 
-          // Prepare account data
-          const accountData = {
-            initialBalance: profile.initial_balance || 10000,
-            accountAgeDays: profile.account_age_days || 30,
-            equityHistory: [] // Will be populated from trades if available
-          };
+        balanceSeries.push(currentBalance);
+        tradeDates.push(new Date(trade.close_time || trade.time));
+        tradeReturns.push(tradeReturn);
+      });
 
-          // Calculate ELO
-          const result = await eloApi.calculateTraderELO(tradeData, accountData, profile.id);
-          if (result.success && result.elo) {
-            elo = result.elo;
-          }
+      // Start and End dates (more precise duration calculation)
+      const startDate = tradeDates[0];
+      const endDate = tradeDates[tradeDates.length - 1];
+      const durationMs = endDate - startDate;
+      const durationDays = Math.max(0.001, durationMs / (1000 * 60 * 60 * 24)); // More precise, avoid division by zero
+      const durationYears = durationDays / 365;
+
+      // Equity Final and Peak
+      const equityFinal = balanceSeries[balanceSeries.length - 1];
+      const equityPeak = Math.max(...balanceSeries);
+
+      // Return %
+      const totalReturn = initialBalance > 0 ? ((equityFinal - initialBalance) / initialBalance) * 100 : 0;
+
+      // Build daily equity curve (forward-fill like Python)
+      const dailyEquity = new Map();
+      sortedTrades.forEach((trade, index) => {
+        const dateKey = new Date(trade.close_time || trade.time).toDateString();
+        dailyEquity.set(dateKey, balanceSeries[index]);
+      });
+
+      // Add initial balance at start
+      const startDateKey = new Date(startDate.getTime() - 60 * 60 * 1000).toDateString(); // 1 hour before first trade
+      dailyEquity.set(startDateKey, initialBalance);
+
+      // Daily returns
+      const dailyReturns = [];
+      const dates = Array.from(dailyEquity.keys()).sort((a, b) => new Date(a) - new Date(b));
+      for (let i = 1; i < dates.length; i++) {
+        const prevEquity = dailyEquity.get(dates[i-1]);
+        const currEquity = dailyEquity.get(dates[i]);
+        if (prevEquity > 0) {
+          dailyReturns.push((currEquity - prevEquity) / prevEquity);
         }
       }
 
-      // If we still don't have ELO data, use mock data
-      if (!elo) {
-        console.log('Using mock ELO data as fallback');
-        elo = {
-          traderId: profileId || 'demo',
-          eloScore: 75.5,
-          rawScore: 80.2,
-          reliability: {
-            totalTrades: 150,
-            reliabilityMultiplier: 0.9,
-            dataCoverage: 0.85,
-            confidenceCoefficient: 0.76
-          },
-          blocks: [
-            {
-              name: 'Performance',
-              score: 82.3,
-              confidence: 'high',
-              availableMetrics: 4,
-              totalMetrics: 4,
-              coveragePercent: 100,
-              metrics: [],
-              originalWeight: 0.40,
-              adjustedWeight: 0.40
-            },
-            {
-              name: 'RiskControl',
-              score: 68.7,
-              confidence: 'medium',
-              availableMetrics: 2,
-              totalMetrics: 3,
-              coveragePercent: 67,
-              metrics: [],
-              originalWeight: 0.30,
-              adjustedWeight: 0.30
-            },
-            {
-              name: 'Consistency',
-              score: 88.1,
-              confidence: 'high',
-              availableMetrics: 3,
-              totalMetrics: 3,
-              coveragePercent: 100,
-              metrics: [],
-              originalWeight: 0.15,
-              adjustedWeight: 0.15
-            },
-            {
-              name: 'AccountHealth',
-              score: 72.4,
-              confidence: 'medium',
-              availableMetrics: 2,
-              totalMetrics: 3,
-              coveragePercent: 67,
-              metrics: [],
-              originalWeight: 0.10,
-              adjustedWeight: 0.10
-            },
-            {
-              name: 'Longevity',
-              score: 55.2,
-              confidence: 'high',
-              availableMetrics: 1,
-              totalMetrics: 1,
-              coveragePercent: 100,
-              metrics: [],
-              originalWeight: 0.05,
-              adjustedWeight: 0.05
-            }
-          ],
-          penalties: [],
-          missingMetrics: ['Monthly Positive Ratio', 'Trade Frequency Stability'],
-          lowConfidenceBlocks: ['RiskControl', 'AccountHealth'],
-          category: 'Professional',
-          calculatedAt: new Date(),
-          dataQuality: {
-            hasRequiredFields: true,
-            totalTrades: 150,
-            dataCompleteness: 0.85
-          }
-        };
+      // Annualized Return (more precise compounded calculation)
+      const annReturn = durationDays > 0 ? Math.pow(1 + totalReturn / 100, 365 / durationDays) - 1 : 0;
+      const annReturnPct = annReturn * 100;
+
+      // Volatility (Annualized with 252 trading days - more precise)
+      const avgReturn = dailyReturns.length > 0 ? dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length : 0;
+      const variance = dailyReturns.length > 0 ?
+        dailyReturns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / dailyReturns.length : 0;
+      const stdDev = Math.sqrt(variance);
+      const annVol = dailyReturns.length > 1 ? stdDev * Math.sqrt(252) * 100 : 0;
+
+      // Roughness (daily volatility proxy)
+      const roughness = stdDev;
+
+      // Sharpe Ratio (add risk-free rate = 0)
+      const riskFreeRate = 0.04; // 4% annual
+      const sharpeRatio = annVol > 0 ? (annReturn - riskFreeRate) / (annVol / 100) : 0;
+
+      // Max Drawdown (using daily equity like Python)
+      const cumMax = [];
+      let runningMax = initialBalance;
+
+      // Create daily equity array from map
+      const dailyEquityArray = dates.map(date => dailyEquity.get(date));
+
+      dailyEquityArray.forEach(equity => {
+        runningMax = Math.max(runningMax, equity);
+        cumMax.push(runningMax);
+      });
+
+      const drawdowns = dailyEquityArray.map((equity, i) => (equity - cumMax[i]) / cumMax[i]);
+      const maxDrawdownPct = Math.min(...drawdowns) * -100; // Positive value
+
+      // Trade metrics
+      const totalTrades = sortedTrades.length;
+      const winningTrades = sortedTrades.filter(t => parseFloat(t.net_profit || t.profit_loss || 0) > 0).length;
+      const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+      const tradePnls = sortedTrades.map(t => parseFloat(t.net_profit || t.profit_loss || 0));
+      const bestTrade = Math.max(...tradePnls);
+      const worstTrade = Math.min(...tradePnls);
+      const avgTrade = tradePnls.reduce((a, b) => a + b, 0) / totalTrades;
+
+      // Calculate winning and losing streaks
+      let maxWinStreak = 0;
+      let maxLoseStreak = 0;
+      let currentWinStreak = 0;
+      let currentLoseStreak = 0;
+
+      for (let i = 0; i < tradePnls.length; i++) {
+        const pnl = tradePnls[i];
+        const isWin = pnl > 0;
+        const isLoss = pnl < 0;
+
+        if (isWin) {
+          currentWinStreak++;
+          currentLoseStreak = 0;
+          maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
+        } else if (isLoss) {
+          currentLoseStreak++;
+          currentWinStreak = 0;
+          maxLoseStreak = Math.max(maxLoseStreak, currentLoseStreak);
+        } else {
+          // Break streak on neutral trades
+          currentWinStreak = 0;
+          currentLoseStreak = 0;
+        }
       }
 
-      console.log('Setting ELO data:', elo);
-      setEloData(elo);
-    } catch (error) {
-      console.error('Failed to load/calculate ELO data:', error);
-      // Set mock data as fallback in case of error
-      const fallbackElo = {
-          traderId: profile.id,
-          eloScore: 75.5,
-          rawScore: 80.2,
-          reliability: {
-            totalTrades: 150,
-            reliabilityMultiplier: 0.9,
-            dataCoverage: 0.85,
-            confidenceCoefficient: 0.76
-          },
-          blocks: [
-            {
-              name: 'Performance',
-              score: 82.3,
-              confidence: 'high',
-              availableMetrics: 4,
-              totalMetrics: 4,
-              coveragePercent: 100,
-              metrics: [],
-              originalWeight: 0.40,
-              adjustedWeight: 0.40
-            },
-            {
-              name: 'RiskControl',
-              score: 68.7,
-              confidence: 'medium',
-              availableMetrics: 2,
-              totalMetrics: 3,
-              coveragePercent: 67,
-              metrics: [],
-              originalWeight: 0.30,
-              adjustedWeight: 0.30
-            },
-            {
-              name: 'Consistency',
-              score: 88.1,
-              confidence: 'high',
-              availableMetrics: 3,
-              totalMetrics: 3,
-              coveragePercent: 100,
-              metrics: [],
-              originalWeight: 0.15,
-              adjustedWeight: 0.15
-            },
-            {
-              name: 'AccountHealth',
-              score: 72.4,
-              confidence: 'medium',
-              availableMetrics: 2,
-              totalMetrics: 3,
-              coveragePercent: 67,
-              metrics: [],
-              originalWeight: 0.10,
-              adjustedWeight: 0.10
-            },
-            {
-              name: 'Longevity',
-              score: 55.2,
-              confidence: 'high',
-              availableMetrics: 1,
-              totalMetrics: 1,
-              coveragePercent: 100,
-              metrics: [],
-              originalWeight: 0.05,
-              adjustedWeight: 0.05
-            }
-          ],
-          penalties: [],
-          missingMetrics: ['Monthly Positive Ratio', 'Trade Frequency Stability'],
-          lowConfidenceBlocks: ['RiskControl', 'AccountHealth'],
-          category: 'Professional',
-          calculatedAt: new Date(),
-          dataQuality: {
-            hasRequiredFields: true,
-            totalTrades: 150,
-            dataCompleteness: 0.85
-          }
-        };
-        console.log('Setting fallback mock ELO data:', mockElo);
-        setEloData(mockElo);
-      } finally {
-        setEloLoading(false);
+      // Risk/Trade % (average |PnL| / Prev_Balance * 100 for all trades)
+      const prevBalances = [initialBalance, ...balanceSeries.slice(0, -1)];
+      const riskPcts = tradePnls.map((pnl, i) => {
+        const prevBalance = parseFloat(prevBalances[i] || initialBalance);
+        return prevBalance > 0 ? Math.abs(pnl) / prevBalance * 100 : 0;
+      });
+      const avgRiskTradePct = riskPcts.length > 0 ? riskPcts.reduce((a, b) => a + b, 0) / riskPcts.length : 0;
+
+      // Exposure Time [%]
+      const tradeDurations = sortedTrades.map(trade => {
+        const openTime = new Date(trade.open_time || trade.time);
+        const closeTime = new Date(trade.close_time || trade.time);
+        return closeTime - openTime;
+      });
+      const totalExposureMs = tradeDurations.reduce((a, b) => a + b, 0);
+      const exposureTime = durationMs > 0 ? (totalExposureMs / durationMs) * 100 : 0;
+
+      // Profit Factor
+      const grossProfit = tradePnls.filter(pnl => pnl > 0).reduce((a, b) => a + b, 0);
+      const grossLoss = Math.abs(tradePnls.filter(pnl => pnl < 0).reduce((a, b) => a + b, 0));
+      const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : Infinity;
+
+      // Expectancy
+      const expectancy = avgTrade;
+
+      // Positive Months
+      const monthlyEquity = new Map();
+      dailyEquityArray.forEach((equity, index) => {
+        const date = new Date(dates[index]);
+        const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+        if (!monthlyEquity.has(monthKey)) {
+          monthlyEquity.set(monthKey, []);
+        }
+        monthlyEquity.get(monthKey).push(equity);
+      });
+
+      let positiveMonths = 0;
+      monthlyEquity.forEach(equityValues => {
+        if (equityValues.length >= 2) {
+          const monthReturn = (equityValues[equityValues.length - 1] - equityValues[0]) / equityValues[0];
+          if (monthReturn > 0) positiveMonths++;
+        }
+      });
+
+      // Freq Std (frequency standard deviation - std of daily trade counts)
+      const dailyTradeCounts = new Map();
+      sortedTrades.forEach(trade => {
+        const dateKey = new Date(trade.close_time || trade.time).toDateString();
+        dailyTradeCounts.set(dateKey, (dailyTradeCounts.get(dateKey) || 0) + 1);
+      });
+
+      const tradeCounts = Array.from(dailyTradeCounts.values());
+      const avgTradeCount = tradeCounts.length > 0 ? tradeCounts.reduce((a, b) => a + b, 0) / tradeCounts.length : 0;
+      const tradeCountVariance = tradeCounts.length > 0 ?
+        tradeCounts.reduce((sum, count) => sum + Math.pow(count - avgTradeCount, 2), 0) / tradeCounts.length : 0;
+      const freqStd = Math.sqrt(tradeCountVariance);
+
+      // Sortino Ratio (downside volatility only)
+      const downReturns = dailyReturns.filter(r => r < 0);
+      const downAvg = downReturns.length > 0 ? downReturns.reduce((a, b) => a + b, 0) / downReturns.length : 0;
+      const downVariance = downReturns.length > 0 ?
+        downReturns.reduce((sum, ret) => sum + Math.pow(ret - downAvg, 2), 0) / downReturns.length : 0;
+      const downStdDev = Math.sqrt(downVariance);
+      const annDownVol = downReturns.length > 0 ? downStdDev * Math.sqrt(252) * 100 : 0;
+      const sortinoRatio = annDownVol > 0 ? (annReturn - riskFreeRate) / (annDownVol / 100) : 0;
+
+      // Calmar Ratio
+      const calmarRatio = maxDrawdownPct > 0 ? (annReturnPct / 100) / (maxDrawdownPct / 100) : 0;
+
+      // SQN (System Quality Number) - fixed with safeguard
+      const tradeMean = tradeReturns.length > 0 ? tradeReturns.reduce((a, b) => a + b, 0) / tradeReturns.length : 0;
+      let tradeStdDev = 0;
+      if (tradeReturns.length > 1) {
+        const variance = tradeReturns.reduce((sum, ret) => sum + Math.pow(ret - tradeMean, 2), 0) / tradeReturns.length;
+        tradeStdDev = Math.sqrt(variance);
       }
+      // Safeguard against division by zero or near-zero
+      tradeStdDev = Math.max(tradeStdDev, 1e-6);
+      const sqn = tradeStdDev > 0 ? Math.sqrt(totalTrades) * (tradeMean / tradeStdDev) : 0;
+
+
+      // Recovery Factor - net profit divided by max drawdown amount
+      const maxDDAmount = Math.abs(maxDrawdownPct / 100) * equityPeak;
+      const recoveryFactor = maxDDAmount > 0 ? totalReturn / maxDrawdownPct : 0;
+
+      // Average Drawdown - calculate properly
+      const drawdownPeriods = [];
+      let currentDD = 0;
+      let ddStart = null;
+
+      dailyEquityArray.forEach((equity, i) => {
+        const dd = (equity - cumMax[i]) / cumMax[i];
+        if (dd < 0) {
+          if (ddStart === null) ddStart = i;
+          currentDD = Math.min(currentDD, dd);
+        } else if (ddStart !== null) {
+          drawdownPeriods.push(Math.abs(currentDD));
+          currentDD = 0;
+          ddStart = null;
+        }
+      });
+
+      const avgDrawdownPct = drawdownPeriods.length > 0 ?
+        (drawdownPeriods.reduce((a, b) => a + b, 0) / drawdownPeriods.length) * 100 : 0;
+
+      // Account Age (days)
+      const accountAge = Math.ceil(durationDays);
+
+      // Trading Days (unique days with trades)
+      const tradingDays = new Set(sortedTrades.map(trade => new Date(trade.close_time || trade.time).toDateString())).size;
+
+      // Activity Rate
+      const activityRate = accountAge > 0 ? (tradingDays / accountAge) * 100 : 0;
+
+      const result = {
+        totalReturn: totalReturn,
+        winRate: winRate,
+        profitFactor: profitFactor,
+        expectancy: expectancy,
+        bestTrade: bestTrade,
+        worstTrade: worstTrade,
+        sharpeRatio: sharpeRatio,
+        sortinoRatio: sortinoRatio,
+        calmarRatio: calmarRatio,
+        maxDrawdown: maxDrawdownPct,
+        avgDrawdown: avgDrawdownPct,
+        volatility: annVol,
+        annualizedReturn: annReturnPct,
+        totalTrades: totalTrades,
+        avgRiskTrade: avgRiskTradePct,
+        roughness: roughness,
+        positiveMonths: positiveMonths,
+        freqStd: freqStd,
+        exposureTime: exposureTime,
+        sqn: sqn,
+        recoveryFactor: recoveryFactor,
+        accountAge: accountAge,
+        tradingDays: tradingDays,
+        activityRate: activityRate,
+        maxWinStreak: maxWinStreak,
+        maxLoseStreak: maxLoseStreak,
+        currentStreak: currentWinStreak > 0 ? currentWinStreak : -currentLoseStreak
+      };
+
+      return result;
+
+    } catch (error) {
+      console.error('Error calculating metrics:', error);
+        return {
+          totalReturn: 0,
+          winRate: 0,
+          profitFactor: 0,
+          expectancy: 0,
+          bestTrade: 0,
+          worstTrade: 0,
+          sharpeRatio: 0,
+          sortinoRatio: 0,
+          calmarRatio: 0,
+          maxDrawdown: 0,
+          avgDrawdown: 0,
+          volatility: 0,
+          annualizedReturn: 0,
+          totalTrades: 0,
+          avgRiskTrade: 0,
+          roughness: 0,
+          positiveMonths: 0,
+          freqStd: 0,
+          exposureTime: 0,
+          sqn: 0,
+          recoveryFactor: 0,
+          accountAge: 0,
+          tradingDays: 0,
+          activityRate: 0,
+          maxWinStreak: 0,
+          maxLoseStreak: 0,
+          currentStreak: 0
+        };
     }
   };
 
-  // Load ELO data when component mounts or profile changes
-  useEffect(() => {
-    console.log('Loading ELO data - profile exists:', !!profile, 'profileId:', profileId);
-    loadELOData();
-  }, [profile, profileId]);
+  // Enhanced normalize score helper with cap and edge case handling
+  const normalizeScore = (value, minThresh, excellentThresh, isPositive = true, capValue = null) => {
+    if (value === null || value === undefined || isNaN(value)) return 50.0; // Neutral for missing data
 
-  // Handle name editing
-  useEffect(() => {
-    console.log('Loading ELO data - profile exists:', !!profile, 'profileId:', profileId);
-    loadELOData();
-  }, [profile, profileId]);
+    if (capValue !== null) {
+      if (isPositive) {
+        value = Math.min(value, capValue); // Cap maximum values
+      } else {
+        value = Math.max(value, capValue); // Cap minimum values for negative metrics
+      }
+    }
+
+    if (isPositive) {
+      // For positive metrics: higher value = higher score
+      if (value <= minThresh) return 0;
+      if (value >= excellentThresh) return 100;
+      return (value - minThresh) / (excellentThresh - minThresh) * 100;
+    } else {
+      // For negative metrics: lower value = higher score
+      if (value >= minThresh) return 0; // Worse than poor threshold
+      if (value <= excellentThresh) return 100; // Better than excellent threshold
+      return (minThresh - value) / (minThresh - excellentThresh) * 100;
+    }
+  };
+
+  // Calculate ELO scores based on generalized benchmark normalization
+  const calculateELOScores = (metrics) => {
+    if (!metrics || !metrics.totalTrades || metrics.totalTrades === 0) {
+      return {
+        performance_score: 0,
+        risk_score: 0,
+        consistency_score: 0,
+        account_health_score: 0,
+        elo_score: 1000
+      };
+    }
+
+    // Get account context for scaling and dynamic benchmarks
+    const startEquity = 10000; // Default, should come from profile or trades
+    const durationDays = metrics.accountAge || 30; // Use account age as proxy for duration
+    const totalTrades = metrics.totalTrades;
+
+    // Detect asset type (crypto vs other) - simplified detection
+    // In real implementation, this should come from trade symbols
+    const isCrypto = false; // Placeholder - would detect from symbols like BTC, ETH, etc.
+
+    // Scale dollar metrics to percentages relative to start equity
+    const expectancyPct = metrics.expectancy ? (metrics.expectancy / startEquity) * 100 : 0;
+    const bestTradePct = metrics.bestTrade ? (metrics.bestTrade / startEquity) * 100 : 0;
+    const worstTradePct = metrics.worstTrade ? Math.abs(metrics.worstTrade / startEquity) * 100 : 0;
+
+    // PERFORMANCE SCORE (0-100) with corrected benchmarks for strong profitability
+    const perfSubs = {
+      totalReturn: normalizeScore(metrics.totalReturn, 0, 50, true), // 0% poor, 50% excellent
+      annReturn: normalizeScore(metrics.annualizedReturn, 10, 100, true, 500), // 10% poor, 100% excellent, cap at 500%
+      winRate: normalizeScore(metrics.winRate, 50, 80, true), // 50% poor, 80% excellent
+      profitFactor: normalizeScore(metrics.profitFactor, 1.0, 3.0, true, 10), // 1.0 poor, 3.0 excellent, cap at 10
+      expectancy: normalizeScore(expectancyPct, 0, 0.5, true), // 0% poor, 0.5% excellent (scaled)
+      bestTrade: normalizeScore(bestTradePct, 0, 5, true, 10) // 0% poor, 5% excellent, cap at 10%
+    };
+    const perfWeights = [0.15, 0.25, 0.20, 0.20, 0.10, 0.10];
+    let performanceScore = perfWeights.reduce((sum, weight, i) =>
+      sum + Object.values(perfSubs)[i] * weight, 0);
+
+    // Penalize insufficient data
+    if (totalTrades < 10) {
+      performanceScore = Math.min(performanceScore, 70);
+    }
+
+    // RISK CONTROL SCORE (0-100) - corrected benchmarks for low DD/risk scenario
+    const riskSubs = {
+      maxDrawdown: normalizeScore(metrics.maxDrawdown, 30, 5, false), // 30% poor, 5% excellent (negative)
+      avgDrawdown: normalizeScore(metrics.avgDrawdown || 0, 10, 1, false), // 10% poor, 1% excellent (negative)
+      recoveryFactor: normalizeScore(metrics.recoveryFactor, 1, 10, true), // 1 poor, 10 excellent
+      volatility: normalizeScore(metrics.volatility, 50, 20, false), // 50% poor, 20% excellent (negative)
+      sharpeRatio: normalizeScore(metrics.sharpeRatio, 0.5, 2.0, true, 5), // 0.5 poor, 2.0 excellent, cap at 5
+      avgRiskTrade: normalizeScore(metrics.avgRiskTrade, 5, 1, false) // 5% poor, 1% excellent (negative)
+    };
+
+    const riskWeights = [0.25, 0.15, 0.15, 0.15, 0.20, 0.10];
+    const riskScore = riskWeights.reduce((sum, weight, i) =>
+      sum + Object.values(riskSubs)[i] * weight, 0);
+
+    // CONSISTENCY SCORE (0-100) with data sufficiency penalties
+    const totalMonths = Math.max(1, Math.ceil(durationDays / 30));
+    const positiveMonthsExcellent = totalMonths; // All months positive
+
+    const consistencySubs = {
+      roughness: normalizeScore(metrics.roughness, 5, 0.5, false), // 5% poor, 0.5% excellent
+      positiveMonths: normalizeScore(metrics.positiveMonths, 3, 6, true), // 3 min, 6 excellent (fixed)
+      freqStd: normalizeScore(metrics.freqStd, 2.0, 0.5, false), // 2.0 poor, 0.5 excellent
+      sortinoRatio: normalizeScore(metrics.sortinoRatio, 1.0, 4.0, true, 10), // 1.0 min, 4.0 excellent, cap at 10
+      calmarRatio: normalizeScore(metrics.calmarRatio, 1.0, 5.0, true), // 1.0 min, 5.0 excellent
+      sqn: normalizeScore(metrics.sqn, 1.6, 3.0, true, 5) // 1.6 min, 3.0 excellent, cap at 5
+    };
+    const consistencyWeights = [0.10, 0.15, 0.10, 0.20, 0.20, 0.25];
+    let consistencyScore = consistencyWeights.reduce((sum, weight, i) =>
+      sum + Object.values(consistencySubs)[i] * weight, 0);
+
+    // Penalize insufficient data
+    if (totalTrades < 50) {
+      consistencyScore *= Math.min(1, totalTrades / 50);
+    }
+
+    // ACCOUNT HEALTH SCORE (0-100) with maturity considerations
+    const currentDate = new Date(2025, 11, 23); // Dec 23, 2025
+    const firstTradeDate = new Date(Math.min(...trades.map(t => new Date(t.close_time || t.time))));
+    const actualAccountAge = Math.max(1, Math.ceil((currentDate - firstTradeDate) / (1000 * 60 * 60 * 24)));
+
+    // Handle missing exposure time
+    const exposureTime = metrics.exposureTime || 50; // Default to 50% if missing
+
+    // Cap activity rate to prevent overtrading penalty
+    const activityRate = Math.min(metrics.activityRate || 0, 100);
+
+    const healthSubs = {
+      accountAge: normalizeScore(actualAccountAge, 90, 365, true),
+      tradingDays: normalizeScore(metrics.tradingDays, 20, 100, true),
+      activityRate: normalizeScore(activityRate, 10, 50, true), // Cap at 100
+      exposureTime: normalizeScore(exposureTime, 100, 50, false),
+      totalTrades: normalizeScore(totalTrades, 30, 200, true),
+      worstTrade: normalizeScore(worstTradePct, 10, 1, false) // 10% poor, 1% excellent (scaled)
+    };
+
+    const healthWeights = [0.20, 0.15, 0.15, 0.15, 0.20, 0.10];
+    const accountHealthScore = healthWeights.reduce((sum, weight, i) =>
+      sum + Object.values(healthSubs)[i] * weight, 0);
+
+    // No additional penalty for young accounts in corrected calculation
+
+    // TRADER ELO CALCULATION (Generalized formula)
+    // ELO = 1000 + (Performance * 4 + Risk * 3 + Consistency * 2 + Health * 1) * 3
+    let eloScore = 1000 + (performanceScore * 4 + riskScore * 3 + consistencyScore * 2 + accountHealthScore * 1) * 3;
+
+
+
+    return {
+      performance_score: Math.round(Math.max(0, Math.min(100, performanceScore))),
+      risk_score: Math.round(Math.max(0, Math.min(100, riskScore))),
+      consistency_score: Math.round(Math.max(0, Math.min(100, consistencyScore))),
+      account_health_score: Math.round(Math.max(0, Math.min(100, accountHealthScore))),
+      elo_score: Math.round(Math.max(1000, Math.min(4000, eloScore))) // Cap between 1000-4000
+    };
+  };
+
+  // Calculate metrics when data is available
+  const metrics = React.useMemo(() => {
+    const calculatedMetrics = calculateMetricsFromData(trades, profile);
+    console.log('📊 Calculated metrics:', calculatedMetrics);
+    console.log('📊 Input data - trades:', trades?.length || 0, 'profile:', profile?.id || 'none');
+    return calculatedMetrics;
+  }, [trades, profile]);
+
+  // Calculate ELO scores based on metrics
+  const eloScores = React.useMemo(() => {
+    return calculateELOScores(metrics);
+  }, [metrics]);
+
+  // Get ELO color based on generalized score ranges
+  const getELOColor = (eloScore) => {
+    if (eloScore >= 3500) return '#FFD700'; // Gold - Elite
+    if (eloScore >= 3000) return '#C0C0C0'; // Silver - Professional
+    if (eloScore >= 2500) return '#CD7F32'; // Bronze - Consistent
+    if (eloScore >= 2200) return '#EF4444'; // Red - Unstable (более насыщенный)
+    if (eloScore >= 1800) return '#06B6D4'; // Cyan - Developing (более насыщенный)
+    if (eloScore >= 1400) return '#3B82F6'; // Blue - Intermediate (более насыщенный)
+    if (eloScore >= 1200) return '#10B981'; // Green - Beginner (более насыщенный)
+    return '#6B7280'; // Gray - Insufficient Data (более насыщенный)
+  };
 
   // Handle name editing
   const handleEditName = () => {
@@ -382,6 +1235,639 @@ export default function Dashboard() {
     setEditedName('');
   };
 
+  // Generate social media share image
+  const handleGenerateShareImage = async () => {
+    try {
+      // Create a temporary div with the share content
+      const shareDiv = document.createElement('div');
+      shareDiv.style.position = 'absolute';
+      shareDiv.style.left = '-9999px';
+      shareDiv.style.top = '-9999px';
+      shareDiv.style.width = '1400px';
+      shareDiv.style.minHeight = '2000px';
+      shareDiv.style.backgroundColor = '#ffffff';
+      shareDiv.style.padding = '0px';
+      shareDiv.style.borderRadius = '0px';
+      shareDiv.style.border = '2px solid #1f2937';
+      shareDiv.style.fontFamily = '"Times New Roman", serif';
+      shareDiv.style.position = 'relative';
+      shareDiv.style.overflow = 'visible';
+      shareDiv.style.boxShadow = '0 0 30px rgba(0,0,0,0.15)';
+
+      // Determine data source
+      const dataSource = profile.is_live_account ? `${profile.broker} (Live Account)` : 'File Upload';
+
+      // Professional hedge fund report header
+      shareDiv.innerHTML = `
+        <!-- Watermark -->
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 120px; color: rgba(0,0,0,0.03); font-weight: bold; z-index: 0; pointer-events: none; user-select: none; font-family: 'Times New Roman', serif;">ALPHA EDGE</div>
+
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 40px 50px; position: relative; z-index: 1;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center;">
+              <img src="/logo.png" style="width: 60px; height: 60px; border-radius: 50%; margin-right: 20px; border: 3px solid rgba(255,255,255,0.2);" />
+              <div>
+                <h1 style="font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 1px;">ALPHA EDGE</h1>
+                <p style="font-size: 14px; margin: 2px 0 0 0; opacity: 0.9;">Trading Analytics Platform</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; opacity: 0.8;">Report Generated</div>
+              <div style="font-size: 14px; font-weight: 600;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+            </div>
+          </div>
+          <div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px;">
+            <h2 style="font-size: 24px; font-weight: 600; margin: 0; letter-spacing: 0.5px;">TRADER PERFORMANCE REPORT</h2>
+            <p style="font-size: 16px; margin: 5px 0 0 0; opacity: 0.9;">Comprehensive Analytics & Risk Assessment</p>
+          </div>
+        </div>
+
+        <!-- Main Report Content -->
+        <div style="padding: 50px; background: #ffffff; position: relative; z-index: 1;">
+          <!-- Executive Summary -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">EXECUTIVE SUMMARY</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px;">
+              <div>
+                <h4 style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 15px;">Trader Profile</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280;">Name:</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${profile.nickname}</td></tr>
+                  <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280;">Data Source:</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${dataSource}</td></tr>
+                  <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280;">Account Age:</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${metrics?.accountAge !== undefined ? metrics.accountAge + ' days' : '0 days'}</td></tr>
+                  <tr><td style="padding: 8px 0; font-weight: 600; color: #6b7280;">Global Rank:</td><td style="padding: 8px 0; color: #1f2937; font-weight: bold; color: #d97706;">#${rank || 'N/A'}</td></tr>
+                </table>
+              </div>
+              <div>
+                <h4 style="font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 15px;">Performance Overview</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #059669; margin-bottom: 5px;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Win Rate</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Profit Factor</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #374151; margin-bottom: 5px; filter: blur(4px);">****</div>
+                    <div style="font-size: 12px; color: #6b7280;">Total Profit</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <div style="font-size: 18px; font-weight: bold; color: #ea580c; margin-bottom: 5px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Total Trades</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Performance Analytics Section -->
+          <div style="margin-bottom: 40px; page-break-before: always;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">PERFORMANCE ANALYTICS</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-bottom: 35px;">
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Return Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Total Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.totalReturn !== undefined ? (metrics.totalReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Annualized Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.annualizedReturn !== undefined ? (metrics.annualizedReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Expectancy:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.expectancy !== undefined ? '$' + metrics.expectancy.toFixed(2) : '$0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">SQN:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sqn !== undefined ? metrics.sqn.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Efficiency Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Profit Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #7c3aed;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Win Rate:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Win/Loss:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">**** / ****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Best Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669; filter: blur(3px);">****</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Alpha Edge Score</h4>
+                <div style="text-align: center; margin-bottom: 15px;">
+                  <div style="font-size: 36px; font-weight: bold; color: #1f2937; margin-bottom: 5px;">${eloScores?.elo_score || 1000}</div>
+                  <div style="font-size: 14px; color: #6b7280;">Trader ELO Rating</div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #059669;">${eloScores?.performance_score || 0}</div>
+                    <div style="color: #6b7280;">Performance</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #d97706;">${eloScores?.risk_score || 0}</div>
+                    <div style="color: #6b7280;">Risk</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #7c3aed;">${eloScores?.consistency_score || 0}</div>
+                    <div style="color: #6b7280;">Consistency</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #0891b2;">${eloScores?.account_health_score || 0}</div>
+                    <div style="color: #6b7280;">Health</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Risk Assessment Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">RISK ASSESSMENT</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px;">
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Risk Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sharpe Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sortino Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sortinoRatio !== undefined ? metrics.sortinoRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.maxDrawdown !== undefined ? metrics.maxDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.avgDrawdown !== undefined ? metrics.avgDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Trading Risk</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Risk per Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Volatility:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.volatility !== undefined ? (metrics.volatility * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Recovery Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.recoveryFactor !== undefined ? metrics.recoveryFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Calmar Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.calmarRatio !== undefined ? metrics.calmarRatio.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trading Statistics Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">TRADING STATISTICS</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px;">
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Trade Analysis</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Total Trades:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Winning Trades:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round(metrics.winRate * metrics.totalTrades / 100) : '0'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Losing Trades:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round((100 - metrics.winRate) * metrics.totalTrades / 100) : '0'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Trade Frequency:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.totalTrades !== undefined && metrics?.accountAge !== undefined ? (metrics.totalTrades / metrics.accountAge).toFixed(1) + '/day' : '0.0/day'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Streak Analysis</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Win Streak:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.maxWinStreak || 0} trades</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Loss Streak:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.maxLoseStreak || 0} trades</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Current Streak:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.currentStreak !== undefined ? (metrics.currentStreak > 0 ? '+' + metrics.currentStreak : metrics.currentStreak) + ' trades' : '0 trades'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Trade Duration:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.avgTradeDuration !== undefined ? Math.round(metrics.avgTradeDuration / 60) + 'min' : '0min'}</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Global Rank Showcase -->
+          <div style="text-align: center; margin-top: 50px;">
+            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 20px; padding: 30px; margin-bottom: 20px; border: 3px solid #f59e0b;">
+              <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 20px;">
+                  <span style="color: white; font-size: 24px;">🏆</span>
+                </div>
+                <div>
+                  <div style="font-size: 48px; font-weight: bold; color: white; line-height: 1;">#${rank || 'N/A'}</div>
+                  <div style="font-size: 12px; color: #fbbf24; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">GLOBAL LEADERBOARD</div>
+                </div>
+              </div>
+              <div style="font-size: 18px; color: white; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Elite Trading Community</div>
+            </div>
+
+            <div style="background: #f8fafc; border-radius: 15px; padding: 20px; border: 2px solid #e5e7eb; display: inline-block;">
+              <div style="font-size: 16px; color: #374151; font-weight: 600;">Professional Trader Certification</div>
+              <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">Alpha Edge Capital Management</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f8fafc; padding: 20px 50px; border-top: 1px solid #e5e7eb; text-align: center;">
+          <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">This report is confidential and intended solely for the recipient. Generated by Alpha Edge Trading Analytics Platform.</div>
+          <div style="font-size: 10px; color: #9ca3af;">© 2024 Alpha Edge. All rights reserved. | Share your achievements #AlphaEdge</div>
+        </div>
+
+          <!-- Risk Assessment Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">RISK ASSESSMENT</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px;">
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Risk Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sharpe Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Sortino Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sortinoRatio !== undefined ? metrics.sortinoRatio.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Max Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #dc2626;">${metrics?.maxDrawdown !== undefined ? metrics.maxDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Drawdown:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.avgDrawdown !== undefined ? metrics.avgDrawdown.toFixed(2) + '%' : '0.00%'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Trading Risk</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Risk per Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Volatility:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.volatility !== undefined ? (metrics.volatility * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Recovery Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.recoveryFactor !== undefined ? metrics.recoveryFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Calmar Ratio:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.calmarRatio !== undefined ? metrics.calmarRatio.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Performance Analytics Section -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">PERFORMANCE ANALYTICS</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-bottom: 35px;">
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Return Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Total Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.totalReturn !== undefined ? (metrics.totalReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Annualized Return:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.annualizedReturn !== undefined ? (metrics.annualizedReturn * 100).toFixed(2) + '%' : '0.00%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Expectancy:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.expectancy !== undefined ? '$' + metrics.expectancy.toFixed(2) : '$0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">SQN:</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${metrics?.sqn !== undefined ? metrics.sqn.toFixed(2) : '0.00'}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Efficiency Metrics</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Profit Factor:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #7c3aed;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Win Rate:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Avg Win/Loss:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; filter: blur(3px);">**** / ****</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Best Trade:</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #059669; filter: blur(3px);">****</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 15px; text-transform: uppercase;">Alpha Edge Score</h4>
+                <div style="text-align: center; margin-bottom: 15px;">
+                  <div style="font-size: 36px; font-weight: bold; color: #1f2937; margin-bottom: 5px;">${eloScores?.elo_score || 1000}</div>
+                  <div style="font-size: 14px; color: #6b7280;">Trader ELO Rating</div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #059669;">${eloScores?.performance_score || 0}</div>
+                    <div style="color: #6b7280;">Performance</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #d97706;">${eloScores?.risk_score || 0}</div>
+                    <div style="color: #6b7280;">Risk</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #7c3aed;">${eloScores?.consistency_score || 0}</div>
+                    <div style="color: #6b7280;">Consistency</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-weight: 600; color: #0891b2;">${eloScores?.account_health_score || 0}</div>
+                    <div style="color: #6b7280;">Health</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Key Performance Indicators -->
+          <div style="margin-bottom: 35px;">
+            <h3 style="text-align: center; font-size: 24px; font-weight: bold; color: #374151; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px;">Key Performance Indicators</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+              <!-- Win Rate Card -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #059669, #047857); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);">
+                  <span style="color: white; font-size: 20px;">🎯</span>
+                </div>
+                <div style="font-size: 28px; font-weight: bold; color: #059669; margin-bottom: 5px;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</div>
+                <div style="font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Win Rate</div>
+              </div>
+
+              <!-- Profit Factor Card -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #7c3aed, #6d28d9); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);">
+                  <span style="color: white; font-size: 20px;">💰</span>
+                </div>
+                <div style="font-size: 28px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${metrics?.profitFactor !== undefined ? (metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)) : '0.00'}</div>
+                <div style="font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Profit Factor</div>
+              </div>
+
+              <!-- Total Profit Card -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #374151, #1f2937); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(55, 65, 81, 0.3);">
+                  <span style="color: white; font-size: 20px;">📊</span>
+                </div>
+                <div style="font-size: 28px; font-weight: bold; color: #374151; filter: blur(4px); margin-bottom: 5px;">****</div>
+                <div style="font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Total Profit</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced Metrics Section -->
+          <div style="margin-bottom: 35px;">
+            <h3 style="text-align: center; font-size: 20px; font-weight: bold; color: #6b7280; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">Advanced Analytics</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+              <!-- Left Column -->
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #4f46e5, #3730a3); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(79, 70, 229, 0.3);">
+                    <span style="color: white; font-size: 14px;">📅</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #4f46e5; margin-bottom: 3px;">${metrics?.accountAge !== undefined ? metrics.accountAge + 'd' : '0d'}</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Account Age</div>
+                </div>
+
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #dc2626, #b91c1c); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(220, 38, 38, 0.3);">
+                    <span style="color: white; font-size: 14px;">📊</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #dc2626; margin-bottom: 3px;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Sharpe Ratio</div>
+                </div>
+              </div>
+
+              <!-- Right Column -->
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #ea580c, #c2410c); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(234, 88, 12, 0.3);">
+                    <span style="color: white; font-size: 14px;">🎯</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #ea580c; margin-bottom: 3px;">${metrics?.sqn !== undefined ? metrics.sqn.toFixed(2) : '0.00'}</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">SQN</div>
+                </div>
+
+                <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; text-align: center; box-shadow: -4px -4px 8px #ffffff, 4px 4px 8px #aeaec040; border: 1px solid rgba(255,255,255,0.4);">
+                  <div style="width: 35px; height: 35px; background: linear-gradient(135deg, #374151, #1f2937); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: 0 3px 6px rgba(55, 65, 81, 0.3);">
+                    <span style="color: white; font-size: 14px;">⚠️</span>
+                  </div>
+                  <div style="font-size: 20px; font-weight: bold; color: #374151; filter: blur(4px); margin-bottom: 3px;">****</div>
+                  <div style="font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Risk/Trade</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trading Streaks & Volume -->
+          <div style="margin-bottom: 35px;">
+            <h3 style="text-align: center; font-size: 20px; font-weight: bold; color: #6b7280; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">Trading Performance</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+              <!-- Winning Streak -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #16a34a, #15803d); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(22, 163, 74, 0.3);">
+                  <span style="color: white; font-size: 18px;">🔥</span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; color: #16a34a; margin-bottom: 5px;">+${metrics?.maxWinStreak || 0}</div>
+                <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Winning Streak</div>
+              </div>
+
+              <!-- Losing Streak -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #dc2626, #b91c1c); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);">
+                  <span style="color: white; font-size: 18px;">❌</span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 5px;">-${metrics?.maxLoseStreak || 0}</div>
+                <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Losing Streak</div>
+              </div>
+
+              <!-- Volume -->
+              <div style="background: #e0e5ec; border-radius: 20px; padding: 20px; text-align: center; box-shadow: -6px -6px 12px #ffffff, 6px 6px 12px #aeaec040; border: 2px solid rgba(255,255,255,0.4);">
+                <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #7c3aed, #6d28d9); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);">
+                  <span style="color: white; font-size: 18px;">📊</span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; color: #7c3aed; margin-bottom: 5px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</div>
+                <div style="font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase;">Total Trades</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Global Rank Showcase -->
+          <div style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 25px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(30, 41, 59, 0.3); border: 3px solid #f59e0b;">
+              <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 20px; box-shadow: 0 6px 12px rgba(245, 158, 11, 0.4);">
+                  <span style="color: white; font-size: 24px;">🏆</span>
+                </div>
+                <div>
+                  <div style="font-size: 48px; font-weight: bold; color: white; text-shadow: 0 3px 6px rgba(0,0,0,0.3); line-height: 1;">#${rank || 'N/A'}</div>
+                  <div style="font-size: 12px; color: #fbbf24; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">RANK</div>
+                </div>
+              </div>
+              <div style="font-size: 18px; color: white; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Global Leaderboard</div>
+              <div style="font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500;">Elite Trading Community</div>
+            </div>
+
+            <!-- Achievement Badge -->
+            <div style="background: #e0e5ec; border-radius: 15px; padding: 15px; box-shadow: inset -3px -3px 6px #ffffff, inset 3px 3px 6px #aeaec040; border: 2px solid rgba(255,255,255,0.4); display: inline-block;">
+              <div style="font-size: 14px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Professional Trader</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; font-size: 10px; color: #9ca3af;">
+          Generated by Alpha Edge • Share your achievements #AlphaEdge
+        </div>
+      `;
+
+      document.body.appendChild(shareDiv);
+
+      // Wait for images to load
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Wait for images and styles to load completely
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Generate canvas with ultra high quality
+      const canvas = await html2canvas(shareDiv, {
+        backgroundColor: '#ffffff',
+        scale: 2, // Good quality for report rendering
+        width: 1400,
+        height: 2000,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        imageTimeout: 20000,
+        removeContainer: true,
+        foreignObjectRendering: false,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 1000,
+        windowHeight: 800,
+        onclone: async (clonedDoc) => {
+          // Ensure all images are loaded in cloned document
+          const images = clonedDoc.querySelectorAll('img');
+          const promises = Array.from(images).map(img => {
+            return new Promise((resolve) => {
+              if (img.complete) {
+                resolve();
+              } else {
+                img.onload = resolve;
+                img.onerror = resolve;
+                // Force reload image
+                const src = img.src;
+                img.src = '';
+                img.src = src;
+              }
+            });
+          });
+
+          // Wait for fonts to load
+          await document.fonts.ready;
+
+          return Promise.all(promises);
+        }
+      });
+
+      // Convert to blob and download with high quality
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `alpha-edge-${profile.nickname}-trading-stats.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 'image/png', 1.0); // Maximum quality
+
+      // Remove temporary element
+      document.body.removeChild(shareDiv);
+
+      alert('High-quality share image generated! Check your downloads.');
+
+    } catch (error) {
+      console.error('Error generating share image:', error);
+      alert('Error generating share image. Please try again.');
+    }
+  };
+
+  // Handle data unlinking
+  const handleUnlinkData = async () => {
+    console.log('🗑️ Starting unlink data process for profile:', profile?.id);
+
+    const confirmed = window.confirm(
+      'Are you sure you want to unlink all trading data and disconnect cTrader?\n\n' +
+      'This will permanently delete:\n' +
+      '• All trade records\n' +
+      '• Performance metrics\n' +
+      '• Account statistics\n\n' +
+      'And disconnect:\n' +
+      '• cTrader account connection\n' +
+      '• Clear stored tokens\n\n' +
+      'You can reconnect cTrader or upload new data afterwards.\n\n' +
+      'Continue?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+
+      // Delete all trades associated with this profile
+      const trades = await localDataService.entities.Trade.filter({
+        trader_profile_id: profile.id
+      });
+
+      for (const trade of trades) {
+        await localDataService.entities.Trade.delete(trade.id);
+      }
+
+      // Reset profile metrics and data
+      await localDataService.entities.TraderProfile.update(profile.id, {
+        initial_balance: 1000,
+        trader_score: 0,
+        total_trades: 0,
+        win_rate: 0,
+        total_pnl: 0,
+        // Keep other profile info like nickname, broker, etc.
+      });
+
+      // Clear cTrader tokens and account info from localStorage
+      localStorage.removeItem('ctrader_tokens');
+      localStorage.removeItem('ctrader_account_type');
+      localStorage.removeItem('ctrader_account_id');
+      console.log('🧹 Cleared cTrader data from localStorage');
+
+      // Redirect to connect page to start fresh
+      console.log('🔄 Redirecting to connect page after data unlink');
+      window.location.href = '/connect';
+
+    } catch (error) {
+      console.error('Error unlinking data:', error);
+      alert('Error unlinking data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFetchCTraderData = async () => {
+    if (!localStorage.getItem('ctrader_tokens')) {
+      alert('Please connect to cTrader first in the Connect page.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const trades = await fetchAndAnalyzeTrades(true); // true for demo account
+
+      // Clear existing data first
+      const existingTrades = await localDataService.entities.Trade.filter({
+        trader_profile_id: profile.id
+      });
+      for (const trade of existingTrades) {
+        await localDataService.entities.Trade.delete(trade.id);
+      }
+
+      // Save new trades from cTrader
+      for (const trade of trades) {
+        await localDataService.entities.Trade.create({
+          trader_profile_id: profile.id,
+          ...trade
+        });
+      }
+
+      // Update profile to reflect cTrader data
+      await localDataService.entities.TraderProfile.update(profile.id, {
+        is_live_account: true,
+        broker: 'cTrader',
+        last_updated: new Date().toISOString()
+      });
+
+      // Refresh page to show new data
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error fetching cTrader data:', error);
+      alert('Failed to fetch data from cTrader. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-[50vh] text-gray-400">Loading statistics...</div>;
+
+  if (!profile) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh]">
+        <div className="w-24 h-24 bg-[#e0e5ec] rounded-full shadow-[-8px_-8px_16px_#ffffff,8px_8px_16px_#a3b1c6] flex items-center justify-center mb-8">
+          <Activity size={40} className="text-gray-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-700 mb-2">{profileId ? 'Trader Not Found' : 'No Trading Account Found'}</h2>
+        <p className="text-gray-500 mb-8">{profileId ? 'The requested trader profile does not exist.' : 'Connect your live trading account to view your dashboard.'}</p>
+        {!profileId && (
+          <Link to={createPageUrl('Connect')}>
+            <NeumorphicButton variant="action">Connect Account</NeumorphicButton>
+          </Link>
+        )}
+        {profileId && (
+          <Link to={createPageUrl('Leaderboard')}>
+             <NeumorphicButton>Back to Leaderboard</NeumorphicButton>
+          </Link>
+        )}
+      </div>
+    );
+  }
 
 
   // Get current balance from last trade or account data
@@ -449,39 +1935,50 @@ export default function Dashboard() {
   const helpContent = {
     performance: {
       title: "Performance Score",
-      description: "Overall performance rating combining annualized return, win rate, risk/reward ratio, and expectancy. Higher scores indicate better trading performance.",
+      description: "Overall profitability rating combining total returns, annualized returns, win rate, profit factor, expectancy, and best trade. Higher scores indicate better trading performance and profit generation.",
       metrics: {
-        "Ann. Return": "Annualized return percentage based on total profit over trading period",
-        "Win Rate": "Percentage of profitable trades out of total trades",
-        "R/R": "Risk/Reward ratio - average profit divided by average loss",
-        "Expectancy": "Average profit per trade in account currency"
+        "Total Return": "Total percentage return since account inception",
+        "Ann. Return": "Annualized return percentage using compound growth formula",
+        "Win Rate": "Percentage of profitable trades out of total trades executed",
+        "Profit Factor": "Ratio of gross profits to gross losses (values >1 indicate profitability)",
+        "Expectancy": "Average profit per trade scaled by account size (higher = better)",
+        "Best Trade": "Largest single profitable trade scaled by account size"
       }
     },
     risk: {
       title: "Risk Control Score",
-      description: "Risk management effectiveness combining maximum drawdown, volatility, and risk per trade. Higher scores indicate better risk control.",
+      description: "Risk management effectiveness combining drawdowns, volatility, Sharpe ratio, Sortino ratio, recovery factor, and risk per trade. Higher scores indicate better risk-adjusted performance.",
       metrics: {
         "Max DD": "Maximum Drawdown - largest peak-to-trough decline in account equity",
-        "Volatility": "Standard deviation of returns - measures return variability",
-        "Risk/Trade": "Average risk exposure per trade as percentage of account"
+        "Avg DD": "Average Drawdown - mean of all drawdown periods",
+        "Recovery Factor": "Net profit divided by maximum drawdown (higher = better recovery)",
+        "Volatility": "Annualized standard deviation of daily returns (lower = more stable)",
+        "Sharpe Ratio": "Risk-adjusted return using total volatility (higher = better risk-adjusted performance)",
+        "Risk/Trade": "Average risk exposure per trade as percentage of account balance"
       }
     },
     consistency: {
       title: "Consistency Score",
-      description: "Trading consistency measuring equity curve smoothness, monthly profitability, and trade frequency stability. Higher scores indicate more consistent performance.",
+      description: "Trading consistency measuring equity curve smoothness, monthly profitability, trade frequency stability, Sortino ratio, Calmar ratio, and System Quality Number. Higher scores indicate more predictable and stable performance.",
       metrics: {
-        "Roughness": "Measure of equity curve smoothness (1 - R²)",
-        "Positive Mos": "Monthly positive ratio - percentage of profitable months",
-        "Freq Std": "Trade frequency standard deviation - consistency of trading activity"
+        "Roughness": "Standard deviation of daily returns (lower = smoother equity curve)",
+        "Positive Mos": "Number of months with positive returns (higher = more consistent)",
+        "Freq Std": "Standard deviation of trades per day (lower = more regular trading)",
+        "Sortino Ratio": "Risk-adjusted return using only downside volatility (higher = better)",
+        "Calmar Ratio": "Annual return divided by maximum drawdown (higher = better risk-adjusted return)",
+        "SQN": "System Quality Number - statistical measure of strategy quality (higher = better)"
       }
     },
     health: {
       title: "Account Health Score",
-      description: "Overall account status considering violations, leverage usage, and risk limit breaches. Higher scores indicate healthier account management.",
+      description: "Overall account sustainability considering account age, trading activity, exposure time, and trade statistics. Higher scores indicate healthier and more established trading accounts.",
       metrics: {
-        "Violations": "Number of trading rule violations",
-        "Leverage": "Excessive leverage usage incidents",
-        "Risk Limit": "Number of risk limit breaches"
+        "Account Age": "Number of days since first trade (older accounts = more established)",
+        "Trading Days": "Total number of days with trading activity",
+        "Activity Rate": "Percentage of account age spent actively trading",
+        "Exposure Time": "Percentage of time account had open positions (lower = more conservative)",
+        "Total Trades": "Total number of closed trades executed",
+        "Worst Trade": "Largest single loss scaled by account size (smaller losses = better)"
       }
     }
   };
@@ -521,36 +2018,9 @@ export default function Dashboard() {
     );
   };
 
-  // Main component render
-  if (loading) {
-    return <div className="flex items-center justify-center h-[50vh] text-gray-400">Loading statistics...</div>;
-  }
-
-  if (!profile) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh]">
-        <div className="w-24 h-24 bg-[#e0e5ec] rounded-full shadow-[-8px_-8px_16px_#ffffff,8px_8px_16px_#a3b1c6] flex items-center justify-center mb-8">
-          <Activity size={40} className="text-gray-400" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-700 mb-2">{profileId ? 'Trader Not Found' : 'No Trading Account Found'}</h2>
-        <p className="text-gray-500 mb-8">{profileId ? 'The requested trader profile does not exist.' : 'Connect your live trading account to view your dashboard.'}</p>
-        {!profileId && (
-          <Link to={createPageUrl('Connect')}>
-            <NeumorphicButton variant="action">Connect Account</NeumorphicButton>
-          </Link>
-        )}
-        {profileId && (
-          <Link to={createPageUrl('Leaderboard')}>
-             <NeumorphicButton>Back to Leaderboard</NeumorphicButton>
-          </Link>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-
+      
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6">
@@ -589,6 +2059,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
                 <h1 className="text-xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left">{profile.nickname}</h1>
                 {isOwnProfile && (
+                  <div className="flex gap-2">
                   <button
                     onClick={handleEditName}
                     className="p-2 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
@@ -596,15 +2067,54 @@ export default function Dashboard() {
                   >
                     <Edit2 size={16} />
                   </button>
+                    <button
+                      onClick={handleGenerateShareImage}
+                      className="p-2 bg-blue-100 rounded-lg text-blue-600 hover:bg-blue-200 transition-colors"
+                      title="Generate share image"
+                    >
+                      <Share2 size={16} />
+                    </button>
+                    <button
+                      onClick={handleFetchCTraderData}
+                      disabled={loading}
+                      className="p-2 bg-purple-100 rounded-lg text-purple-600 hover:bg-purple-200 disabled:bg-purple-50 disabled:text-purple-400 transition-colors"
+                      title="Fetch data from cTrader"
+                    >
+                      <Zap size={16} />
+                    </button>
+                    <button
+                      onClick={handleUnlinkData}
+                      disabled={loading}
+                      className="p-2 bg-red-100 rounded-lg text-red-600 hover:bg-red-200 disabled:bg-red-50 disabled:text-red-400 transition-colors"
+                      title="Unlink all trading data"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 )}
               </div>
             )}
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 text-gray-500">
               <span className="flex items-center gap-1"><Target size={14} /> {profile.broker}</span>
               <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+              {profile.broker === 'cTrader' && (
+                <>
+                  <span className="flex items-center gap-1 text-blue-600 font-medium">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    {(() => {
+                      const accountsCount = parseInt(localStorage.getItem('ctrader_accounts_count') || '1');
+                      const accountType = profile.is_live_account ? 'Live' : 'Demo';
+                      return accountsCount > 1
+                        ? `${accountType} (${accountsCount} accounts combined)`
+                        : accountType;
+                    })()}
+                  </span>
+                  <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                </>
+              )}
               <span className="flex items-center gap-1 text-orange-600 font-medium">
                 <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                File Imported
+                {profile.broker === 'cTrader' ? 'cTrader Connected' : 'File Imported'}
               </span>
             </div>
           </div>
@@ -621,34 +2131,6 @@ export default function Dashboard() {
              </div>
           </NeumorphicCard>
 
-          {eloData && (
-            <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
-               <div
-                 className="p-2 rounded-lg text-white font-bold"
-                 style={{ backgroundColor: eloApi.getELOColor(eloData.eloScore) }}
-               >
-                 ELO
-               </div>
-               <div>
-                  <p className="text-xs text-gray-500 font-bold uppercase">Trader ELO</p>
-                  <p className="text-lg font-bold text-gray-800">{eloApi.formatELOScore(eloData.eloScore)}</p>
-                  <p className="text-xs text-gray-600">{eloData.category}</p>
-               </div>
-            </NeumorphicCard>
-          )}
-
-          {eloLoading && (
-            <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
-               <div className="p-2 bg-gray-200 rounded-lg animate-pulse">
-                 <div className="w-5 h-5 bg-gray-300 rounded"></div>
-               </div>
-               <div>
-                  <p className="text-xs text-gray-500 font-bold uppercase">Trader ELO</p>
-                  <p className="text-lg font-bold text-gray-400">Calculating...</p>
-               </div>
-            </NeumorphicCard>
-          )}
-
           {isOwnProfile && (
             <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
                <div className="p-2 bg-green-100 rounded-lg text-green-700">
@@ -661,94 +2143,58 @@ export default function Dashboard() {
             </NeumorphicCard>
           )}
 
-          {!eloData && !eloLoading && (
-            <NeumorphicCard className="px-6 py-3">
-              <button
-                onClick={async () => {
-                  setEloLoading(true);
-                  try {
-                    // Prepare trade data for ELO calculation
-                    const tradeData = trades.map(trade => ({
-                      openTime: new Date(trade.open_time),
-                      closeTime: new Date(trade.close_time),
-                      pnl: trade.profit_loss,
-                      entryPrice: trade.entry_price,
-                      exitPrice: trade.exit_price,
-                      positionSize: trade.position_size
-                    }));
-
-                    // Prepare account data
-                    const accountData = {
-                      initialBalance: profile.initial_balance || 10000,
-                      accountAgeDays: profile.account_age_days || 30,
-                      equityHistory: [] // Will be populated from trades if available
-                    };
-
-                    const result = await eloApi.calculateTraderELO(tradeData, accountData, profile.id);
-                    if (result.success && result.elo) {
-                      setEloData(result.elo);
-                    }
-                  } catch (error) {
-                    console.error('ELO calculation failed:', error);
-                  } finally {
-                    setEloLoading(false);
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-3 py-2 px-4 bg-purple-100 hover:bg-purple-200 rounded-lg text-purple-700 font-medium transition-colors"
-                disabled={eloLoading}
-              >
-                <Award size={16} />
-                {eloLoading ? 'Calculating ELO...' : 'Calculate ELO Score'}
-              </button>
+          <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
+             <div className="p-2 rounded-lg flex items-center justify-center" style={{ backgroundColor: getELOColor(eloScores?.elo_score || 1000) + '20', color: getELOColor(eloScores?.elo_score || 1000) }}>
+                <Award size={20} />
+             </div>
+             <div>
+                <p className="text-xs text-gray-500 font-bold uppercase">Trader ELO</p>
+                <p className="text-lg font-bold text-gray-800">{eloScores?.elo_score || 1000}</p>
+             </div>
           </NeumorphicCard>
-          )}
         </div>
       </div>
 
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-6">
           <StatBox 
           title="Total Profit"
-            value={`${profile.profit_percentage}%`}
-            trend={profile.profit_percentage}
+            value={metrics?.totalReturn !== undefined ? `${Math.abs(metrics.totalReturn) > 1000 ? (Number((metrics.totalReturn / 1000).toFixed(1))) + 'K%' : Number(metrics.totalReturn).toFixed(2) + '%'}` : '0.00%'}
           />
 
           <StatBox 
           title="Win Rate"
-            value={`${profile.win_rate}%`}
-          subValue={`${profile.profitable_trades_count}/${profile.total_trades} trades`}
+            value={metrics?.winRate !== undefined ? `${metrics.winRate.toFixed(1)}%` : '0.0%'}
+            subValue={metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? `${Math.round(metrics.winRate * metrics.totalTrades / 100)}/${metrics.totalTrades > 999 ? (metrics.totalTrades / 1000).toFixed(1) + 'K' : metrics.totalTrades} trades` : '0/0 trades'}
           />
 
           <StatBox 
           title="Profit Factor"
-            value={profile.profit_factor}
-          trend={profile.profit_factor > 1.5 ? 12 : -5}
+            value={metrics?.profitFactor !== undefined ? (isFinite(metrics.profitFactor) ? (metrics.profitFactor > 999 ? '999+' : metrics.profitFactor.toFixed(2)) : '∞') : '0.00'}
+            trend={metrics?.profitFactor !== undefined ? (metrics.profitFactor > 1.5 ? 12 : -5) : 0}
           />
 
           <StatBox 
-          title="Active Days"
-            value={profile.trading_days}
-          trend={null}
+          title="Account Age"
+            value={metrics?.accountAge !== undefined ? `${metrics.accountAge} days` : '0 days'}
         />
 
         <StatBox
           title="Sharpe Ratio"
-          value={profile.sharpe_ratio}
-          trend={null}
+          value={metrics?.sharpeRatio !== undefined ? (Math.abs(metrics.sharpeRatio) > 99 ? '99+' : metrics.sharpeRatio.toFixed(2)) : '0.00'}
         />
 
         {isOwnProfile ? (
           <StatBox
             title="Expectancy"
-            value={`$${profile.expectancy}`}
-            trend={null}
+            value={metrics?.expectancy !== undefined ? (Math.abs(metrics.expectancy) > 999999 ? '$999K+' : `$${Math.abs(metrics.expectancy) > 999 ? (metrics.expectancy / 1000).toFixed(1) + 'K' : metrics.expectancy.toFixed(2)}`) : '$0.00'}
           />
         ) : (
           <StatBox 
             title="Total Trades"
-            value={profile.total_trades}
-            trend={null}
+            value={metrics?.totalTrades > 999 ? (metrics.totalTrades / 1000).toFixed(1) + 'K' : (metrics?.totalTrades || 0).toString()}
+            trend={metrics?.totalTrades || 0}
           />
         )}
       </div>
@@ -833,12 +2279,12 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-3">
                    <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
                       <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Daily Streak</p>
-                      <p className="text-lg font-bold text-green-600">+{profile.max_win_streak}</p>
+                      <p className="text-lg font-bold text-green-600">+{metrics?.maxWinStreak || 0}</p>
                       <p className="text-[10px] text-gray-400">trades</p>
                    </div>
                    <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
                       <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Current Streak</p>
-                      <p className="text-lg font-bold text-green-600">+{profile.current_win_streak}</p>
+                      <p className="text-lg font-bold text-green-600">+0</p>
                       <p className="text-[10px] text-gray-400">trades</p>
                    </div>
                 </div>
@@ -849,154 +2295,228 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-3">
                    <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
                       <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Max Streak</p>
-                      <p className="text-lg font-bold text-red-500">-{profile.max_loss_streak}</p>
+                      <p className="text-lg font-bold text-red-500">-{metrics?.maxLoseStreak || 0}</p>
                       <p className="text-[10px] text-gray-400">trades</p>
                    </div>
                    <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
                       <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Current Streak</p>
-                      <p className="text-lg font-bold text-red-500">-{profile.current_loss_streak}</p>
+                      <p className="text-lg font-bold text-red-500">-0</p>
                       <p className="text-[10px] text-gray-400">trades</p>
                    </div>
                 </div>
              </NeumorphicCard>
           </div>
 
+          {/* Capital Under Management - Coming Soon */}
+          <NeumorphicCard className="p-6">
+             <h4 className="text-gray-500 font-bold text-sm uppercase mb-4 tracking-wider">Capital Under Management</h4>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ filter: 'blur(2px)', opacity: 0.6 }}>
+                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Total Capital</p>
+                   <p className="text-xl font-bold text-blue-600">$1,250,000</p>
+                   <p className="text-[10px] text-gray-400">under management</p>
+                </div>
+                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Active Accounts</p>
+                   <p className="text-xl font-bold text-green-600">247</p>
+                   <p className="text-[10px] text-gray-400">managed accounts</p>
+                </div>
+                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Avg Account Size</p>
+                   <p className="text-xl font-bold text-purple-600">$5,060</p>
+                   <p className="text-[10px] text-gray-400">per account</p>
+                </div>
+                <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner border border-white/50">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Performance Fee</p>
+                   <p className="text-xl font-bold text-orange-600">15%</p>
+                   <p className="text-[10px] text-gray-400">of profits</p>
+                </div>
+             </div>
+             <div className="mt-4 text-center">
+                <p className="text-xs text-gray-400 italic">Coming Soon - Feature Under Development</p>
+             </div>
+          </NeumorphicCard>
+
         </div>
 
-        {/* Right Column: ELO Analysis */}
+        {/* Right Column: Score Analysis */}
         <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-           <NeumorphicCard className="p-6 min-h-[500px] flex flex-col">
-              <h3 className="text-xl font-bold text-gray-700 mb-6">ELO Analysis</h3>
+           <NeumorphicCard className="p-6 min-h-[955px] flex flex-col">
+              <h3 className="text-xl font-bold text-gray-700 mb-6">Score Analysis</h3>
 
-              {eloLoading ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <Award size={48} className="text-gray-300 mx-auto mb-4 animate-pulse" />
-                    <p className="text-gray-500 mb-2">Calculating ELO Score...</p>
-                    <p className="text-sm text-gray-400">Analyzing trading performance</p>
-                  </div>
-                </div>
-              ) : eloData ? (
-                <div className="flex-1 flex flex-col gap-6">
-                  {/* ELO Score Overview */}
-                  <div className="text-center p-4 bg-[#e0e5ec] rounded-xl shadow-inner">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <Award size={24} style={{ color: eloApi.getELOColor(eloData.eloScore) }} />
-                      <span className="text-2xl font-bold" style={{ color: eloApi.getELOColor(eloData.eloScore) }}>
-                        {eloApi.formatELOScore(eloData.eloScore)}
-                      </span>
-                          </div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">{eloData.category}</p>
-                    <p className="text-xs text-gray-500">
-                      Data Coverage: {(eloData.dataQuality.dataCompleteness * 100).toFixed(0)}%
-                    </p>
-                   </div>
-
-                  {/* ELO Blocks */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Block Scores</h4>
-                    {eloData.blocks.filter(block => block.confidence !== 'excluded').map((block, index) => (
-                      <div key={index}>
-                        <div className="flex justify-between items-center mb-1">
+              <div className="flex-1 flex flex-col justify-center gap-8">
+                 <div className="space-y-6">
+                   {/* Performance */}
+                   <div>
+                       <div className="flex justify-between items-center mb-1">
                           <div className="flex items-center gap-1">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                              {block.name.charAt(0).toUpperCase() + block.name.slice(1).replace(/([A-Z])/g, ' $1')}
-                            </p>
-                            <span className={`text-xs px-1.5 py-0.5 rounded text-white font-medium ${
-                              block.confidence === 'high' ? 'bg-green-500' :
-                              block.confidence === 'medium' ? 'bg-yellow-500' :
-                              block.confidence === 'low' ? 'bg-orange-500' : 'bg-red-500'
-                            }`}>
-                              {block.confidence === 'excluded' ? 'excluded' : block.confidence}
-                            </span>
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance</p>
+                             <button
+                               onClick={() => setHelpPopup('performance')}
+                               className="text-gray-400 hover:text-gray-600 transition-colors"
+                             >
+                               <HelpCircle size={12} />
+                             </button>
                           </div>
-                          <span className="text-sm font-bold text-blue-600">
-                            {block.score !== null ? block.score.toFixed(1) : 'N/A'}
-                          </span>
-                        </div>
-                       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
-                          <div
-                            className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, block.score)}%` }}
-                          ></div>
+                          <span className="text-sm font-bold text-blue-600">{eloScores.performance_score}</span>
                        </div>
-                       <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-gray-500">
-                          <div className="flex justify-between">
-                            <span>Metrics:</span>
-                            <span className="font-medium text-gray-700">{block.availableMetrics}/{block.totalMetrics}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Coverage:</span>
-                            <span className="font-medium text-gray-700">{block.coveragePercent.toFixed(0)}%</span>
-                          </div>
+                       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${eloScores.performance_score}%` }}></div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] sm:text-[10px] text-gray-500">
+                          <div className="flex justify-between"><span>Total Return:</span> <span className="font-medium text-gray-700">{metrics?.totalReturn !== undefined ? metrics.totalReturn.toFixed(2) + '%' : '0.00%'}</span></div>
+                          <div className="flex justify-between"><span>Ann. Return:</span> <span className="font-medium text-gray-700">{metrics?.annualizedReturn !== undefined ? metrics.annualizedReturn.toFixed(2) + '%' : '0.00%'}</span></div>
+                          <div className="flex justify-between"><span>Win Rate:</span> <span className="font-medium text-gray-700">{metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</span></div>
+                          <div className="flex justify-between"><span>Profit Factor:</span> <span className="font-medium text-gray-700">{metrics?.profitFactor !== undefined ? (metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)) : '0.00'}</span></div>
+                          <div className="flex justify-between"><span>Expectancy:</span> <span className="font-medium text-gray-700">${metrics?.expectancy !== undefined ? (Math.abs(metrics.expectancy) > 999 ? (metrics.expectancy / 1000).toFixed(1) + 'K' : metrics.expectancy.toFixed(2)) : '0.00'}</span></div>
+                          <div className="flex justify-between"><span>Best Trade:</span> <span className="font-medium text-gray-700">${metrics?.bestTrade !== undefined ? (Math.abs(metrics.bestTrade) > 999 ? (metrics.bestTrade / 1000).toFixed(1) + 'K' : metrics.bestTrade.toFixed(2)) : '0.00'}</span></div>
                        </div>
                    </div>
-                    ))}
+
+                   {/* Risk Control */}
+                   <div>
+                       <div className="flex justify-between items-center mb-1">
+                          <div className="flex items-center gap-1">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Risk Control</p>
+                             <button
+                               onClick={() => setHelpPopup('risk')}
+                               className="text-gray-400 hover:text-gray-600 transition-colors"
+                             >
+                               <HelpCircle size={12} />
+                             </button>
+                          </div>
+                          <span className="text-sm font-bold text-blue-600">{eloScores.risk_score}</span>
+                       </div>
+                       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${eloScores.risk_score}%` }}></div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] sm:text-[10px] text-gray-500">
+                          <div className="flex justify-between"><span>Max DD:</span> <span className="font-medium text-gray-700">{metrics?.maxDrawdown !== undefined ? metrics.maxDrawdown.toFixed(2) + '%' : '0.00%'}</span></div>
+                          <div className="flex justify-between"><span>Avg DD:</span> <span className="font-medium text-gray-700">{metrics?.avgDrawdown !== undefined ? metrics.avgDrawdown.toFixed(2) + '%' : '0.00%'}</span></div>
+                          <div className="flex justify-between"><span>Recovery Factor:</span> <span className="font-medium text-gray-700">{metrics?.recoveryFactor !== undefined ? (metrics.recoveryFactor === Infinity ? '∞' : metrics.recoveryFactor.toFixed(2)) : '0.00'}</span></div>
+                          <div className="flex justify-between"><span>Volatility:</span> <span className="font-medium text-gray-700">{metrics?.volatility !== undefined ? metrics.volatility.toFixed(2) + '%' : '0.00%'}</span></div>
+                          <div className="flex justify-between"><span>Sharpe Ratio:</span> <span className="font-medium text-gray-700">{metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</span></div>
+                          <div className="flex justify-between"><span>Risk/Trade:</span> <span className="font-medium text-gray-700">{metrics?.avgRiskTrade !== undefined ? metrics.avgRiskTrade.toFixed(2) + '%' : '0.00%'}</span></div>
+                       </div>
+                   </div>
+
+                   {/* Consistency */}
+                   <div>
+                       <div className="flex justify-between items-center mb-1">
+                          <div className="flex items-center gap-1">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Consistency</p>
+                             <button
+                               onClick={() => setHelpPopup('consistency')}
+                               className="text-gray-400 hover:text-gray-600 transition-colors"
+                             >
+                               <HelpCircle size={12} />
+                             </button>
+                          </div>
+                          <span className="text-sm font-bold text-blue-600">{eloScores.consistency_score}</span>
+                       </div>
+                       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${eloScores.consistency_score}%` }}></div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] sm:text-[10px] text-gray-500">
+                          <div className="flex justify-between"><span>Roughness:</span> <span className="font-medium text-gray-700">{metrics?.roughness !== undefined ? metrics.roughness.toFixed(2) + '%' : '0.00%'}</span></div>
+                          <div className="flex justify-between"><span>Positive Mos:</span> <span className="font-medium text-gray-700">{metrics?.positiveMonths !== undefined ? metrics.positiveMonths : '0'}</span></div>
+                          <div className="flex justify-between"><span>Freq Std:</span> <span className="font-medium text-gray-700">{metrics?.freqStd !== undefined ? metrics.freqStd.toFixed(2) : '0.00'}</span></div>
+                          <div className="flex justify-between"><span>Sortino Ratio:</span> <span className="font-medium text-gray-700">{metrics?.sortinoRatio !== undefined ? metrics.sortinoRatio.toFixed(2) : '0.00'}</span></div>
+                          <div className="flex justify-between"><span>Calmar Ratio:</span> <span className="font-medium text-gray-700">{metrics?.calmarRatio !== undefined ? metrics.calmarRatio.toFixed(2) : '0.00'}</span></div>
+                          <div className="flex justify-between"><span>SQN:</span> <span className="font-medium text-gray-700">{metrics?.sqn !== undefined ? metrics.sqn.toFixed(2) : '0.00'}</span></div>
+                       </div>
+                   </div>
+
+                   {/* Account Health */}
+                   <div>
+                       <div className="flex justify-between items-center mb-1">
+                          <div className="flex items-center gap-1">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Account Health</p>
+                             <button
+                               onClick={() => setHelpPopup('health')}
+                               className="text-gray-400 hover:text-gray-600 transition-colors"
+                             >
+                               <HelpCircle size={12} />
+                             </button>
+                          </div>
+                          <span className="text-sm font-bold text-blue-600">{eloScores.account_health_score}</span>
+                       </div>
+                       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${eloScores.account_health_score}%` }}></div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] sm:text-[10px] text-gray-500">
+                          <div className="flex justify-between"><span>Account Age:</span> <span className="font-medium text-gray-700">{metrics?.accountAge !== undefined ? metrics.accountAge + ' days' : '0 days'}</span></div>
+                          <div className="flex justify-between"><span>Trading Days:</span> <span className="font-medium text-gray-700">{metrics?.tradingDays !== undefined ? metrics.tradingDays : '0'}</span></div>
+                          <div className="flex justify-between"><span>Activity Rate:</span> <span className="font-medium text-gray-700">{metrics?.activityRate !== undefined ? metrics.activityRate.toFixed(1) + '%' : '0.0%'}</span></div>
+                          <div className="flex justify-between"><span>Exposure Time:</span> <span className="font-medium text-gray-700">{metrics?.exposureTime !== undefined ? metrics.exposureTime.toFixed(1) + '%' : '0.0%'}</span></div>
+                          <div className="flex justify-between"><span>Total Trades:</span> <span className="font-medium text-gray-700">{metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</span></div>
+                          <div className="flex justify-between"><span>Worst Trade:</span> <span className="font-medium text-gray-700">${metrics?.worstTrade !== undefined ? (Math.abs(metrics.worstTrade) > 999 ? (metrics.worstTrade / 1000).toFixed(1) + 'K' : metrics.worstTrade.toFixed(2)) : '0.00'}</span></div>
+                       </div>
+                   </div>
                  </div>
 
-                  {/* Reliability & Penalties */}
-                  <div className="space-y-4 pt-4 border-t border-gray-300/50">
-                    <h4 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Reliability Factors</h4>
 
-                    <div className="grid grid-cols-2 gap-4">
+                 <div className="pt-6 border-t border-gray-300/50 space-y-4">
                     <div>
-                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Total Trades</p>
-                        <p className="text-lg font-bold text-gray-800">{eloData.dataQuality.totalTrades}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Reliability</p>
-                        <p className="text-lg font-bold text-blue-600">
-                          {(eloData.reliability.reliabilityMultiplier * 100).toFixed(0)}%
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Data Coverage</p>
-                        <p className="text-lg font-bold text-green-600">
-                          {(eloData.dataQuality.dataCompleteness * 100).toFixed(0)}%
-                        </p>
-                    </div>
-                     <div>
-                        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Confidence</p>
-                        <p className="text-lg font-bold text-purple-600">
-                          {(eloData.reliability.confidenceCoefficient * 100).toFixed(0)}%
-                        </p>
-                    </div>
-                 </div>
-
-                    {eloData.penalties.length > 0 && (
-                      <div className="mt-4">
-                        <h5 className="text-sm font-bold text-red-600 uppercase tracking-wider mb-2">Penalties Applied</h5>
-                        <div className="space-y-1">
-                          {eloData.penalties.map((penalty, index) => (
-                            <div key={index} className="flex justify-between text-xs">
-                              <span className="text-gray-600">{penalty.name}:</span>
-                              <span className="font-medium text-red-600">-{penalty.value}</span>
+                        <p className="text-gray-500 text-sm font-medium mb-2">Volume Breakdown</p>
+                        <div className="flex justify-between items-baseline mb-1">
+                           <span className="text-2xl font-bold text-gray-800">{metrics?.totalTrades !== undefined ? (metrics.totalTrades > 999 ? (metrics.totalTrades / 1000).toFixed(1) + 'K' : metrics.totalTrades) : 0} <span className="text-sm font-normal text-gray-500">trades</span></span>
                         </div>
-                          ))}
+                        <div className="flex gap-4 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                           <span className="flex items-center gap-1 text-green-600"><ArrowUpRight size={14} /> {metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round(metrics.winRate * metrics.totalTrades / 100) : 0} Won</span>
+                           <span className="flex items-center gap-1 text-red-500"><ArrowDownRight size={14} /> {metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? (metrics.totalTrades - Math.round(metrics.winRate * metrics.totalTrades / 100)) : 0} Lost</span>
                         </div>
                     </div>
-                    )}
 
-                    {eloData.missingMetrics.length > 0 && (
-                      <div className="mt-4">
-                        <h5 className="text-sm font-bold text-orange-600 uppercase tracking-wider mb-2">Missing Metrics</h5>
-                        <div className="text-xs text-gray-600">
-                          {eloData.missingMetrics.slice(0, 5).join(', ')}
-                          {eloData.missingMetrics.length > 5 && ` +${eloData.missingMetrics.length - 5} more`}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                           <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Buy Orders</p>
+                           <p className="text-lg font-bold text-green-600">{trades.filter(t => t.direction === 'Buy').length}</p>
+                           <p className="text-[10px] text-gray-400">trades</p>
+                           <div className="mt-2 space-y-1">
+                              <div className="flex justify-between text-[9px]">
+                                 <span className="text-green-600">Won:</span>
+                                 <span className="font-semibold text-green-600">{trades.filter(t => t.direction === 'Buy' && parseFloat(t.net_profit) > 0).length}</span>
+                              </div>
+                              <div className="flex justify-between text-[9px]">
+                                 <span className="text-red-500">Lost:</span>
+                                 <span className="font-semibold text-red-500">{trades.filter(t => t.direction === 'Buy' && parseFloat(t.net_profit) <= 0).length}</span>
+                              </div>
+                              <div className="flex justify-between text-[9px] pt-1 border-t border-gray-200">
+                                 <span>Win Rate:</span>
+                                 <span className="font-semibold">{trades.filter(t => t.direction === 'Buy').length > 0 ? ((trades.filter(t => t.direction === 'Buy' && parseFloat(t.net_profit) > 0).length / trades.filter(t => t.direction === 'Buy').length) * 100).toFixed(1) : 0}%</span>
+                              </div>
+                           </div>
                         </div>
+                        <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                           <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Sell Orders</p>
+                           <p className="text-lg font-bold text-red-600">{trades.filter(t => t.direction === 'Sell').length}</p>
+                           <p className="text-[10px] text-gray-400">trades</p>
+                           <div className="mt-2 space-y-1">
+                              <div className="flex justify-between text-[9px]">
+                                 <span className="text-green-600">Won:</span>
+                                 <span className="font-semibold text-green-600">{trades.filter(t => t.direction === 'Sell' && parseFloat(t.net_profit) > 0).length}</span>
+                              </div>
+                              <div className="flex justify-between text-[9px]">
+                                 <span className="text-red-500">Lost:</span>
+                                 <span className="font-semibold text-red-500">{trades.filter(t => t.direction === 'Sell' && parseFloat(t.net_profit) <= 0).length}</span>
+                              </div>
+                              <div className="flex justify-between text-[9px] pt-1 border-t border-gray-200">
+                                 <span>Win Rate:</span>
+                                 <span className="font-semibold">{trades.filter(t => t.direction === 'Sell').length > 0 ? ((trades.filter(t => t.direction === 'Sell' && parseFloat(t.net_profit) > 0).length / trades.filter(t => t.direction === 'Sell').length) * 100).toFixed(1) : 0}%</span>
+                              </div>
+                           </div>
+                        </div>
+                        {isOwnProfile && (
+                          <div className="bg-[#e0e5ec] p-3 rounded-xl shadow-inner border border-white/50">
+                             <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Total Volume</p>
+                             <p className="text-lg font-bold text-blue-600">{trades.reduce((sum, t) => sum + (parseFloat(t.volume) || 0), 0).toFixed(2)}</p>
+                             <p className="text-[10px] text-gray-400">lots</p>
                           </div>
                         )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <Award size={48} className="text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 mb-2">No ELO data available</p>
-                    <p className="text-sm text-gray-400">Unable to load ELO analysis</p>
-                  </div>
-                </div>
-              )}
+                    </div>
+                 </div>
+              </div>
            </NeumorphicCard>
 
         </div>
@@ -1007,3 +2527,4 @@ export default function Dashboard() {
       {helpPopup && <HelpPopup metric={helpPopup} onClose={() => setHelpPopup(null)} />}
     </div>
   );
+}
