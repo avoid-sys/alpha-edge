@@ -415,22 +415,35 @@ export const startCtraderFlow = async (isDemo = false) => {
         const payloadTypeNum = message.payloadType;
         console.log('📨 Received payloadType:', payloadTypeNum);
 
-        if (payloadTypeNum === 51 || payloadTypeNum === 2142) {
-          console.log('💓 Heartbeat received — connection alive');
+        // Handle simple heartbeat first
+        if (payloadTypeNum === 51) {
+          console.log('💓 Heartbeat received (51) — connection alive');
           return;
         }
 
-        console.log(`📨 Processing message type: ${payloadTypeNum} (${typeName})`);
-
+        // For other messages, decode to determine type
         const payloadTypeEnum = protoRoot.lookupEnum('ProtoOAPayloadType');
         const typeName = payloadTypeEnum.valuesById[payloadTypeNum];
+
+        console.log(`📨 Processing message type: ${payloadTypeNum} (${typeName || 'unknown'})`);
+
         if (!typeName) {
-          console.warn('Unknown payloadType:', payloadTypeNum);
+          console.warn('Unknown payloadType:', payloadTypeNum, '- raw data:', message);
           return;
         }
 
         const PayloadType = protoRoot.lookupType(`ProtoOA.${typeName}`);
         const payload = PayloadType.decode(message.payload);
+
+        console.log(`🔍 Decoded ${typeName} payload:`, payload);
+
+        // Handle heartbeat that comes as 2142 (same as auth response)
+        if (payloadTypeNum === 2142 && typeName !== 'ProtoOAApplicationAuthRes') {
+          console.log('💓 Heartbeat received (2142) — connection alive');
+          return;
+        }
+
+        console.log(`🔍 Decoded payload for ${typeName}:`, payload);
 
         if (payloadTypeNum === 2142) { // ProtoOAApplicationAuthRes - app auth success
           console.log('✅ Application authenticated — requesting all accounts');
