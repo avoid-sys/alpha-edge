@@ -1854,7 +1854,13 @@ export default function Dashboard() {
                 <>
                   <span className="flex items-center gap-1 text-blue-600 font-medium">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    {profile.is_live_account ? 'Live Account' : 'Demo Account'}
+                    {(() => {
+                      const accountsCount = parseInt(localStorage.getItem('ctrader_accounts_count') || '1');
+                      const accountType = profile.is_live_account ? 'Live' : 'Demo';
+                      return accountsCount > 1
+                        ? `${accountType} (${accountsCount} accounts combined)`
+                        : accountType;
+                    })()}
                   </span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
                 </>

@@ -357,7 +357,9 @@ export const startCtraderFlow = async (isDemo = false) => {
 
   const ws = new WebSocket(wsUrl);
 
-  let accountId = null;
+  let accounts = []; // Список всех аккаунтов пользователя
+  let allDeals = []; // Все сделки со всех аккаунтов
+  let currentAccountIndex = -1; // Текущий обрабатываемый аккаунт
 
   return new Promise((resolve, reject) => {
     ws.onopen = () => {
@@ -449,48 +451,92 @@ export const startCtraderFlow = async (isDemo = false) => {
         const PayloadType = protoRoot.lookupType(`ProtoOA.${typeName}`);
         const payload = PayloadType.decode(message.payload);
 
-        if (payloadTypeNum === 2101) { // SUCCESS app auth
-          console.log('✅ Application authenticated — requesting accounts');
+        if (payloadTypeNum === 2101) { // ProtoOAApplicationAuthRes - app auth success
+          console.log('✅ Application authenticated — requesting all accounts');
           sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
             accessToken: tokens.access_token
           });
-        } else if (payloadTypeNum === 2103) { // Accounts list
-          if (!payload.ctidTraderAccount || payload.ctidTraderAccount.length === 0) {
-            console.warn('No trading accounts found');
-            resolve({}); // Пустая статистика, если аккаунтов нет
+        } else if (payloadTypeNum === 2150) { // ProtoOAGetAccountListByAccessTokenRes - accounts list
+          accounts = payload.ctidTraderAccount || [];
+          if (accounts.length === 0) {
+            console.warn('⚠️ No trading accounts found');
+            isConnecting = false;
+            resolve([]); // Return empty array if no accounts
             ws.close();
             return;
           }
-          accountId = payload.ctidTraderAccount[0].ctidTraderAccountId;
-          localStorage.setItem('ctrader_account_id', accountId);
-          console.log('Found account ID:', accountId);
 
-          sendMessage(ws, 'ProtoOAAccountAuthReq', {
-            ctidTraderAccountId: accountId,
-            accessToken: tokens.access_token
-          });
-        } else if (payloadTypeNum === 2105) { // Account auth success
-          console.log('✅ Account authenticated — requesting deals');
+          console.log(`📋 Found ${accounts.length} accounts (demo + live):`, accounts.map(acc => ({
+            id: acc.ctidTraderAccountId,
+            isLive: acc.isLive
+          })));
+
+          // Start processing first account
+          currentAccountIndex = 0;
+          processNextAccount();
+        } else if (payloadTypeNum === 2104) { // ProtoOAAccountAuthRes - account auth success
+          console.log(`✅ Account ${currentAccountIndex + 1}/${accounts.length} authenticated — requesting deals`);
           const from = Date.now() - 365 * 24 * 60 * 60 * 1000;
           const to = Date.now();
+          const accountId = accounts[currentAccountIndex].ctidTraderAccountId;
+
           sendMessage(ws, 'ProtoOADealListReq', {
             ctidTraderAccountId: accountId,
             fromTimestamp: from,
             toTimestamp: to
           });
-        } else if (payloadTypeNum === 2113) { // Deals received
-          console.log('📊 Received', payload.deal?.length || 0, 'deals');
-          const completeTrades = parseDealsToTrades(payload.deal || []);
-          console.log('✅ Stats calculated:', completeTrades.length, 'trades');
+        } else if (payloadTypeNum === 2125) { // ProtoOADealListRes - deals received
+          const deals = payload.deal || [];
+          const accountId = accounts[currentAccountIndex].ctidTraderAccountId;
+          const isLive = accounts[currentAccountIndex].isLive;
 
-          isConnecting = false; // Reset flag on success
-          resolve(completeTrades);
-          ws.close();
-        } else if (payloadTypeNum === 50) { // Error
-          console.error('Spotware error:', payload.description);
-          isConnecting = false; // Reset flag on error
+          console.log(`📊 Received ${deals.length} deals from account ${accountId} (${isLive ? 'LIVE' : 'DEMO'})`);
+          allDeals = allDeals.concat(deals);
+
+          // Move to next account
+          currentAccountIndex++;
+
+          if (currentAccountIndex >= accounts.length) {
+            // All accounts processed - combine and return results
+            console.log(`🎯 All ${accounts.length} accounts processed. Total deals: ${allDeals.length}`);
+            const completeTrades = parseDealsToTrades(allDeals);
+            const stats = analyzeTrades(completeTrades);
+
+            console.log('✅ Combined stats from all accounts:', {
+              accountsProcessed: accounts.length,
+              totalDeals: allDeals.length,
+              totalTrades: completeTrades.length,
+              stats: stats
+            });
+
+            // Save account count for UI display
+            localStorage.setItem('ctrader_accounts_count', accounts.length.toString());
+
+            isConnecting = false;
+            resolve(completeTrades);
+            ws.close();
+          } else {
+            // Process next account
+            processNextAccount();
+          }
+        } else if (payloadTypeNum === 50) { // ProtoOAErrorRes - error
+          console.error('❌ Spotware error:', payload.description);
+          isConnecting = false;
           reject(new Error(payload.description || 'cTrader error'));
           ws.close();
+        }
+
+        // Helper function to process next account
+        function processNextAccount() {
+          if (currentAccountIndex >= accounts.length) return;
+
+          const account = accounts[currentAccountIndex];
+          console.log(`🔐 Authenticating account ${currentAccountIndex + 1}/${accounts.length}: ID ${account.ctidTraderAccountId}, isLive: ${account.isLive}`);
+
+          sendMessage(ws, 'ProtoOAAccountAuthReq', {
+            ctidTraderAccountId: account.ctidTraderAccountId,
+            accessToken: tokens.access_token
+          });
         }
       } catch (err) {
         console.error('Processing error:', err);
