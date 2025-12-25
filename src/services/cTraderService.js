@@ -320,6 +320,41 @@ const parseDealsToTrades = (deals) => {
     });
 };
 
+const analyzeTrades = (trades) => {
+  if (!trades || !Array.isArray(trades) || trades.length === 0) {
+    return {
+      totalTrades: 0,
+      winningTrades: 0,
+      losingTrades: 0,
+      winRate: 0,
+      totalProfit: 0,
+      avgProfit: 0,
+      largestWin: 0,
+      largestLoss: 0
+    };
+  }
+
+  const totalTrades = trades.length;
+  const winningTrades = trades.filter(t => t.profit > 0).length;
+  const losingTrades = totalTrades - winningTrades;
+  const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+  const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
+  const avgProfit = totalTrades > 0 ? totalProfit / totalTrades : 0;
+  const largestWin = Math.max(0, ...trades.map(t => t.profit).filter(p => p > 0));
+  const largestLoss = Math.min(0, ...trades.map(t => t.profit).filter(p => p < 0));
+
+  return {
+    totalTrades,
+    winningTrades,
+    losingTrades,
+    winRate,
+    totalProfit,
+    avgProfit,
+    largestWin,
+    largestLoss
+  };
+};
+
 export const startCtraderFlow = async (isDemo = false) => {
   // Prevent multiple simultaneous flows
   if (isConnecting) {
