@@ -239,14 +239,6 @@ export default function Dashboard() {
 
                   if (profileError) throw profileError;
 
-                  // Save empty trades array
-                  const { error: tradesError } = await supabase
-                    .from('trades')
-                    .insert([]);
-
-                  if (tradesError) {
-                    console.warn('Warning: Could not save empty trades:', tradesError);
-                  }
 
                   fetchedProfile = newProfile;
                   fetchedTrades = [];
@@ -286,13 +278,8 @@ export default function Dashboard() {
                 };
 
                 console.log('📝 Creating empty cTrader profile due to error:', emptyProfileData);
-                const { data: newProfile, error: profileError } = await supabase
-                  .from('profiles')
-                  .insert(emptyProfileData)
-                  .select()
-                  .single();
-
-                if (profileError) throw profileError;
+                const newProfile = await localDataService.entities.TraderProfile.create(emptyProfileData);
+                console.log('✅ Created empty cTrader profile in localDataService:', newProfile.id);
 
                 fetchedProfile = newProfile;
                 fetchedTrades = [];
@@ -512,14 +499,6 @@ export default function Dashboard() {
 
                   if (profileError) throw profileError;
 
-                  // Save empty trades array
-                  const { error: tradesError } = await supabase
-                    .from('trades')
-                    .insert([]);
-
-                  if (tradesError) {
-                    console.warn('Warning: Could not save empty trades:', tradesError);
-                  }
 
                   fetchedProfile = newProfile;
                   fetchedTrades = [];
@@ -559,13 +538,8 @@ export default function Dashboard() {
                 };
 
                 console.log('📝 Creating empty cTrader profile due to error:', emptyProfileData);
-                const { data: newProfile, error: profileError } = await supabase
-                  .from('profiles')
-                  .insert(emptyProfileData)
-                  .select()
-                  .single();
-
-                if (profileError) throw profileError;
+                const newProfile = await localDataService.entities.TraderProfile.create(emptyProfileData);
+                console.log('✅ Created empty cTrader profile in localDataService:', newProfile.id);
 
                 fetchedProfile = newProfile;
                 fetchedTrades = [];
