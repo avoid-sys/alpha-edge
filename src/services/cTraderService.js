@@ -260,6 +260,7 @@ const sendMessage = (ws, messageTypeName, payloadObj) => {
     const payloadTypeMap = {
       'ProtoOAApplicationAuthReq': payloadTypeEnum.PROTO_OA_APPLICATION_AUTH_REQ, // 2100
       'ProtoOAGetAccountListByAccessTokenReq': payloadTypeEnum.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ, // 2149
+      'ProtoOAGetAccountListReq': payloadTypeEnum.PROTO_OA_GET_ACCOUNT_LIST_REQ, // 2148
       'ProtoOAAccountAuthReq': payloadTypeEnum.PROTO_OA_ACCOUNT_AUTH_REQ, // 2103
       'ProtoOADealListReq': payloadTypeEnum.PROTO_OA_DEAL_LIST_REQ, // 2124
     };
@@ -489,17 +490,47 @@ export const startCtraderFlow = async (isDemo = false) => {
 
         // Handle potential heartbeat on 2142 (same as auth response)
         if (payloadTypeNum === 2142) {
-          // Try to decode as auth response first
+          // Check if this is an error response first
+          const payloadTypeEnum = protoRoot.lookupEnum('ProtoOAPayloadType');
+          const typeName = payloadTypeEnum.valuesById[payloadTypeNum];
+
+          if (typeName === 'ProtoOAErrorRes') {
+            try {
+              const ErrorType = protoRoot.lookupType('ProtoOA.ProtoOAErrorRes');
+              const errorPayload = ErrorType.decode(message.payload);
+              console.error('❌ cTrader error response:', errorPayload.description, 'code:', errorPayload.errorCode);
+              isConnecting = false;
+              reject(new Error(errorPayload.description || 'cTrader API error'));
+              ws.close();
+              return;
+            } catch (e) {
+              console.log('💓 Heartbeat received (2142) — connection alive');
+              return;
+            }
+          }
+
+          // Try to decode as auth response
           try {
             const AuthResType = protoRoot.lookupType('ProtoOA.ProtoOAApplicationAuthRes');
             const authPayload = AuthResType.decode(message.payload);
             console.log('🎉 ProtoOAApplicationAuthRes received - app auth success!');
             console.log('🔍 Auth response payload:', authPayload);
 
-            // Proceed with account list request
-            sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
-              accessToken: tokens.access_token
-            });
+            // Wait a bit before sending next request to avoid overwhelming the server
+            setTimeout(() => {
+              console.log('📋 Sending account list request...');
+              // Try the simpler account list request first (without access token since we're authenticated)
+              try {
+                sendMessage(ws, 'ProtoOAGetAccountListReq', {});
+                console.log('✅ Sent ProtoOAGetAccountListReq');
+              } catch (e) {
+                console.log('⚠️ ProtoOAGetAccountListReq failed, trying with access token...');
+                sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
+                  accessToken: tokens.access_token
+                });
+                console.log('✅ Sent ProtoOAGetAccountListByAccessTokenReq with accessToken');
+              }
+            }, 100);
             return;
           } catch (authError) {
             // Not an auth response, treat as heartbeat
@@ -531,24 +562,24 @@ export const startCtraderFlow = async (isDemo = false) => {
           sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
             accessToken: tokens.access_token
           });
-        } else if (payloadTypeNum === 2150) { // ProtoOAGetAccountListByAccessTokenRes - accounts list
-          accounts = payload.ctidTraderAccount || [];
-          if (accounts.length === 0) {
-            console.warn('⚠️ No trading accounts found');
-            isConnecting = false;
-            resolve([]); // Return empty array if no accounts
-            ws.close();
-            return;
-          }
+               } else if (payloadTypeNum === 2150 || payloadTypeNum === 2148) { // ProtoOAGetAccountListByAccessTokenRes or ProtoOAGetAccountListRes - accounts list
+                 accounts = payload.ctidTraderAccount || [];
+                 if (accounts.length === 0) {
+                   console.warn('⚠️ No trading accounts found');
+                   isConnecting = false;
+                   resolve([]); // Return empty array if no accounts
+                   ws.close();
+                   return;
+                 }
 
-          console.log(`📋 Found ${accounts.length} accounts (demo + live):`, accounts.map(acc => ({
-            id: acc.ctidTraderAccountId,
-            isLive: acc.isLive
-          })));
+                 console.log(`📋 Found ${accounts.length} accounts (demo + live):`, accounts.map(acc => ({
+                   id: acc.ctidTraderAccountId,
+                   isLive: acc.isLive
+                 })));
 
-          // Start processing first account
-          currentAccountIndex = 0;
-          processNextAccount();
+                 // Start processing first account
+                 currentAccountIndex = 0;
+                 processNextAccount();
         } else if (payloadTypeNum === 2104) { // ProtoOAAccountAuthRes - account auth success
           console.log(`✅ Account ${currentAccountIndex + 1}/${accounts.length} authenticated — requesting deals`);
           const from = Date.now() - 365 * 24 * 60 * 60 * 1000;

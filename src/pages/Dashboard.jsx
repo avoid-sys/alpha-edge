@@ -1722,7 +1722,8 @@ export default function Dashboard() {
 
     setLoading(true);
     try {
-      const trades = await fetchAndAnalyzeTrades(true); // true for demo account
+      const { startCtraderFlow } = await import('@/services/cTraderService');
+      const trades = await startCtraderFlow(true); // true for demo account
 
       // Clear existing data first
       const existingTrades = await localDataService.entities.Trade.filter({
