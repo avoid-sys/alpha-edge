@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const { code, redirect_uri } = req.body;
+  const { code, redirect_uri, account_type = 'live' } = req.body;
 
   // Validate required parameters
   if (!code || !redirect_uri) {
@@ -20,15 +20,37 @@ export default async function handler(req, res) {
     });
   }
 
-  // Validate cTrader credentials - use FULL client ID for consistency
-  if (!process.env.CTRADER_FULL_CLIENT_ID || !process.env.CTRADER_CLIENT_SECRET) {
-    console.error('❌ Missing cTrader credentials:', {
-      hasFullClientId: !!process.env.CTRADER_FULL_CLIENT_ID,
-      hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET
+  // Select credentials based on account type with fallback to live
+  const isDemo = account_type === 'demo';
+  let clientId = isDemo
+    ? process.env.CTRADER_DEMO_CLIENT_ID
+    : process.env.CTRADER_LIVE_CLIENT_ID;
+  let clientSecret = isDemo
+    ? process.env.CTRADER_DEMO_CLIENT_SECRET
+    : process.env.CTRADER_LIVE_CLIENT_SECRET;
+
+  // Fallback: if demo credentials missing, use live credentials
+  if (isDemo && (!clientId || !clientSecret)) {
+    console.warn('⚠️ DEMO credentials not configured, falling back to LIVE credentials for token exchange');
+    clientId = process.env.CTRADER_LIVE_CLIENT_ID;
+    clientSecret = process.env.CTRADER_LIVE_CLIENT_SECRET;
+  }
+
+  console.log('🔧 Using', isDemo ? 'DEMO' : 'LIVE', 'credentials for token exchange (with fallback)');
+
+  // Validate cTrader credentials
+  if (!clientId || !clientSecret) {
+    console.error('❌ Missing cTrader credentials (both LIVE and DEMO):', {
+      hasLiveClientId: !!process.env.CTRADER_LIVE_CLIENT_ID,
+      hasLiveClientSecret: !!process.env.CTRADER_LIVE_CLIENT_SECRET,
+      hasDemoClientId: !!process.env.CTRADER_DEMO_CLIENT_ID,
+      hasDemoClientSecret: !!process.env.CTRADER_DEMO_CLIENT_SECRET,
+      accountType: account_type,
+      fallbackUsed: isDemo && (!process.env.CTRADER_DEMO_CLIENT_ID || !process.env.CTRADER_DEMO_CLIENT_SECRET)
     });
     return res.status(500).json({
       error: 'Server configuration error',
-      message: 'cTrader credentials not configured. Need CTRADER_FULL_CLIENT_ID and CTRADER_CLIENT_SECRET'
+      message: 'cTrader credentials not configured. Need at least CTRADER_LIVE_CLIENT_ID and CTRADER_LIVE_CLIENT_SECRET'
     });
   }
 
@@ -42,11 +64,12 @@ export default async function handler(req, res) {
 
   // Log environment variables (without secrets)
   console.log('🔧 Environment check:', {
-    hasFullClientId: !!process.env.CTRADER_FULL_CLIENT_ID,
-    fullClientIdValue: process.env.CTRADER_FULL_CLIENT_ID, // Show actual value for debugging
-    fullClientIdLength: process.env.CTRADER_FULL_CLIENT_ID?.length,
-    hasClientSecret: !!process.env.CTRADER_CLIENT_SECRET,
-    clientSecretLength: process.env.CTRADER_CLIENT_SECRET?.length,
+    accountType: account_type,
+    hasClientId: !!clientId,
+    clientIdValue: clientId, // Show actual value for debugging
+    clientIdLength: clientId?.length,
+    hasClientSecret: !!clientSecret,
+    clientSecretLength: clientSecret?.length,
     tokenUrl: process.env.CTRADER_TOKEN_URL || 'https://openapi.ctrader.com/apps/token'
   });
 
@@ -59,15 +82,16 @@ export default async function handler(req, res) {
     grant_type: 'authorization_code',
     code,
     redirect_uri,
-    client_id: process.env.CTRADER_FULL_CLIENT_ID, // Full public key string for consistency
-    client_secret: process.env.CTRADER_CLIENT_SECRET,
+    client_id: clientId, // Use selected credentials based on account type
+    client_secret: clientSecret,
   });
 
   try {
     console.log('🔄 cTrader token exchange request:', {
+      accountType: account_type,
       code: code.substring(0, 20) + '...', // Don't log full code
       redirect_uri,
-      client_id: process.env.CTRADER_CLIENT_ID?.substring(0, 20) + '...',
+      client_id: clientId?.substring(0, 20) + '...',
       tokenUrl
     });
 

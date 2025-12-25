@@ -19,8 +19,14 @@ VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJz
 
 #### cTrader Configuration (Client-side)
 ```
-VITE_CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for ALL cTrader operations (OAuth + WebSocket)
-VITE_CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+# LIVE Account Credentials
+VITE_CTRADER_LIVE_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for LIVE accounts
+VITE_CTRADER_LIVE_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+
+# DEMO Account Credentials (create separate app in cTrader for demo)
+VITE_CTRADER_DEMO_CLIENT_ID=YOUR_DEMO_CLIENT_ID_HERE  # Create separate demo app
+VITE_CTRADER_DEMO_CLIENT_SECRET=YOUR_DEMO_CLIENT_SECRET_HERE
+
 VITE_CTRADER_AUTH_URL=https://id.ctrader.com/my/settings/openapi/grantingaccess
 VITE_CTRADER_WS_DEMO=wss://demo.ctraderapi.com:5035
 VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
@@ -28,8 +34,14 @@ VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
 
 #### cTrader Server-side (for Vercel serverless functions)
 ```
-CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for token exchange (REQUIRED!)
-CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe       # Client secret (REQUIRED!)
+# LIVE Account Credentials (for token exchange)
+CTRADER_LIVE_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
+CTRADER_LIVE_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+
+# DEMO Account Credentials (create separate demo app)
+CTRADER_DEMO_CLIENT_ID=YOUR_DEMO_CLIENT_ID_HERE
+CTRADER_DEMO_CLIENT_SECRET=YOUR_DEMO_CLIENT_SECRET_HERE
+
 CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
 
@@ -59,6 +71,13 @@ CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 - "Application authentication failed" = wrong WebSocket clientId format
 - "429 Too Many Requests" = rate limit exceeded, wait 5-15 minutes before retrying
 - HTML response instead of JSON = rate limit or authorization code expired
+- WebSocket closes immediately = demo accounts may not support OpenAPI (create separate demo app)
+
+**Demo Account Setup:**
+1. Create separate cTrader app for demo accounts: https://connect.spotware.com/apps
+2. Set app type to "Demo"
+3. Get separate Client ID and Secret for demo
+4. Add demo credentials to environment variables
 
 ### Настройки:
 - **Environment:** Production

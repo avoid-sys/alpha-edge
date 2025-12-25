@@ -72,12 +72,17 @@ const CTraderCallback = () => {
 
     console.log('📡 Making request to: /api/ctrader/token-exchange');
 
+    // Get account type from localStorage (set during Connect.jsx)
+    const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+    console.log('📡 Using account type for token exchange:', accountType);
+
     fetch('/api/ctrader/token-exchange', {
       method: 'POST', // Explicit POST to avoid 405 errors
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code,
-        redirect_uri: redirectUri // Must match exactly
+        redirect_uri: redirectUri, // Must match exactly
+        account_type: accountType // 'live' or 'demo'
       })
     })
       .then(res => {

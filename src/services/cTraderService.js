@@ -363,14 +363,27 @@ export const startCtraderFlow = async (isDemo = false) => {
     ws.onopen = () => {
       console.log('WS opened — sending app auth');
 
-      const clientId = import.meta.env.VITE_CTRADER_FULL_CLIENT_ID;
-      const clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET;
+      // Select credentials based on account type with fallback to live
+      let clientId = isDemo
+        ? import.meta.env.VITE_CTRADER_DEMO_CLIENT_ID
+        : import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID;
+      let clientSecret = isDemo
+        ? import.meta.env.VITE_CTRADER_DEMO_CLIENT_SECRET
+        : import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET;
 
+      // Fallback: if demo credentials missing, use live credentials
+      if (isDemo && (!clientId || !clientSecret)) {
+        console.warn('⚠️ DEMO credentials not configured, falling back to LIVE credentials');
+        clientId = import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID;
+        clientSecret = import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET;
+      }
+
+      console.log('🔑 Using', isDemo ? 'DEMO' : 'LIVE', 'credentials for WS (with fallback)');
       console.log('🔑 Using clientId for WS:', clientId ? clientId.substring(0, 10) + '...' : 'UNDEFINED');
       console.log('🔑 Using clientSecret length:', clientSecret ? clientSecret.length : 'UNDEFINED');
 
       if (!clientId || !clientSecret) {
-        console.error('❌ Missing cTrader WebSocket credentials!');
+        console.error('❌ Missing cTrader WebSocket credentials (both LIVE and DEMO)!');
         reject(new Error('cTrader WebSocket credentials not configured'));
         ws.close();
         return;
