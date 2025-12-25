@@ -14,6 +14,7 @@ export default function Connect() {
   const [binanceKey, setBinanceKey] = useState('');
   const [binanceSecret, setBinanceSecret] = useState('');
   const [binanceLoading, setBinanceLoading] = useState(false);
+  const [skipBinanceValidation, setSkipBinanceValidation] = useState(false);
 
   // Bybit state
   const [bybitKey, setBybitKey] = useState('');
@@ -23,35 +24,46 @@ export default function Connect() {
 
   // Handle Binance connection
   const handleBinanceConnect = async () => {
-    if (!binanceKey || !binanceSecret) {
+    if (!skipBinanceValidation && (!binanceKey || !binanceSecret)) {
       alert('Please enter both API Key and Secret for Binance');
       return;
     }
 
     setBinanceLoading(true);
     try {
-      const response = await fetch('/api/binance/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: binanceKey, apiSecret: binanceSecret })
-      });
+      let validationPassed = skipBinanceValidation;
 
-      const data = await response.json();
+      if (!skipBinanceValidation) {
+        const response = await fetch('/api/binance/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: binanceKey, apiSecret: binanceSecret })
+        });
 
-      if (data.valid) {
+        const data = await response.json();
+        validationPassed = data.valid;
+      }
+
+      if (validationPassed) {
         localStorage.setItem('binance_credentials', JSON.stringify({
           apiKey: binanceKey,
           apiSecret: binanceSecret,
-          connectedAt: Date.now()
+          connectedAt: Date.now(),
+          skipValidation: skipBinanceValidation
         }));
-        alert('✅ Binance account connected successfully!');
+
+        const message = skipBinanceValidation
+          ? '✅ Binance connected with demo data!\n\nNote: API validation was skipped. Real trading data will not be loaded.'
+          : '✅ Binance account connected successfully!';
+
+        alert(message);
         navigate('/dashboard');
       } else {
-        alert('❌ Invalid Binance credentials. Please check:\n\n1. API Key and Secret are correct\n2. API Key has "Enable Spot & Margin Trading" permission\n3. IP restrictions allow access from any IP or include your IP\n4. API Key is not expired\n\nTry creating new API keys in Binance API Management.');
+        alert('❌ Invalid Binance credentials. Please check:\n\n1. API Key and Secret are correct\n2. API Key has "Enable Spot & Margin Trading" permission\n3. IP restrictions allow access from any IP or include your IP\n4. API Key is not expired\n\nTry creating new API keys in Binance API Management.\n\nOr check "Skip API validation" to use demo data.');
       }
     } catch (err) {
       console.error('Binance connection error:', err);
-      alert('❌ Connection failed. Please try again.');
+      alert('❌ Connection failed. Please check your internet connection and try again.');
     } finally {
       setBinanceLoading(false);
     }
@@ -330,6 +342,19 @@ export default function Connect() {
               placeholder="Enter your Binance API Secret"
               className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-orange-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
             />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="skip-binance-validation"
+              checked={skipBinanceValidation}
+              onChange={(e) => setSkipBinanceValidation(e.target.checked)}
+              className="mr-2"
+            />
+            <label htmlFor="skip-binance-validation" className="text-sm text-gray-600">
+              Skip API validation (use demo data)
+            </label>
           </div>
 
           <NeumorphicButton

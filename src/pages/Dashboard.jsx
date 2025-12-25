@@ -360,18 +360,53 @@ export default function Dashboard() {
               // Load Binance data
               if (binanceCreds) {
                 console.log('📊 Loading Binance data...');
-                const { apiKey, apiSecret } = JSON.parse(binanceCreds);
-                const { fetchBinanceTrades } = await import('@/services/BinanceService');
-                const binanceTrades = await fetchBinanceTrades(apiKey, apiSecret);
+                const creds = JSON.parse(binanceCreds);
+                const { apiKey, apiSecret, skipValidation } = creds;
+
+                let binanceTrades = [];
+                if (skipValidation) {
+                  // Use demo data if validation was skipped
+                  console.log('📊 Using demo data for Binance (validation skipped)');
+                  binanceTrades = [
+                    {
+                      id: 'binance_demo_1',
+                      time: new Date(Date.now() - 86400000), // 1 day ago
+                      close_time: new Date(Date.now() - 86400000),
+                      symbol: 'BTCUSDT',
+                      direction: 'Buy',
+                      volume: 0.001,
+                      price: 50000,
+                      net_profit: 50,
+                      commission: 0.1,
+                      balance: 10000
+                    },
+                    {
+                      id: 'binance_demo_2',
+                      time: new Date(Date.now() - 43200000), // 12 hours ago
+                      close_time: new Date(Date.now() - 43200000),
+                      symbol: 'ETHUSDT',
+                      direction: 'Sell',
+                      volume: 0.01,
+                      price: 3000,
+                      net_profit: -10,
+                      commission: 0.05,
+                      balance: 10050
+                    }
+                  ];
+                } else {
+                  // Try to fetch real data
+                  const { fetchBinanceTrades } = await import('@/services/BinanceService');
+                  binanceTrades = await fetchBinanceTrades(apiKey, apiSecret);
+                }
 
                 if (binanceTrades && binanceTrades.length > 0) {
                   allTrades = allTrades.concat(binanceTrades);
                   exchangeProfiles.push({
-                    name: 'Binance Account',
+                    name: skipValidation ? 'Binance Account (Demo)' : 'Binance Account',
                     exchange: 'binance',
                     trades: binanceTrades
                   });
-                  console.log('✅ Loaded', binanceTrades.length, 'Binance trades');
+                  console.log('✅ Loaded', binanceTrades.length, 'Binance trades', skipValidation ? '(demo)' : '');
                 }
               }
 
