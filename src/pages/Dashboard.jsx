@@ -346,6 +346,135 @@ export default function Dashboard() {
             console.error('❌ Error fetching profiles:', e);
           }
 
+          // Check for exchange connections (Binance, Bybit) first
+          const binanceCreds = localStorage.getItem('binance_credentials');
+          const bybitCreds = localStorage.getItem('bybit_credentials');
+
+          if (binanceCreds || bybitCreds) {
+            console.log('🔄 Exchange credentials detected - loading exchange data');
+
+            try {
+              let allTrades = [];
+              let exchangeProfiles = [];
+
+              // Load Binance data
+              if (binanceCreds) {
+                console.log('📊 Loading Binance data...');
+                const { apiKey, apiSecret } = JSON.parse(binanceCreds);
+                const { fetchBinanceTrades } = await import('@/services/BinanceService');
+                const binanceTrades = await fetchBinanceTrades(apiKey, apiSecret);
+
+                if (binanceTrades && binanceTrades.length > 0) {
+                  allTrades = allTrades.concat(binanceTrades);
+                  exchangeProfiles.push({
+                    name: 'Binance Account',
+                    exchange: 'binance',
+                    trades: binanceTrades
+                  });
+                  console.log('✅ Loaded', binanceTrades.length, 'Binance trades');
+                }
+              }
+
+              // Load Bybit data
+              if (bybitCreds) {
+                console.log('📊 Loading Bybit data...');
+                const { apiKey, apiSecret } = JSON.parse(bybitCreds);
+                const { fetchBybitTrades } = await import('@/services/BybitService');
+                const bybitTrades = await fetchBybitTrades(apiKey, apiSecret);
+
+                if (bybitTrades && bybitTrades.length > 0) {
+                  allTrades = allTrades.concat(bybitTrades);
+                  exchangeProfiles.push({
+                    name: 'Bybit Account',
+                    exchange: 'bybit',
+                    trades: bybitTrades
+                  });
+                  console.log('✅ Loaded', bybitTrades.length, 'Bybit trades');
+                }
+              }
+
+              // Create combined profile if we have trades
+              if (allTrades.length > 0) {
+                console.log('🔄 Creating combined exchange profile from', allTrades.length, 'total trades...');
+
+                const totalTrades = allTrades.length;
+                const winningTrades = allTrades.filter(t => t.profit > 0).length;
+                const losingTrades = totalTrades - winningTrades;
+                const totalProfit = allTrades.reduce((sum, t) => sum + t.profit, 0);
+                const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+                const profileData = {
+                  name: exchangeProfiles.length === 1
+                    ? exchangeProfiles[0].name
+                    : 'Multi-Exchange Account',
+                  is_live_account: true,
+                  trader_score: Math.round(winRate * 10),
+                  total_trades: totalTrades,
+                  winning_trades: winningTrades,
+                  losing_trades: losingTrades,
+                  total_profit: totalProfit,
+                  win_rate: winRate,
+                  created_by: user.email
+                };
+
+                // Save to localDataService
+                const newProfile = await localDataService.entities.TraderProfile.create(profileData);
+                console.log('✅ Created exchange profile:', newProfile.id);
+
+                fetchedProfile = newProfile;
+                fetchedTrades = allTrades;
+                setDataVersion(prev => prev + 1);
+                console.log('🎉 Exchange profile creation completed successfully');
+              } else {
+                console.log('⚠️ No exchange trades found, will create empty profile');
+
+                // Create empty profile for exchanges
+                const emptyProfileData = {
+                  name: 'Exchange Account',
+                  is_live_account: true,
+                  trader_score: 0,
+                  total_trades: 0,
+                  winning_trades: 0,
+                  losing_trades: 0,
+                  total_profit: 0,
+                  win_rate: 0,
+                  created_by: user.email
+                };
+
+                const newProfile = await localDataService.entities.TraderProfile.create(emptyProfileData);
+                console.log('✅ Created empty exchange profile:', newProfile.id);
+
+                fetchedProfile = newProfile;
+                fetchedTrades = [];
+                setDataVersion(prev => prev + 1);
+                console.log('🎉 Empty exchange profile created successfully');
+              }
+
+            } catch (exchangeError) {
+              console.error('❌ Failed to load exchange data:', exchangeError);
+
+              // Create empty profile even on error
+              const emptyProfileData = {
+                name: 'Exchange Account',
+                is_live_account: true,
+                trader_score: 0,
+                total_trades: 0,
+                winning_trades: 0,
+                losing_trades: 0,
+                total_profit: 0,
+                win_rate: 0,
+                created_by: user.email
+              };
+
+              const newProfile = await localDataService.entities.TraderProfile.create(emptyProfileData);
+              console.log('✅ Created empty exchange profile after error:', newProfile.id);
+
+              fetchedProfile = newProfile;
+              fetchedTrades = [];
+              setDataVersion(prev => prev + 1);
+            }
+          }
+
           // If cTrader tokens exist, try to create/update profile from cTrader (even if file profile exists)
           if (localStorage.getItem('ctrader_tokens')) {
             console.log('🔄 cTrader tokens found - attempting to create/update profile from cTrader data');

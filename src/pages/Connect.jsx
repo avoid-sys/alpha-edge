@@ -1,13 +1,96 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { NeumorphicButton } from '@/components/NeumorphicUI';
-import { Upload, Zap, Settings, Trash2 } from 'lucide-react';
+import { Upload, Zap, Settings, Trash2, TrendingUp, BarChart3 } from 'lucide-react';
 import { getRedirectUri, generateState } from '../utils/cTraderUtils';
 
 export default function Connect() {
+  const navigate = useNavigate();
   const [selectedScope, setSelectedScope] = useState('accounts');
   const [accountType, setAccountType] = useState('live'); // 'live' or 'demo' - live recommended
+
+  // Binance state
+  const [binanceKey, setBinanceKey] = useState('');
+  const [binanceSecret, setBinanceSecret] = useState('');
+  const [binanceLoading, setBinanceLoading] = useState(false);
+
+  // Bybit state
+  const [bybitKey, setBybitKey] = useState('');
+  const [bybitSecret, setBybitSecret] = useState('');
+  const [bybitLoading, setBybitLoading] = useState(false);
+
+  // Handle Binance connection
+  const handleBinanceConnect = async () => {
+    if (!binanceKey || !binanceSecret) {
+      alert('Please enter both API Key and Secret for Binance');
+      return;
+    }
+
+    setBinanceLoading(true);
+    try {
+      const response = await fetch('/api/binance/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: binanceKey, apiSecret: binanceSecret })
+      });
+
+      const data = await response.json();
+
+      if (data.valid) {
+        localStorage.setItem('binance_credentials', JSON.stringify({
+          apiKey: binanceKey,
+          apiSecret: binanceSecret,
+          connectedAt: Date.now()
+        }));
+        alert('✅ Binance account connected successfully!');
+        navigate('/dashboard');
+      } else {
+        alert('❌ Invalid Binance credentials. Please check your API Key and Secret.');
+      }
+    } catch (err) {
+      console.error('Binance connection error:', err);
+      alert('❌ Connection failed. Please try again.');
+    } finally {
+      setBinanceLoading(false);
+    }
+  };
+
+  // Handle Bybit connection
+  const handleBybitConnect = async () => {
+    if (!bybitKey || !bybitSecret) {
+      alert('Please enter both API Key and Secret for Bybit');
+      return;
+    }
+
+    setBybitLoading(true);
+    try {
+      const response = await fetch('/api/bybit/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: bybitKey, apiSecret: bybitSecret })
+      });
+
+      const data = await response.json();
+
+      if (data.valid) {
+        localStorage.setItem('bybit_credentials', JSON.stringify({
+          apiKey: bybitKey,
+          apiSecret: bybitSecret,
+          connectedAt: Date.now()
+        }));
+        alert('✅ Bybit account connected successfully!');
+        navigate('/dashboard');
+      } else {
+        alert('❌ Invalid Bybit credentials. Please check your API Key and Secret.');
+      }
+    } catch (err) {
+      console.error('Bybit connection error:', err);
+      alert('❌ Connection failed. Please try again.');
+    } finally {
+      setBybitLoading(false);
+    }
+  };
 
   // Test function for cTrader playground (temporary)
   const handleTestCTraderPlayground = () => {
@@ -200,6 +283,104 @@ export default function Connect() {
             Reset cTrader Connection
           </NeumorphicButton>
           <p className="text-xs text-gray-500 mt-1 text-center">Clear stored tokens and try again</p>
+        </div>
+      </div>
+
+      {/* Binance Connection */}
+      <div className="bg-white rounded-2xl p-6 shadow-[8px_8px_16px_#d1d9e6,-8px_-8px_16px_#ffffff]">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <BarChart3 size={24} className="mr-2 text-orange-500" />
+          Connect Binance
+        </h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              API Key
+            </label>
+            <input
+              type="password"
+              value={binanceKey}
+              onChange={(e) => setBinanceKey(e.target.value)}
+              placeholder="Enter your Binance API Key"
+              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-orange-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              API Secret
+            </label>
+            <input
+              type="password"
+              value={binanceSecret}
+              onChange={(e) => setBinanceSecret(e.target.value)}
+              placeholder="Enter your Binance API Secret"
+              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-orange-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+            />
+          </div>
+
+          <NeumorphicButton
+            onClick={handleBinanceConnect}
+            disabled={binanceLoading}
+            className="w-full flex items-center justify-center bg-gradient-to-r from-orange-500 to-yellow-600 text-white border-0 disabled:opacity-50"
+          >
+            <BarChart3 size={20} className="mr-2" />
+            {binanceLoading ? 'Connecting...' : 'Connect Binance'}
+          </NeumorphicButton>
+
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            Connect to your Binance Futures account for live trading data
+          </p>
+        </div>
+      </div>
+
+      {/* Bybit Connection */}
+      <div className="bg-white rounded-2xl p-6 shadow-[8px_8px_16px_#d1d9e6,-8px_-8px_16px_#ffffff]">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <TrendingUp size={24} className="mr-2 text-blue-500" />
+          Connect Bybit
+        </h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              API Key
+            </label>
+            <input
+              type="password"
+              value={bybitKey}
+              onChange={(e) => setBybitKey(e.target.value)}
+              placeholder="Enter your Bybit API Key"
+              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              API Secret
+            </label>
+            <input
+              type="password"
+              value={bybitSecret}
+              onChange={(e) => setBybitSecret(e.target.value)}
+              placeholder="Enter your Bybit API Secret"
+              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+            />
+          </div>
+
+          <NeumorphicButton
+            onClick={handleBybitConnect}
+            disabled={bybitLoading}
+            className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 disabled:opacity-50"
+          >
+            <TrendingUp size={20} className="mr-2" />
+            {bybitLoading ? 'Connecting...' : 'Connect Bybit'}
+          </NeumorphicButton>
+
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            Connect to your Bybit account for live trading data
+          </p>
         </div>
       </div>
 
