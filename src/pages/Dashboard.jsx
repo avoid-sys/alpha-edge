@@ -90,9 +90,17 @@ export default function Dashboard() {
 
       try {
 
+        // Check if we have cTrader tokens - if yes, prioritize cTrader data
+        const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
+
         if (profileId) {
           fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
+        } else if (hasCTraderTokens) {
+          // If we have cTrader tokens, skip profile search - cTrader flow will create/update profile
+          console.log('🔄 cTrader tokens detected - will load cTrader data instead of existing profiles');
+          fetchedProfile = null;
+          fetchedTrades = [];
         } else {
           try {
             // Try to find profile by current user email
@@ -322,6 +330,68 @@ export default function Dashboard() {
               console.error('❌ Failed to create profile from cTrader data:', error);
               // Reset flag on error
               ctraderStartedRef.current = false;
+
+              // Even on error, create empty cTrader profile to show metrics
+              console.log('⚠️ cTrader flow failed, creating empty profile anyway...');
+              try {
+                const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+                const isLiveAccount = accountType === 'live';
+
+                const emptyProfileData = {
+                  name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  is_live_account: isLiveAccount,
+                  trader_score: 0,
+                  total_trades: 0,
+                  winning_trades: 0,
+                  losing_trades: 0,
+                  total_profit: 0,
+                  total_loss: 0,
+                  win_rate: 0,
+                  avg_win: 0,
+                  avg_loss: 0,
+                  largest_win: 0,
+                  largest_loss: 0,
+                  profit_factor: 0,
+                  expectancy: 0,
+                  sharpe_ratio: 0,
+                  max_drawdown: 0,
+                  recovery_factor: 0,
+                  calmar_ratio: 0,
+                  total_trading_days: 0,
+                  avg_trades_per_day: 0,
+                  best_day: 0,
+                  worst_day: 0,
+                  consecutive_wins: 0,
+                  consecutive_losses: 0,
+                  max_consecutive_wins: 0,
+                  max_consecutive_losses: 0,
+                  total_fees: 0,
+                  net_profit: 0,
+                  created_by: user.email,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+
+                console.log('📝 Creating empty cTrader profile due to error:', emptyProfileData);
+                const { data: newProfile, error: profileError } = await supabase
+                  .from('profiles')
+                  .insert(emptyProfileData)
+                  .select()
+                  .single();
+
+                if (profileError) throw profileError;
+
+                fetchedProfile = newProfile;
+                fetchedTrades = [];
+
+                // Force reload of data
+                setDataVersion(prev => prev + 1);
+                console.log('🎉 Empty cTrader profile created despite error');
+
+              } catch (emptyProfileError) {
+                console.error('❌ Failed to create empty cTrader profile on error:', emptyProfileError);
+              }
+
               // If tokens are expired, don't show error - just skip profile creation
               if (!error.message.includes('expired')) {
                 // Show other errors to user
