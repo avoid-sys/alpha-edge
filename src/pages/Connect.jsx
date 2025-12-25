@@ -46,7 +46,7 @@ export default function Connect() {
         alert('✅ Binance account connected successfully!');
         navigate('/dashboard');
       } else {
-        alert('❌ Invalid Binance credentials. Please check your API Key and Secret.');
+        alert('❌ Invalid Binance credentials. Please check:\n\n1. API Key and Secret are correct\n2. API Key has "Enable Spot & Margin Trading" permission\n3. IP restrictions allow access from any IP or include your IP\n4. API Key is not expired\n\nTry creating new API keys in Binance API Management.');
       }
     } catch (err) {
       console.error('Binance connection error:', err);
@@ -82,11 +82,11 @@ export default function Connect() {
         alert('✅ Bybit account connected successfully!');
         navigate('/dashboard');
       } else {
-        alert('❌ Invalid Bybit credentials. Please check your API Key and Secret.');
+        alert('❌ Invalid Bybit credentials. Please check:\n\n1. API Key and Secret are correct\n2. API Key has "Read" permissions enabled\n3. IP restrictions allow access from any IP\n4. API Key is not expired\n\nTry creating new API keys in Bybit account settings.');
       }
     } catch (err) {
       console.error('Bybit connection error:', err);
-      alert('❌ Connection failed. Please try again.');
+      alert('❌ Connection failed. Please check your internet connection and try again.');
     } finally {
       setBybitLoading(false);
     }

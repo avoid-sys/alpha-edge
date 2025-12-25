@@ -4,10 +4,11 @@ import CryptoJS from 'crypto-js';
 const validateBybitCredentials = async (apiKey, apiSecret) => {
   try {
     const timestamp = Date.now().toString();
-    const queryString = `category=linear&timestamp=${timestamp}`;
+    const queryString = `timestamp=${timestamp}`;
     const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString();
 
-    const response = await axios.get('https://api.bybit.com/v5/position/list', {
+    // Use account info endpoint for validation (doesn't require specific permissions)
+    const response = await axios.get('https://api.bybit.com/v5/account/info', {
       headers: {
         'X-BAPI-API-KEY': apiKey,
         'X-BAPI-TIMESTAMP': timestamp,
@@ -15,9 +16,10 @@ const validateBybitCredentials = async (apiKey, apiSecret) => {
       }
     });
 
-    return response.status === 200;
+    // Check if response is successful and contains account data
+    return response.status === 200 && response.data?.result;
   } catch (err) {
-    console.error('Bybit validation error:', err.message);
+    console.error('Bybit validation error:', err.message, err.response?.data);
     return false;
   }
 };

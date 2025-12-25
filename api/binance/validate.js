@@ -3,6 +3,7 @@ import CryptoJS from 'crypto-js';
 
 const validateBinanceCredentials = async (apiKey, apiSecret) => {
   try {
+    // First try to get account information (requires trading permissions)
     const timestamp = Date.now();
     const queryString = `timestamp=${timestamp}`;
     const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString();
@@ -19,8 +20,31 @@ const validateBinanceCredentials = async (apiKey, apiSecret) => {
 
     return response.status === 200;
   } catch (err) {
-    console.error('Binance validation error:', err.message);
-    return false;
+    console.error('Binance validation error:', err.message, err.response?.data);
+
+    // If account endpoint fails, try simpler ping endpoint
+    try {
+      const timestamp = Date.now();
+      const queryString = `timestamp=${timestamp}`;
+      const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString();
+
+      // Try account snapshot (requires less permissions)
+      const snapshotResponse = await axios.get('https://api.binance.com/sapi/v1/accountSnapshot', {
+        headers: {
+          'X-MBX-APIKEY': apiKey
+        },
+        params: {
+          type: 'SPOT',
+          timestamp,
+          signature
+        }
+      });
+
+      return snapshotResponse.status === 200;
+    } catch (snapshotErr) {
+      console.error('Binance snapshot validation also failed:', snapshotErr.message);
+      return false;
+    }
   }
 };
 
