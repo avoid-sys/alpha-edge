@@ -278,8 +278,18 @@ const sendMessage = (ws, messageTypeName, payloadObj) => {
 
     console.log(`📦 Encoded payload size: ${encodedPayload.length} bytes`);
 
-    // Create wrapper message
-    const ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
+    // Create wrapper message - try different ProtoMessage paths
+    let ProtoMessage;
+    try {
+      ProtoMessage = protoRoot.lookupType('ProtoMessage');
+    } catch (e) {
+      try {
+        ProtoMessage = protoRoot.lookupType('ProtoOA.ProtoMessage');
+      } catch (e2) {
+        throw new Error('Cannot find ProtoMessage type in proto definitions');
+      }
+    }
+
     const wrapper = ProtoMessage.create({
       payloadType: payloadType,
       payload: encodedPayload
@@ -387,7 +397,10 @@ export const startCtraderFlow = async (isDemo = false) => {
   let currentAccountIndex = -1; // Текущий обрабатываемый аккаунт
 
   return new Promise((resolve, reject) => {
+    console.log('🔌 Creating WebSocket connection...');
+
     ws.onopen = () => {
+      console.log('✅ WebSocket connection opened successfully');
       console.log('WS opened — sending app auth');
 
       // Force live credentials as demo accounts don't support OpenAPI
@@ -450,10 +463,31 @@ export const startCtraderFlow = async (isDemo = false) => {
         const payloadTypeNum = message.payloadType;
         console.log('📨 Received payloadType:', payloadTypeNum);
 
-        // Handle simple heartbeat first
+        // Handle heartbeat first
         if (payloadTypeNum === 51) {
           console.log('💓 Heartbeat received (51) — connection alive');
           return;
+        }
+
+        // Handle potential heartbeat on 2142 (same as auth response)
+        if (payloadTypeNum === 2142) {
+          // Try to decode as auth response first
+          try {
+            const AuthResType = protoRoot.lookupType('ProtoOA.ProtoOAApplicationAuthRes');
+            const authPayload = AuthResType.decode(message.payload);
+            console.log('🎉 ProtoOAApplicationAuthRes received - app auth success!');
+            console.log('🔍 Auth response payload:', authPayload);
+
+            // Proceed with account list request
+            sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
+              accessToken: tokens.access_token
+            });
+            return;
+          } catch (authError) {
+            // Not an auth response, treat as heartbeat
+            console.log('💓 Heartbeat received (2142) — connection alive');
+            return;
+          }
         }
 
         // For other messages, decode to determine type
@@ -463,7 +497,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         console.log(`📨 Processing message type: ${payloadTypeNum} (${typeName || 'unknown'})`);
 
         if (!typeName) {
-          console.warn('Unknown payloadType:', payloadTypeNum, '- raw data:', message);
+          console.warn('Unknown payloadType:', payloadTypeNum, '- raw data length:', message.payload?.length || 0);
           return;
         }
 
@@ -471,25 +505,6 @@ export const startCtraderFlow = async (isDemo = false) => {
         const payload = PayloadType.decode(message.payload);
 
         console.log(`🔍 Decoded ${typeName} payload:`, payload);
-
-        // Handle heartbeat that comes as 2142 (same as auth response)
-        // Check if it's actually an auth response by trying to decode
-        if (payloadTypeNum === 2142) {
-          try {
-            const PayloadType = protoRoot.lookupType(`ProtoOA.ProtoOAApplicationAuthRes`);
-            const payload = PayloadType.decode(message.payload);
-            console.log('🎉 This is ProtoOAApplicationAuthRes - app auth success!');
-            // Proceed with account list request
-            sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
-              accessToken: tokens.access_token
-            });
-            return;
-          } catch (e) {
-            // Not an auth response, treat as heartbeat
-            console.log('💓 Heartbeat received (2142) — connection alive');
-            return;
-          }
-        }
 
         console.log(`🔍 Decoded payload for ${typeName}:`, payload);
 
