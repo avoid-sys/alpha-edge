@@ -1427,13 +1427,18 @@ export default function Dashboard() {
 
   // Handle data unlinking
   const handleUnlinkData = async () => {
+    console.log('🗑️ Starting unlink data process for profile:', profile?.id);
+
     const confirmed = window.confirm(
-      'Are you sure you want to unlink all trading data from your account?\n\n' +
+      'Are you sure you want to unlink all trading data and disconnect cTrader?\n\n' +
       'This will permanently delete:\n' +
       '• All trade records\n' +
       '• Performance metrics\n' +
       '• Account statistics\n\n' +
-      'You can upload new data afterwards, but the current data will be lost forever.\n\n' +
+      'And disconnect:\n' +
+      '• cTrader account connection\n' +
+      '• Clear stored tokens\n\n' +
+      'You can reconnect cTrader or upload new data afterwards.\n\n' +
       'Continue?'
     );
 
@@ -1460,6 +1465,12 @@ export default function Dashboard() {
         total_pnl: 0,
         // Keep other profile info like nickname, broker, etc.
       });
+
+      // Clear cTrader tokens and account info from localStorage
+      localStorage.removeItem('ctrader_tokens');
+      localStorage.removeItem('ctrader_account_type');
+      localStorage.removeItem('ctrader_account_id');
+      console.log('🧹 Cleared cTrader data from localStorage');
 
       // Refresh the page to show empty state
       window.location.reload();
