@@ -7,7 +7,7 @@ import { getRedirectUri, generateState } from '../utils/cTraderUtils';
 
 export default function Connect() {
   const [selectedScope, setSelectedScope] = useState('accounts');
-  const [accountType, setAccountType] = useState('live'); // 'live' or 'demo'
+  const [accountType, setAccountType] = useState('live'); // 'live' or 'demo' - live recommended
 
   // Test function for cTrader playground (temporary)
   const handleTestCTraderPlayground = () => {

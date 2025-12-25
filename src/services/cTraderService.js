@@ -441,6 +441,8 @@ export const startCtraderFlow = async (isDemo = false) => {
           return;
         }
 
+        console.log(`📨 Processing message type: ${payloadTypeNum} (${typeName})`);
+
         const payloadTypeEnum = protoRoot.lookupEnum('ProtoOAPayloadType');
         const typeName = payloadTypeEnum.valuesById[payloadTypeNum];
         if (!typeName) {
@@ -520,10 +522,12 @@ export const startCtraderFlow = async (isDemo = false) => {
             processNextAccount();
           }
         } else if (payloadTypeNum === 50) { // ProtoOAErrorRes - error
-          console.error('❌ Spotware error:', payload.description);
+          console.error('❌ Spotware error:', payload.description, 'errorCode:', payload.errorCode);
           isConnecting = false;
           reject(new Error(payload.description || 'cTrader error'));
           ws.close();
+        } else {
+          console.log(`⚠️ Unknown message type: ${payloadTypeNum} (${typeName})`);
         }
 
         // Helper function to process next account
