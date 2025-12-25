@@ -268,13 +268,13 @@ export default function Dashboard() {
               // Even on error, create empty cTrader profile to show metrics
               console.log('⚠️ cTrader flow failed, creating empty profile anyway...');
               try {
-                const accountType = localStorage.getItem('ctrader_account_type') || 'live';
-                const isLiveAccount = accountType === 'live';
+                // Force live account as demo doesn't work
+                const accountType = 'live';
+                const isLiveAccount = true;
 
                 const emptyProfileData = {
                   name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
                   nickname: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
-                  broker: 'cTrader',
                   is_live_account: isLiveAccount,
                   trader_score: 0,
                   total_trades: 0,
@@ -541,13 +541,13 @@ export default function Dashboard() {
               // Even on error, create empty cTrader profile to show metrics
               console.log('⚠️ cTrader flow failed, creating empty profile anyway...');
               try {
-                const accountType = localStorage.getItem('ctrader_account_type') || 'live';
-                const isLiveAccount = accountType === 'live';
+                // Force live account as demo doesn't work
+                const accountType = 'live';
+                const isLiveAccount = true;
 
                 const emptyProfileData = {
                   name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
                   nickname: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
-                  broker: 'cTrader',
                   is_live_account: isLiveAccount,
                   trader_score: 0,
                   total_trades: 0,

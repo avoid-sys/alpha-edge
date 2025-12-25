@@ -473,9 +473,22 @@ export const startCtraderFlow = async (isDemo = false) => {
         console.log(`🔍 Decoded ${typeName} payload:`, payload);
 
         // Handle heartbeat that comes as 2142 (same as auth response)
-        if (payloadTypeNum === 2142 && typeName !== 'ProtoOAApplicationAuthRes') {
-          console.log('💓 Heartbeat received (2142) — connection alive');
-          return;
+        // Check if it's actually an auth response by trying to decode
+        if (payloadTypeNum === 2142) {
+          try {
+            const PayloadType = protoRoot.lookupType(`ProtoOA.ProtoOAApplicationAuthRes`);
+            const payload = PayloadType.decode(message.payload);
+            console.log('🎉 This is ProtoOAApplicationAuthRes - app auth success!');
+            // Proceed with account list request
+            sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
+              accessToken: tokens.access_token
+            });
+            return;
+          } catch (e) {
+            // Not an auth response, treat as heartbeat
+            console.log('💓 Heartbeat received (2142) — connection alive');
+            return;
+          }
         }
 
         console.log(`🔍 Decoded payload for ${typeName}:`, payload);
