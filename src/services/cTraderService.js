@@ -328,7 +328,7 @@ export const startCtraderFlow = async (isDemo = false) => {
   }
   isConnecting = true;
 
-  console.log('🚀 Starting cTrader flow for', isDemo ? 'DEMO' : 'LIVE', 'account');
+  console.log('🚀 Starting cTrader flow (forced LIVE mode)');
 
   const tokens = JSON.parse(localStorage.getItem('ctrader_tokens') || '{}');
   if (!tokens.access_token) {
@@ -338,22 +338,12 @@ export const startCtraderFlow = async (isDemo = false) => {
 
   await loadProtos();
 
-  // CRITICAL: Match WS endpoint to account type
-  const wsUrl = isDemo
-    ? "wss://demo.ctraderapi.com:5035"
-    : "wss://live.ctraderapi.com:5035";
+  // Force live endpoint as demo accounts don't support OpenAPI
+  const wsUrl = "wss://live.ctraderapi.com:5035";
 
-  console.log('🔌 Connecting to cTrader WS:', wsUrl, '(isDemo:', isDemo, ')');
+  console.log('🔌 Connecting to cTrader WS:', wsUrl, '(forced live mode)');
 
-  // Validate endpoint matches account type
-  if (isDemo && wsUrl.includes('live')) {
-    isConnecting = false;
-    throw new Error('DEMO account used with LIVE cTrader endpoint - mismatch!');
-  }
-  if (!isDemo && wsUrl.includes('demo')) {
-    isConnecting = false;
-    throw new Error('LIVE account used with DEMO cTrader endpoint - mismatch!');
-  }
+  // Always use live endpoint and credentials
 
   const ws = new WebSocket(wsUrl);
 
@@ -365,17 +355,13 @@ export const startCtraderFlow = async (isDemo = false) => {
     ws.onopen = () => {
       console.log('WS opened — sending app auth');
 
-      // Select credentials based on account type with backward compatibility
-      let clientId = isDemo
-        ? import.meta.env.VITE_CTRADER_DEMO_CLIENT_ID
-        : import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID;
-      let clientSecret = isDemo
-        ? import.meta.env.VITE_CTRADER_DEMO_CLIENT_SECRET
-        : import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET;
+      // Force live credentials as demo accounts don't support OpenAPI
+      let clientId = import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID;
+      let clientSecret = import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET;
 
-      // Backward compatibility: fallback to old format if new ones not set
+      // Backward compatibility: fallback to old format if live credentials not set
       if (!clientId || !clientSecret) {
-        console.warn('⚠️ New format credentials not found, trying backward compatibility...');
+        console.warn('⚠️ Live credentials not found, trying backward compatibility...');
         clientId = import.meta.env.VITE_CTRADER_FULL_CLIENT_ID || import.meta.env.VITE_CTRADER_CLIENT_ID;
         clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET;
 
@@ -384,14 +370,7 @@ export const startCtraderFlow = async (isDemo = false) => {
         }
       }
 
-      // Fallback: if demo credentials missing, use live credentials
-      if (isDemo && (!clientId || !clientSecret)) {
-        console.warn('⚠️ DEMO credentials not configured, falling back to LIVE credentials');
-        clientId = import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID || import.meta.env.VITE_CTRADER_FULL_CLIENT_ID || import.meta.env.VITE_CTRADER_CLIENT_ID;
-        clientSecret = import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET || import.meta.env.VITE_CTRADER_CLIENT_SECRET;
-      }
-
-      console.log('🔑 Using', isDemo ? 'DEMO' : 'LIVE', 'credentials for WS (with fallback)');
+      console.log('🔑 Using LIVE credentials for WS (forced mode)');
       console.log('🔑 Using clientId for WS:', clientId ? clientId.substring(0, 10) + '...' : 'UNDEFINED');
       console.log('🔑 Using clientSecret length:', clientSecret ? clientSecret.length : 'UNDEFINED');
 

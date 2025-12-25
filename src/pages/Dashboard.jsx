@@ -273,37 +273,16 @@ export default function Dashboard() {
 
                 const emptyProfileData = {
                   name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  nickname: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  broker: 'cTrader',
                   is_live_account: isLiveAccount,
                   trader_score: 0,
                   total_trades: 0,
                   winning_trades: 0,
                   losing_trades: 0,
                   total_profit: 0,
-                  total_loss: 0,
                   win_rate: 0,
-                  avg_win: 0,
-                  avg_loss: 0,
-                  largest_win: 0,
-                  largest_loss: 0,
-                  profit_factor: 0,
-                  expectancy: 0,
-                  sharpe_ratio: 0,
-                  max_drawdown: 0,
-                  recovery_factor: 0,
-                  calmar_ratio: 0,
-                  total_trading_days: 0,
-                  avg_trades_per_day: 0,
-                  best_day: 0,
-                  worst_day: 0,
-                  consecutive_wins: 0,
-                  consecutive_losses: 0,
-                  max_consecutive_wins: 0,
-                  max_consecutive_losses: 0,
-                  total_fees: 0,
-                  net_profit: 0,
-                  created_by: user.email,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
+                  created_by: user.email
                 };
 
                 console.log('📝 Creating empty cTrader profile due to error:', emptyProfileData);
@@ -407,13 +386,9 @@ export default function Dashboard() {
               // Import startCtraderFlow dynamically to avoid circular dependency
               const { startCtraderFlow } = await import('@/services/cTraderService');
 
-              // Get account type from localStorage (default to live)
-              const accountType = localStorage.getItem('ctrader_account_type') || 'live';
-              const isDemo = accountType === 'demo';
-
-              console.log('🚀 Starting cTrader flow for', accountType, 'account...');
-              console.log('🔧 isDemo parameter:', isDemo);
-              const trades = await startCtraderFlow(isDemo);
+              // Force live mode as demo accounts don't support OpenAPI
+              console.log('🚀 Starting cTrader flow (forced LIVE mode)...');
+              const trades = await startCtraderFlow(false);
               console.log('📊 cTrader fetch result:', trades?.length || 0, 'trades');
               console.log('📊 Trades data type:', typeof trades, 'isArray:', Array.isArray(trades));
               if (trades && trades.length > 0) {
@@ -571,37 +546,16 @@ export default function Dashboard() {
 
                 const emptyProfileData = {
                   name: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  nickname: `cTrader ${accountType === 'live' ? 'Live' : 'Demo'} Account`,
+                  broker: 'cTrader',
                   is_live_account: isLiveAccount,
                   trader_score: 0,
                   total_trades: 0,
                   winning_trades: 0,
                   losing_trades: 0,
                   total_profit: 0,
-                  total_loss: 0,
                   win_rate: 0,
-                  avg_win: 0,
-                  avg_loss: 0,
-                  largest_win: 0,
-                  largest_loss: 0,
-                  profit_factor: 0,
-                  expectancy: 0,
-                  sharpe_ratio: 0,
-                  max_drawdown: 0,
-                  recovery_factor: 0,
-                  calmar_ratio: 0,
-                  total_trading_days: 0,
-                  avg_trades_per_day: 0,
-                  best_day: 0,
-                  worst_day: 0,
-                  consecutive_wins: 0,
-                  consecutive_losses: 0,
-                  max_consecutive_wins: 0,
-                  max_consecutive_losses: 0,
-                  total_fees: 0,
-                  net_profit: 0,
-                  created_by: user.email,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
+                  created_by: user.email
                 };
 
                 console.log('📝 Creating empty cTrader profile due to error:', emptyProfileData);

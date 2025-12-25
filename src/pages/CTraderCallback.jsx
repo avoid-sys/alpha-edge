@@ -95,7 +95,8 @@ const CTraderCallback = () => {
     console.log('📡 Making request to: /api/ctrader/token-exchange');
 
     // Get account type from localStorage (set during Connect.jsx)
-    const accountType = localStorage.getItem('ctrader_account_type') || 'live';
+    // Force live account as demo accounts don't support OpenAPI
+    const accountType = 'live'; // localStorage.getItem('ctrader_account_type') || 'live';
     console.log('📡 Using account type for token exchange:', accountType);
 
     fetch('/api/ctrader/token-exchange', {
