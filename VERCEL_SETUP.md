@@ -19,13 +19,15 @@ VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJz
 
 #### cTrader Configuration (Client-side)
 ```
-# LIVE Account Credentials
-VITE_CTRADER_LIVE_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF  # FULL public key for LIVE accounts
+# NEW FORMAT (recommended for demo/live support)
+VITE_CTRADER_LIVE_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
 VITE_CTRADER_LIVE_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+VITE_CTRADER_DEMO_CLIENT_ID=YOUR_DEMO_CLIENT_ID_HERE  # Optional - for demo accounts
+VITE_CTRADER_DEMO_CLIENT_SECRET=YOUR_DEMO_CLIENT_SECRET_HERE  # Optional - for demo accounts
 
-# DEMO Account Credentials (create separate app in cTrader for demo)
-VITE_CTRADER_DEMO_CLIENT_ID=YOUR_DEMO_CLIENT_ID_HERE  # Create separate demo app
-VITE_CTRADER_DEMO_CLIENT_SECRET=YOUR_DEMO_CLIENT_SECRET_HERE
+# BACKWARD COMPATIBILITY (still works)
+VITE_CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
+VITE_CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 
 VITE_CTRADER_AUTH_URL=https://id.ctrader.com/my/settings/openapi/grantingaccess
 VITE_CTRADER_WS_DEMO=wss://demo.ctraderapi.com:5035
@@ -34,18 +36,20 @@ VITE_CTRADER_WS_LIVE=wss://live.ctraderapi.com:5035
 
 #### cTrader Server-side (for Vercel serverless functions)
 ```
-# LIVE Account Credentials (for token exchange)
+# NEW FORMAT (recommended for demo/live support)
 CTRADER_LIVE_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
 CTRADER_LIVE_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
+CTRADER_DEMO_CLIENT_ID=YOUR_DEMO_CLIENT_ID_HERE  # Optional - for demo accounts
+CTRADER_DEMO_CLIENT_SECRET=YOUR_DEMO_CLIENT_SECRET_HERE  # Optional - for demo accounts
 
-# DEMO Account Credentials (create separate demo app)
-CTRADER_DEMO_CLIENT_ID=YOUR_DEMO_CLIENT_ID_HERE
-CTRADER_DEMO_CLIENT_SECRET=YOUR_DEMO_CLIENT_SECRET_HERE
+# BACKWARD COMPATIBILITY (still works)
+CTRADER_FULL_CLIENT_ID=19506_ZNLG80oi7Bj6mt9wi4g9KYgRh3OcEbHele1YzBfeOFvKL0A0nF
+CTRADER_CLIENT_SECRET=Pr937hf9OaHKwv1xqbDc0u0clPtJAohDqOZA6UABPC7JikagPe
 
 CTRADER_TOKEN_URL=https://openapi.ctrader.com/apps/token
 ```
 
-**🚨 CRITICAL: These variables MUST be set in Vercel for cTrader to work!**
+**🚨 CRITICAL: You MUST have either NEW FORMAT or BACKWARD COMPATIBILITY variables set in Vercel!**
 
 #### ⚠️ CRITICAL: cTrader ID Formats (Updated!)
 **cTrader uses CONSISTENT FULL Client ID for ALL operations!**

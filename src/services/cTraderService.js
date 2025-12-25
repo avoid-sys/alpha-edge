@@ -363,7 +363,7 @@ export const startCtraderFlow = async (isDemo = false) => {
     ws.onopen = () => {
       console.log('WS opened — sending app auth');
 
-      // Select credentials based on account type with fallback to live
+      // Select credentials based on account type with backward compatibility
       let clientId = isDemo
         ? import.meta.env.VITE_CTRADER_DEMO_CLIENT_ID
         : import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID;
@@ -371,11 +371,22 @@ export const startCtraderFlow = async (isDemo = false) => {
         ? import.meta.env.VITE_CTRADER_DEMO_CLIENT_SECRET
         : import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET;
 
+      // Backward compatibility: fallback to old format if new ones not set
+      if (!clientId || !clientSecret) {
+        console.warn('⚠️ New format credentials not found, trying backward compatibility...');
+        clientId = import.meta.env.VITE_CTRADER_FULL_CLIENT_ID || import.meta.env.VITE_CTRADER_CLIENT_ID;
+        clientSecret = import.meta.env.VITE_CTRADER_CLIENT_SECRET;
+
+        if (clientId && clientSecret) {
+          console.log('✅ Using backward compatible credentials');
+        }
+      }
+
       // Fallback: if demo credentials missing, use live credentials
       if (isDemo && (!clientId || !clientSecret)) {
         console.warn('⚠️ DEMO credentials not configured, falling back to LIVE credentials');
-        clientId = import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID;
-        clientSecret = import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET;
+        clientId = import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID || import.meta.env.VITE_CTRADER_FULL_CLIENT_ID || import.meta.env.VITE_CTRADER_CLIENT_ID;
+        clientSecret = import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET || import.meta.env.VITE_CTRADER_CLIENT_SECRET;
       }
 
       console.log('🔑 Using', isDemo ? 'DEMO' : 'LIVE', 'credentials for WS (with fallback)');
@@ -383,7 +394,17 @@ export const startCtraderFlow = async (isDemo = false) => {
       console.log('🔑 Using clientSecret length:', clientSecret ? clientSecret.length : 'UNDEFINED');
 
       if (!clientId || !clientSecret) {
-        console.error('❌ Missing cTrader WebSocket credentials (both LIVE and DEMO)!');
+        console.error('❌ Missing cTrader WebSocket credentials (both LIVE and DEMO):', {
+          hasLiveClientId: !!import.meta.env.VITE_CTRADER_LIVE_CLIENT_ID,
+          hasLiveClientSecret: !!import.meta.env.VITE_CTRADER_LIVE_CLIENT_SECRET,
+          hasDemoClientId: !!import.meta.env.VITE_CTRADER_DEMO_CLIENT_ID,
+          hasDemoClientSecret: !!import.meta.env.VITE_CTRADER_DEMO_CLIENT_SECRET,
+          // Backward compatibility check
+          hasOldFullClientId: !!import.meta.env.VITE_CTRADER_FULL_CLIENT_ID,
+          hasOldClientId: !!import.meta.env.VITE_CTRADER_CLIENT_ID,
+          hasOldClientSecret: !!import.meta.env.VITE_CTRADER_CLIENT_SECRET,
+          accountType: isDemo ? 'demo' : 'live'
+        });
         reject(new Error('cTrader WebSocket credentials not configured'));
         ws.close();
         return;

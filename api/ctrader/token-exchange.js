@@ -20,8 +20,10 @@ export default async function handler(req, res) {
     });
   }
 
-  // Select credentials based on account type with fallback to live
+  // Select credentials based on account type with backward compatibility
   const isDemo = account_type === 'demo';
+
+  // Try new format first (CTRADER_LIVE_CLIENT_ID, CTRADER_DEMO_CLIENT_ID)
   let clientId = isDemo
     ? process.env.CTRADER_DEMO_CLIENT_ID
     : process.env.CTRADER_LIVE_CLIENT_ID;
@@ -29,28 +31,42 @@ export default async function handler(req, res) {
     ? process.env.CTRADER_DEMO_CLIENT_SECRET
     : process.env.CTRADER_LIVE_CLIENT_SECRET;
 
+  // Backward compatibility: fallback to old format if new ones not set
+  if (!clientId || !clientSecret) {
+    console.warn('⚠️ New format credentials not found, trying backward compatibility...');
+    clientId = process.env.CTRADER_FULL_CLIENT_ID || process.env.CTRADER_CLIENT_ID;
+    clientSecret = process.env.CTRADER_CLIENT_SECRET;
+
+    if (clientId && clientSecret) {
+      console.log('✅ Using backward compatible credentials');
+    }
+  }
+
   // Fallback: if demo credentials missing, use live credentials
   if (isDemo && (!clientId || !clientSecret)) {
     console.warn('⚠️ DEMO credentials not configured, falling back to LIVE credentials for token exchange');
-    clientId = process.env.CTRADER_LIVE_CLIENT_ID;
-    clientSecret = process.env.CTRADER_LIVE_CLIENT_SECRET;
+    clientId = process.env.CTRADER_LIVE_CLIENT_ID || process.env.CTRADER_FULL_CLIENT_ID || process.env.CTRADER_CLIENT_ID;
+    clientSecret = process.env.CTRADER_LIVE_CLIENT_SECRET || process.env.CTRADER_CLIENT_SECRET;
   }
 
   console.log('🔧 Using', isDemo ? 'DEMO' : 'LIVE', 'credentials for token exchange (with fallback)');
 
-  // Validate cTrader credentials
+  // Validate cTrader credentials with backward compatibility check
   if (!clientId || !clientSecret) {
     console.error('❌ Missing cTrader credentials (both LIVE and DEMO):', {
       hasLiveClientId: !!process.env.CTRADER_LIVE_CLIENT_ID,
       hasLiveClientSecret: !!process.env.CTRADER_LIVE_CLIENT_SECRET,
       hasDemoClientId: !!process.env.CTRADER_DEMO_CLIENT_ID,
       hasDemoClientSecret: !!process.env.CTRADER_DEMO_CLIENT_SECRET,
-      accountType: account_type,
-      fallbackUsed: isDemo && (!process.env.CTRADER_DEMO_CLIENT_ID || !process.env.CTRADER_DEMO_CLIENT_SECRET)
+      // Backward compatibility check
+      hasOldFullClientId: !!process.env.CTRADER_FULL_CLIENT_ID,
+      hasOldClientId: !!process.env.CTRADER_CLIENT_ID,
+      hasOldClientSecret: !!process.env.CTRADER_CLIENT_SECRET,
+      accountType: account_type
     });
     return res.status(500).json({
       error: 'Server configuration error',
-      message: 'cTrader credentials not configured. Need at least CTRADER_LIVE_CLIENT_ID and CTRADER_LIVE_CLIENT_SECRET'
+      message: 'cTrader credentials not configured. Need CTRADER_LIVE_CLIENT_ID/CTRADER_LIVE_CLIENT_SECRET or backward compatible CTRADER_FULL_CLIENT_ID/CTRADER_CLIENT_SECRET'
     });
   }
 
