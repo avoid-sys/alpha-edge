@@ -5,6 +5,7 @@ import { startCtraderFlow } from '@/services/cTraderService';
 import { createPageUrl } from '@/utils';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
+import { supabase } from '@/utils/supabaseClient';
 import html2canvas from 'html2canvas';
 import {
   TrendingUp,
