@@ -565,10 +565,10 @@ export const startCtraderFlow = async (isDemo = false) => {
     };
 
     setTimeout(() => {
-      console.log('⏰ Timeout after 90 seconds');
+      console.log('⏰ Timeout after 180 seconds (extended for multiple accounts)');
       isConnecting = false; // Reset flag on timeout
       reject(new Error('Timeout waiting for cTrader response'));
       ws.close();
-    }, 90000);
+    }, 180000); // Increased timeout for multiple account processing
   });
 };
