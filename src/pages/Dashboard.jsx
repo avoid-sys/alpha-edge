@@ -345,6 +345,8 @@ export default function Dashboard() {
         if (fetchedProfile) {
           // Use profile data (can have 0 trades)
           console.log('🎯 Setting UI state - profile:', fetchedProfile.id, 'trades:', fetchedTrades.length);
+          console.log('🎯 Profile data:', fetchedProfile);
+          console.log('🎯 Trades data:', fetchedTrades);
           setProfile(fetchedProfile);
           setTrades(fetchedTrades || []);
         } else {
@@ -372,8 +374,14 @@ export default function Dashboard() {
 
   // Calculate comprehensive trading metrics based on Python implementation
   const calculateMetricsFromData = (trades, profile) => {
+    console.log('🔢 calculateMetricsFromData called with:', {
+      tradesCount: trades?.length || 0,
+      hasProfile: !!profile,
+      profileId: profile?.id || 'none'
+    });
 
     if (!trades || trades.length === 0 || !profile) {
+      console.log('📊 Returning zero metrics (empty data)');
       return {
         totalReturn: 0,
         winRate: 0,
@@ -862,7 +870,10 @@ export default function Dashboard() {
 
   // Calculate metrics when data is available
   const metrics = React.useMemo(() => {
-    return calculateMetricsFromData(trades, profile);
+    const calculatedMetrics = calculateMetricsFromData(trades, profile);
+    console.log('📊 Calculated metrics:', calculatedMetrics);
+    console.log('📊 Input data - trades:', trades?.length || 0, 'profile:', profile?.id || 'none');
+    return calculatedMetrics;
   }, [trades, profile]);
 
   // Calculate ELO scores based on metrics
