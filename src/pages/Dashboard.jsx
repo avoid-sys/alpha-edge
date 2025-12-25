@@ -378,18 +378,53 @@ export default function Dashboard() {
               // Load Bybit data
               if (bybitCreds) {
                 console.log('📊 Loading Bybit data...');
-                const { apiKey, apiSecret } = JSON.parse(bybitCreds);
-                const { fetchBybitTrades } = await import('@/services/BybitService');
-                const bybitTrades = await fetchBybitTrades(apiKey, apiSecret);
+                const creds = JSON.parse(bybitCreds);
+                const { apiKey, apiSecret, skipValidation } = creds;
+
+                let bybitTrades = [];
+                if (skipValidation) {
+                  // Use demo data if validation was skipped
+                  console.log('📊 Using demo data for Bybit (validation skipped)');
+                  bybitTrades = [
+                    {
+                      id: 'bybit_demo_1',
+                      time: new Date(Date.now() - 172800000), // 2 days ago
+                      close_time: new Date(Date.now() - 172800000),
+                      symbol: 'BTCUSDT',
+                      direction: 'Buy',
+                      volume: 0.001,
+                      price: 50000,
+                      net_profit: 75,
+                      commission: 0.08,
+                      balance: 10000
+                    },
+                    {
+                      id: 'bybit_demo_2',
+                      time: new Date(Date.now() - 21600000), // 6 hours ago
+                      close_time: new Date(Date.now() - 21600000),
+                      symbol: 'ETHUSDT',
+                      direction: 'Sell',
+                      volume: 0.02,
+                      price: 3000,
+                      net_profit: -25,
+                      commission: 0.03,
+                      balance: 10075
+                    }
+                  ];
+                } else {
+                  // Try to fetch real data
+                  const { fetchBybitTrades } = await import('@/services/BybitService');
+                  bybitTrades = await fetchBybitTrades(apiKey, apiSecret);
+                }
 
                 if (bybitTrades && bybitTrades.length > 0) {
                   allTrades = allTrades.concat(bybitTrades);
                   exchangeProfiles.push({
-                    name: 'Bybit Account',
+                    name: skipValidation ? 'Bybit Account (Demo)' : 'Bybit Account',
                     exchange: 'bybit',
                     trades: bybitTrades
                   });
-                  console.log('✅ Loaded', bybitTrades.length, 'Bybit trades');
+                  console.log('✅ Loaded', bybitTrades.length, 'Bybit trades', skipValidation ? '(demo)' : '');
                 }
               }
 

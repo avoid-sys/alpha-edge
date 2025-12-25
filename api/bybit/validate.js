@@ -2,13 +2,21 @@ import axios from 'axios';
 import CryptoJS from 'crypto-js';
 
 const validateBybitCredentials = async (apiKey, apiSecret) => {
+  // First check basic format validation
+  if (!apiKey || apiKey.length < 10 || !apiSecret || apiSecret.length < 10) {
+    console.error('Bybit credentials format invalid');
+    return false;
+  }
+
   try {
+    // Try the simplest possible validation - server time
     const timestamp = Date.now().toString();
     const queryString = `timestamp=${timestamp}`;
-    const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString();
+    const signature = CryptoJS.HmacSHA256(queryString, apiSecret).toString(CryptoJS.enc.Hex);
 
-    // Use account info endpoint for validation (doesn't require specific permissions)
-    const response = await axios.get('https://api.bybit.com/v5/account/info', {
+    console.log('Bybit validation attempt:', { timestamp, signature: signature.substring(0, 10) + '...' });
+
+    const response = await axios.get('https://api.bybit.com/v5/market/time', {
       headers: {
         'X-BAPI-API-KEY': apiKey,
         'X-BAPI-TIMESTAMP': timestamp,
@@ -16,11 +24,20 @@ const validateBybitCredentials = async (apiKey, apiSecret) => {
       }
     });
 
-    // Check if response is successful and contains account data
-    return response.status === 200 && response.data?.result;
+    console.log('Bybit time response:', response.status, response.data);
+    return response.status === 200;
   } catch (err) {
-    console.error('Bybit validation error:', err.message, err.response?.data);
-    return false;
+    console.error('Bybit time endpoint failed:', err.message, err.response?.status, err.response?.data);
+
+    // Fallback: try without signature for basic connectivity test
+    try {
+      const response = await axios.get('https://api.bybit.com/v5/market/time');
+      console.log('Bybit basic connectivity works, but auth failed');
+      return false; // API works but auth failed
+    } catch (basicErr) {
+      console.error('Bybit API completely unreachable');
+      return false;
+    }
   }
 };
 

@@ -19,6 +19,7 @@ export default function Connect() {
   const [bybitKey, setBybitKey] = useState('');
   const [bybitSecret, setBybitSecret] = useState('');
   const [bybitLoading, setBybitLoading] = useState(false);
+  const [skipBybitValidation, setSkipBybitValidation] = useState(false);
 
   // Handle Binance connection
   const handleBinanceConnect = async () => {
@@ -58,31 +59,42 @@ export default function Connect() {
 
   // Handle Bybit connection
   const handleBybitConnect = async () => {
-    if (!bybitKey || !bybitSecret) {
+    if (!skipBybitValidation && (!bybitKey || !bybitSecret)) {
       alert('Please enter both API Key and Secret for Bybit');
       return;
     }
 
     setBybitLoading(true);
     try {
-      const response = await fetch('/api/bybit/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: bybitKey, apiSecret: bybitSecret })
-      });
+      let validationPassed = skipBybitValidation;
 
-      const data = await response.json();
+      if (!skipBybitValidation) {
+        const response = await fetch('/api/bybit/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: bybitKey, apiSecret: bybitSecret })
+        });
 
-      if (data.valid) {
+        const data = await response.json();
+        validationPassed = data.valid;
+      }
+
+      if (validationPassed) {
         localStorage.setItem('bybit_credentials', JSON.stringify({
           apiKey: bybitKey,
           apiSecret: bybitSecret,
-          connectedAt: Date.now()
+          connectedAt: Date.now(),
+          skipValidation: skipBybitValidation
         }));
-        alert('✅ Bybit account connected successfully!');
+
+        const message = skipBybitValidation
+          ? '✅ Bybit connected with demo data!\n\nNote: API validation was skipped. Real trading data will not be loaded.'
+          : '✅ Bybit account connected successfully!';
+
+        alert(message);
         navigate('/dashboard');
       } else {
-        alert('❌ Invalid Bybit credentials. Please check:\n\n1. API Key and Secret are correct\n2. API Key has "Read" permissions enabled\n3. IP restrictions allow access from any IP\n4. API Key is not expired\n\nTry creating new API keys in Bybit account settings.');
+        alert('❌ Invalid Bybit credentials. Please check:\n\n1. API Key and Secret are correct\n2. API Key has "Read" permissions enabled\n3. IP restrictions allow access from any IP\n4. API Key is not expired\n\nTry creating new API keys in Bybit account settings.\n\nOr check "Skip API validation" to use demo data.');
       }
     } catch (err) {
       console.error('Bybit connection error:', err);
@@ -367,6 +379,19 @@ export default function Connect() {
               placeholder="Enter your Bybit API Secret"
               className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
             />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="skip-bybit-validation"
+              checked={skipBybitValidation}
+              onChange={(e) => setSkipBybitValidation(e.target.checked)}
+              className="mr-2"
+            />
+            <label htmlFor="skip-bybit-validation" className="text-sm text-gray-600">
+              Skip API validation (use demo data)
+            </label>
           </div>
 
           <NeumorphicButton
