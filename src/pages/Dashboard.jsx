@@ -97,7 +97,7 @@ export default function Dashboard() {
         if (profileId) {
           fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
           fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
-        } else if (hasCTraderTokens) {
+        } else if (hasCTraderTokens && !fetchedProfile) {
           // If we have cTrader tokens, run cTrader flow immediately
           console.log('🔄 cTrader tokens detected - running cTrader flow');
 
