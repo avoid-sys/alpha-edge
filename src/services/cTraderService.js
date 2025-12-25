@@ -474,7 +474,12 @@ export const startCtraderFlow = async (isDemo = false) => {
 
         const message = ProtoMessage.decode(uint8Array);
         const payloadTypeNum = message.payloadType;
-        console.log('📨 Received payloadType:', payloadTypeNum);
+        console.log('📨 Received payloadType:', payloadTypeNum, 'payload length:', message.payload?.length || 0);
+
+        // Log raw payload for debugging
+        if (message.payload && message.payload.length > 0) {
+          console.log('🔍 Raw payload (first 50 bytes):', Array.from(message.payload.slice(0, 50)));
+        }
 
         // Handle heartbeat first
         if (payloadTypeNum === 51) {
