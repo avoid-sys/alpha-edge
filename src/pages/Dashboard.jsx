@@ -54,6 +54,17 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
   const refreshParam = searchParams.get('refresh');
+
+  // Handle refresh parameter to force data reload after file import
+  React.useEffect(() => {
+    if (refreshParam) {
+      console.log('🔄 Refresh parameter detected, forcing data reload');
+      setDataVersion(prev => prev + 1);
+      // Clean up URL parameter
+      const newUrl = window.location.pathname + (profileId ? `?profileId=${profileId}` : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [refreshParam, profileId]);
   const ctraderStartedRef = useRef(false);
 
   // Check if user is viewing their own profile or someone else's
@@ -308,21 +319,24 @@ export default function Dashboard() {
           }
         } else {
           try {
-            // Try to find profile by current user email
+            // Priority: File imports first, then user-specific profiles
             console.log('🔍 Searching for profiles for user:', user.email);
-            let profiles = await localDataService.entities.TraderProfile.filter({
+            let profiles = [];
+
+            // First, try to find file-imported profiles (they take priority)
+            const fileProfiles = await localDataService.entities.TraderProfile.filter({
+              created_by: 'local@alphaedge.com'
+            });
+            console.log('📊 Found file-imported profiles:', fileProfiles.length);
+
+            // Then, try to find user-specific profiles
+            const userProfiles = await localDataService.entities.TraderProfile.filter({
               created_by: user.email
             });
-            console.log('📊 Found profiles by user email:', profiles.length);
+            console.log('📊 Found user-specific profiles:', userProfiles.length);
 
-            // If no profile found by user email, try local email (for file imports)
-            if (profiles.length === 0) {
-              console.log('No profiles found for user email, checking for local imports...');
-              profiles = await localDataService.entities.TraderProfile.filter({
-                created_by: 'local@alphaedge.com'
-              });
-              console.log('📊 Found profiles by local email:', profiles.length);
-            }
+            // Combine and prioritize: file imports first, then user profiles
+            profiles = [...fileProfiles, ...userProfiles];
 
             // If still no profiles, try to find any profile (fallback)
             if (profiles.length === 0) {
@@ -366,10 +380,16 @@ export default function Dashboard() {
             // If we have a profile, determine mode from its source
             if (fetchedProfile.created_by === 'local@alphaedge.com') {
               activeTradingMode = 'forex'; // File import (assume forex)
-            } else if (hasExchangeCreds) {
-              activeTradingMode = 'crypto'; // Exchange data available
-            } else if (hasCTraderTokens) {
-              activeTradingMode = 'forex'; // cTrader data available
+              console.log('🎯 File-imported data detected, setting Forex mode');
+            } else if (hasExchangeCreds && fetchedProfile.created_by !== 'local@alphaedge.com') {
+              activeTradingMode = 'crypto'; // Exchange data loaded
+              console.log('🎯 Exchange data detected, setting Crypto mode');
+            } else if (hasCTraderTokens && fetchedProfile.created_by !== 'local@alphaedge.com') {
+              activeTradingMode = 'forex'; // cTrader data loaded
+              console.log('🎯 cTrader data detected, setting Forex mode');
+            } else {
+              activeTradingMode = 'forex'; // Default for any profile
+              console.log('🎯 Profile found, defaulting to Forex mode');
             }
           } else {
             // No profile loaded yet, determine from available credentials
@@ -848,8 +868,19 @@ export default function Dashboard() {
     console.log('🔢 calculateMetricsFromData called with:', {
       tradesCount: trades?.length || 0,
       hasProfile: !!profile,
-      profileId: profile?.id || 'none'
+      profileId: profile?.id || 'none',
+      profileCreatedBy: profile?.created_by || 'none'
     });
+
+    // Debug: Log first few trades to see data structure
+    if (trades && trades.length > 0) {
+      console.log('📊 Sample trades data:', trades.slice(0, 3).map(t => ({
+        id: t.id,
+        time: t.time || t.close_time,
+        profit: t.net_profit || t.profit,
+        symbol: t.symbol
+      })));
+    }
 
     if (!trades || trades.length === 0 || !profile) {
       console.log('📊 Returning zero metrics (empty data)');
