@@ -346,27 +346,45 @@ export default function Dashboard() {
             console.error('❌ Error fetching profiles:', e);
           }
 
-          // Determine active trading mode
-          const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
-          const hasBinanceCreds = !!localStorage.getItem('binance_credentials');
-          const hasBybitCreds = !!localStorage.getItem('bybit_credentials');
-
-          // Set active trading mode based on connected brokers
+          // Determine active trading mode based on loaded data
           let activeTradingMode = 'forex'; // default
-          if (hasBinanceCreds || hasBybitCreds) {
-            activeTradingMode = 'crypto';
-          } else if (hasCTraderTokens) {
-            activeTradingMode = 'forex';
+
+          if (fetchedProfile) {
+            // If we have a profile, determine mode from its source
+            if (fetchedProfile.created_by === 'local@alphaedge.com') {
+              activeTradingMode = 'forex'; // File import (assume forex)
+            } else if (hasExchangeCreds && shouldLoadExchangeData) {
+              activeTradingMode = 'crypto'; // Exchange data was loaded
+            } else if (hasCTraderTokens && shouldLoadCTraderData) {
+              activeTradingMode = 'forex'; // cTrader data was loaded
+            }
+          } else {
+            // No profile loaded yet, determine from available credentials
+            const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
+            const hasBinanceCreds = !!localStorage.getItem('binance_credentials');
+            const hasBybitCreds = !!localStorage.getItem('bybit_credentials');
+
+            if (hasBinanceCreds || hasBybitCreds) {
+              activeTradingMode = 'crypto';
+            } else if (hasCTraderTokens) {
+              activeTradingMode = 'forex';
+            }
           }
 
           // Store active trading mode for UI
           localStorage.setItem('active_trading_mode', activeTradingMode);
 
-          // Check for exchange connections (Binance, Bybit) first
+          // Check for exchange connections (Binance, Bybit) - only if no file profile exists
           const binanceCreds = localStorage.getItem('binance_credentials');
           const bybitCreds = localStorage.getItem('bybit_credentials');
+          const hasExchangeCreds = binanceCreds || bybitCreds;
 
-          if (binanceCreds || bybitCreds) {
+          // Only load exchange data if:
+          // 1. Exchange credentials exist AND no file profile was found, OR
+          // 2. Exchange credentials exist AND file profile exists (user wants to update)
+          const shouldLoadExchangeData = hasExchangeCreds && (!fetchedProfile || (fetchedProfile && fetchedProfile.created_by !== 'local@alphaedge.com'));
+
+          if (shouldLoadExchangeData) {
             console.log('🔄 Exchange credentials detected - loading exchange data');
 
             try {
@@ -561,8 +579,11 @@ export default function Dashboard() {
             }
           }
 
-          // If cTrader tokens exist, try to create/update profile from cTrader (even if file profile exists)
-          if (localStorage.getItem('ctrader_tokens')) {
+          // If cTrader tokens exist and no file profile was loaded, try to create profile from cTrader
+          const hasCTraderTokens = localStorage.getItem('ctrader_tokens');
+          const shouldLoadCTraderData = hasCTraderTokens && (!fetchedProfile || (fetchedProfile && fetchedProfile.created_by !== 'local@alphaedge.com'));
+
+          if (shouldLoadCTraderData) {
             console.log('🔄 cTrader tokens found - attempting to create/update profile from cTrader data');
             console.log('📊 Current profile status:', fetchedProfile ? `file profile ${fetchedProfile.id} exists` : 'no profile');
 
