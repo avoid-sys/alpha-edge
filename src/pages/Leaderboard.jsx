@@ -18,20 +18,22 @@ export default function Leaderboard() {
 
         // Transform to leaderboard format
         const leaderboardData = allProfiles
-          .filter(profile => profile.elo_score && profile.elo_score > 0)
+          .filter(profile => profile.trader_score || profile.elo_score) // Accept either field
           .map((profile, index) => ({
             traderId: profile.id,
             traderName: profile.nickname || profile.id,
+            tradingType: getTradingType(profile),
             elo: {
-              eloScore: profile.elo_score || 1000,
-              rawScore: profile.elo_score || 1000,
+              eloScore: profile.elo_score || profile.trader_score || 1000,
+              rawScore: profile.elo_score || profile.trader_score || 1000,
               reliability: {
-                totalTrades: profile.total_trades || 0,
+                totalTrades: profile.total_trades || profile.totalTrades || 0,
                 confidenceCoefficient: 0.8,
                 dataCoverage: 0.9,
                 reliabilityMultiplier: 1.0
               },
-              category: getELOCategory(profile.elo_score || 1000),
+              category: getELOCategory(profile.elo_score || profile.trader_score || 1000),
+              tradingType: getTradingType(profile),
               calculatedAt: profile.updated_at || new Date()
             }
           }));
@@ -57,6 +59,28 @@ export default function Leaderboard() {
     if (eloScore >= 1800) return 'Developing';
     if (eloScore >= 1400) return 'Intermediate';
     return 'Beginner';
+  };
+
+  // Helper function to determine trading type
+  const getTradingType = (profile) => {
+    // Check if this is a crypto exchange connection
+    if (profile.broker === 'Binance' || profile.broker === 'Bybit') {
+      return 'Crypto';
+    }
+
+    // Check if this is a live cTrader account
+    if (profile.is_live_account === true) {
+      return 'Forex';
+    }
+
+    // For imported files, try to determine from broker field or default to Forex
+    if (profile.broker === 'Imported') {
+      // Could be enhanced to detect from trade symbols or other data
+      return 'Forex'; // Default for imported files
+    }
+
+    // Default fallback
+    return 'Forex';
   };
 
   const TopTraderPodium = ({ traderData, rank }) => {
@@ -90,7 +114,7 @@ export default function Leaderboard() {
                  {elo.eloScore.toFixed(1)}
                </p>
              </div>
-             <p className="text-xs text-gray-600">{elo.category}</p>
+             <p className="text-xs text-gray-600">{elo.category} • {tradingType}</p>
            </div>
            </div>
         <div className={`${height} w-24 bg-[#e0e5ec] rounded-t-2xl shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#a3b1c6] mx-2 flex items-end justify-center pb-4`}>
@@ -135,7 +159,8 @@ export default function Leaderboard() {
           <div className="col-span-1">Rank</div>
           <div className="col-span-3">Trader</div>
           <div className="col-span-2 text-right">ELO Score</div>
-          <div className="col-span-2 text-right">Category</div>
+          <div className="col-span-1 text-right">Category</div>
+          <div className="col-span-1 text-right">Type</div>
           <div className="col-span-2 text-right">Confidence</div>
           <div className="col-span-2 text-right">Trades</div>
           </div>
@@ -144,7 +169,7 @@ export default function Leaderboard() {
           <div className="text-center py-10 text-gray-400">Loading leaderboard...</div>
         ) : (
           leaderboard.map((item, index) => {
-            const { traderId, traderName, elo } = item;
+            const { traderId, traderName, elo, tradingType } = item;
             return (
             <NeumorphicCard
                 key={traderId}
@@ -162,7 +187,7 @@ export default function Leaderboard() {
               </div>
 
               {/* Trader Info */}
-              <div className="col-span-2 md:col-span-3 flex items-center gap-3">
+              <div className="col-span-3 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shadow-inner flex-shrink-0 flex items-center justify-center">
                     <Users size={20} className="text-gray-500" />
                 </div>
@@ -173,7 +198,7 @@ export default function Leaderboard() {
               </div>
 
                 {/* ELO Score */}
-              <div className="col-span-1 md:col-span-2 text-right">
+              <div className="col-span-2 text-right">
                  <div className="flex flex-col items-end">
                       <div className="flex items-center gap-1">
                         <Award size={14} style={{ color: getELOColor(elo.eloScore) }} />
@@ -186,8 +211,17 @@ export default function Leaderboard() {
               </div>
 
                 {/* Category */}
-              <div className="hidden md:block col-span-2 text-right">
+              <div className="hidden md:block col-span-1 text-right">
                    <span className="font-medium text-gray-600">{elo.category}</span>
+              </div>
+
+              {/* Trading Type */}
+              <div className="hidden md:block col-span-1 text-right">
+                   <span className="text-sm font-medium" style={{
+                     color: tradingType === 'Crypto' ? '#f97316' : '#3b82f6'
+                   }}>
+                     {tradingType}
+                   </span>
               </div>
 
                 {/* Confidence */}
