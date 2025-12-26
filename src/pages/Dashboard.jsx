@@ -1444,7 +1444,10 @@ export default function Dashboard() {
       const tradingMode = profile.created_by === 'local@alphaedge.com' ? 'Forex Trading' : 'Crypto Trading';
 
       // Fix account age calculation - from first trade to now
-      const accountAgeDays = Math.max(1, Math.ceil((Date.now() - trades[0]?.close_time || trades[0]?.time || Date.now()) / (1000 * 60 * 60 * 24)));
+      const sortedTradesForAge = [...trades].sort((a, b) =>
+        new Date(a.close_time || a.time || 0) - new Date(b.close_time || b.time || 0)
+      );
+      const accountAgeDays = Math.max(1, Math.ceil((Date.now() - (sortedTradesForAge[0]?.close_time || sortedTradesForAge[0]?.time || Date.now())) / (1000 * 60 * 60 * 24)));
 
       // SEC-style institutional report header
       shareDiv.innerHTML = `
