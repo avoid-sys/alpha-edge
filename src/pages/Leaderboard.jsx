@@ -23,6 +23,7 @@ export default function Leaderboard() {
             traderId: profile.id,
             traderName: profile.nickname || profile.id,
             tradingType: getTradingType(profile),
+            winRate: profile.win_rate || 0,
             elo: {
               eloScore: profile.elo_score || profile.trader_score || 1000,
               rawScore: profile.elo_score || profile.trader_score || 1000,
@@ -161,11 +162,10 @@ export default function Leaderboard() {
         {/* Header */}
         <div className="hidden md:grid grid-cols-12 gap-4 px-8 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
           <div className="col-span-1">Rank</div>
-          <div className="col-span-3">Trader</div>
+          <div className="col-span-4">Trader</div>
           <div className="col-span-2 text-right">ELO Score</div>
-          <div className="col-span-1 text-right">Category</div>
           <div className="col-span-1 text-right">Type</div>
-          <div className="col-span-2 text-right">Confidence</div>
+          <div className="col-span-2 text-right">WinRate</div>
           <div className="col-span-2 text-right">Trades</div>
           </div>
 
@@ -191,7 +191,7 @@ export default function Leaderboard() {
               </div>
 
               {/* Trader Info */}
-              <div className="col-span-3 flex items-center gap-3">
+              <div className="col-span-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shadow-inner flex-shrink-0 flex items-center justify-center">
                     <Users size={20} className="text-gray-500" />
                 </div>
@@ -214,11 +214,6 @@ export default function Leaderboard() {
                  </div>
               </div>
 
-                {/* Category */}
-              <div className="hidden md:block col-span-1 text-right">
-                   <span className="font-medium text-gray-600">{elo.category}</span>
-              </div>
-
               {/* Trading Type */}
               <div className="hidden md:block col-span-1 text-right">
                    <span className="text-sm font-medium" style={{
@@ -228,9 +223,9 @@ export default function Leaderboard() {
                    </span>
               </div>
 
-                {/* Confidence */}
+                {/* WinRate */}
               <div className="hidden md:block col-span-2 text-right">
-                  <span className="font-medium text-gray-600">{((elo.reliability.confidenceCoefficient || 0.8) * 100).toFixed(1)}%</span>
+                  <span className="font-medium text-gray-600">{item.winRate ? item.winRate.toFixed(1) + '%' : '0.0%'}</span>
               </div>
 
               {/* Total Trades */}
