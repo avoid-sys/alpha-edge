@@ -3,7 +3,7 @@ import { NeumorphicCard } from '@/components/NeumorphicUI';
 import { Trophy, TrendingUp, Users, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { eloApi } from '@/backend/ELOApi';
+import { localDataService } from '@/services/localDataService';
 
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -13,7 +13,28 @@ export default function Leaderboard() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const leaderboardData = await eloApi.getLeaderboard(50);
+        // Get all trader profiles sorted by trader_score (ELO rating)
+        const allProfiles = await localDataService.entities.TraderProfile.list('-trader_score');
+
+        // Transform to leaderboard format
+        const leaderboardData = allProfiles
+          .filter(profile => profile.trader_score && profile.trader_score > 0)
+          .map((profile, index) => ({
+            traderId: profile.id,
+            elo: {
+              eloScore: profile.elo_score || 1000,
+              rawScore: profile.elo_score || 1000,
+              reliability: {
+                totalTrades: profile.totalTrades || 0,
+                confidenceCoefficient: 0.8,
+                dataCoverage: 0.9,
+                reliabilityMultiplier: 1.0
+              },
+              category: getELOCategory(profile.elo_score || 1000),
+              calculatedAt: profile.updated_at || new Date()
+            }
+          }));
+
         setLeaderboard(leaderboardData);
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
@@ -26,15 +47,26 @@ export default function Leaderboard() {
     fetchLeaderboard();
   }, []);
 
+  // Helper function to determine ELO category
+  const getELOCategory = (eloScore) => {
+    if (eloScore >= 3500) return 'Elite';
+    if (eloScore >= 3000) return 'Professional';
+    if (eloScore >= 2500) return 'Consistent';
+    if (eloScore >= 2200) return 'Unstable';
+    if (eloScore >= 1800) return 'Developing';
+    if (eloScore >= 1400) return 'Intermediate';
+    return 'Beginner';
+  };
+
   const TopTraderPodium = ({ traderData, rank }) => {
     if (!traderData) return null;
     const { traderId, elo } = traderData;
 
     const height = rank === 1 ? 'h-48' : rank === 2 ? 'h-40' : 'h-32';
     const color = rank === 1 ? 'text-yellow-500' : rank === 2 ? 'text-gray-400' : 'text-orange-400';
-    
+
     return (
-      <div 
+      <div
         className="flex flex-col items-center justify-end cursor-pointer transition-transform hover:-translate-y-2 duration-300"
         onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`))}
       >
@@ -52,9 +84,9 @@ export default function Leaderboard() {
            <p className="font-bold text-gray-700">{traderId}</p>
            <div className="flex flex-col items-center">
              <div className="flex items-center gap-1">
-               <Award size={16} style={{ color: eloApi.getELOColor(elo.eloScore) }} />
-               <p className="font-bold text-xl" style={{ color: eloApi.getELOColor(elo.eloScore) }}>
-                 {eloApi.formatELOScore(elo.eloScore)}
+               <Award size={16} style={{ color: getELOColor(elo.eloScore) }} />
+               <p className="font-bold text-xl" style={{ color: getELOColor(elo.eloScore) }}>
+                 {elo.eloScore.toFixed(1)}
                </p>
              </div>
              <p className="text-xs text-gray-600">{elo.category}</p>
@@ -65,6 +97,17 @@ export default function Leaderboard() {
         </div>
       </div>
     );
+  };
+
+  // Helper function to get ELO color
+  const getELOColor = (score) => {
+    if (score >= 3500) return '#FFD700'; // Gold
+    if (score >= 3000) return '#C0C0C0'; // Silver
+    if (score >= 2500) return '#CD7F32'; // Bronze
+    if (score >= 2200) return '#EF4444'; // Red
+    if (score >= 1800) return '#06B6D4'; // Cyan
+    if (score >= 1400) return '#3B82F6'; // Blue
+    return '#6B7280'; // Gray
   };
 
   return (
@@ -102,7 +145,7 @@ export default function Leaderboard() {
           leaderboard.map((item, index) => {
             const { traderId, elo } = item;
             return (
-            <NeumorphicCard 
+            <NeumorphicCard
                 key={traderId}
               className="grid grid-cols-2 md:grid-cols-12 gap-4 px-6 py-4 items-center hover:scale-[1.01] transition-transform cursor-pointer"
                 onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`))}
@@ -132,9 +175,9 @@ export default function Leaderboard() {
               <div className="col-span-1 md:col-span-2 text-right">
                  <div className="flex flex-col items-end">
                       <div className="flex items-center gap-1">
-                        <Award size={14} style={{ color: eloApi.getELOColor(elo.eloScore) }} />
-                        <span className="font-bold text-lg" style={{ color: eloApi.getELOColor(elo.eloScore) }}>
-                          {eloApi.formatELOScore(elo.eloScore)}
+                        <Award size={14} style={{ color: getELOColor(elo.eloScore) }} />
+                        <span className="font-bold text-lg" style={{ color: getELOColor(elo.eloScore) }}>
+                          {elo.eloScore.toFixed(1)}
                     </span>
                       </div>
                       <span className="text-xs text-gray-400 block md:hidden">ELO</span>
@@ -148,13 +191,13 @@ export default function Leaderboard() {
 
                 {/* Confidence */}
               <div className="hidden md:block col-span-2 text-right">
-                  <span className="font-medium text-gray-600">{eloApi.formatConfidence(elo.reliability.confidenceCoefficient)}</span>
+                  <span className="font-medium text-gray-600">{((elo.reliability.confidenceCoefficient || 0.8) * 100).toFixed(1)}%</span>
               </div>
 
               {/* Total Trades */}
               <div className="hidden md:block col-span-2 text-right">
-                  <span className="font-medium text-gray-600">{elo.reliability.totalTrades}</span>
-              </div> 
+                  <span className="font-medium text-gray-600">{elo.reliability.totalTrades || 0}</span>
+              </div>
             </NeumorphicCard>
             );
           })
