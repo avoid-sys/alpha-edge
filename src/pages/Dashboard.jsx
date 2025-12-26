@@ -821,15 +821,13 @@ export default function Dashboard() {
           }
         }
         
-        // Calculate rank based on trader score - only for live connected accounts
-        if (fetchedProfile && fetchedProfile.is_live_account) {
+        // Calculate rank based on trader score - for all accounts (live and file-import)
+        if (fetchedProfile) {
           const allProfiles = await localDataService.entities.TraderProfile.list('-trader_score');
-          // Filter to only live accounts
-          const liveProfiles = allProfiles.filter(p => p.is_live_account);
-          const userRank = liveProfiles.findIndex(p => p.id === fetchedProfile.id) + 1;
-          setRank(userRank);
+          const userRank = allProfiles.findIndex(p => p.id === fetchedProfile.id) + 1;
+          setRank(userRank > 0 ? userRank : null);
         } else {
-          setRank(null); // No rank for demo/file-only accounts
+          setRank(null);
         }
 
         if (fetchedProfile) {
