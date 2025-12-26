@@ -1382,6 +1382,27 @@ export default function Dashboard() {
     return calculateELOScores(metrics);
   }, [metrics]);
 
+  // Update profile with latest ELO scores for leaderboard synchronization
+  React.useEffect(() => {
+    const updateProfileELO = async () => {
+      if (profile && eloScores && eloScores.elo_score && eloScores.elo_score > 1000) {
+        try {
+          console.log('🔄 Updating profile ELO for leaderboard sync:', profile.id, eloScores.elo_score);
+          await localDataService.entities.TraderProfile.update(profile.id, {
+            ...eloScores,
+            trader_score: eloScores.elo_score, // For leaderboard sorting
+            updated_at: new Date()
+          });
+          console.log('✅ Profile ELO updated successfully');
+        } catch (error) {
+          console.error('❌ Failed to update profile ELO:', error);
+        }
+      }
+    };
+
+    updateProfileELO();
+  }, [profile?.id, eloScores]);
+
   // Get ELO color based on generalized score ranges
   const getELOColor = (eloScore) => {
     if (eloScore >= 3500) return '#FFD700'; // Gold - Elite
