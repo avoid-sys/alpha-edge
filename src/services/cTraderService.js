@@ -581,18 +581,25 @@ export const startCtraderFlow = async (isDemo = false) => {
         console.log(`🔍 Decoded payload for ${typeName}:`, payload);
 
         if (payloadTypeNum === 2150 || payloadTypeNum === 2148) { // ProtoOAGetAccountListByAccessTokenRes or ProtoOAGetAccountListRes - accounts list
+                 console.log('✅ Account list response received!');
+                 console.log('🔍 Full account list payload:', payload);
+
                  accounts = payload.ctidTraderAccount || [];
+                 console.log('📊 Accounts array:', accounts);
+
                  if (accounts.length === 0) {
-                   console.warn('⚠️ No trading accounts found');
+                   console.warn('⚠️ No trading accounts found in response');
+                   console.log('🔍 Full response for debugging:', JSON.stringify(payload, null, 2));
                    isConnecting = false;
                    resolve([]); // Return empty array if no accounts
                    ws.close();
                    return;
                  }
 
-                 console.log(`📋 Found ${accounts.length} accounts (demo + live):`, accounts.map(acc => ({
+                 console.log(`📋 Found ${accounts.length} accounts:`, accounts.map(acc => ({
                    id: acc.ctidTraderAccountId,
-                   isLive: acc.isLive
+                   isLive: acc.isLive,
+                   brokerName: acc.brokerName
                  })));
 
                  // Start processing first account
