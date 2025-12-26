@@ -13,19 +13,20 @@ export default function Leaderboard() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Get all trader profiles sorted by trader_score (ELO rating)
-        const allProfiles = await localDataService.entities.TraderProfile.list('-trader_score');
+        // Get all trader profiles sorted by elo_score (ELO rating)
+        const allProfiles = await localDataService.entities.TraderProfile.list('-elo_score');
 
         // Transform to leaderboard format
         const leaderboardData = allProfiles
-          .filter(profile => profile.trader_score && profile.trader_score > 0)
+          .filter(profile => profile.elo_score && profile.elo_score > 0)
           .map((profile, index) => ({
             traderId: profile.id,
+            traderName: profile.nickname || profile.id,
             elo: {
               eloScore: profile.elo_score || 1000,
               rawScore: profile.elo_score || 1000,
               reliability: {
-                totalTrades: profile.totalTrades || 0,
+                totalTrades: profile.total_trades || 0,
                 confidenceCoefficient: 0.8,
                 dataCoverage: 0.9,
                 reliabilityMultiplier: 1.0
@@ -60,7 +61,7 @@ export default function Leaderboard() {
 
   const TopTraderPodium = ({ traderData, rank }) => {
     if (!traderData) return null;
-    const { traderId, elo } = traderData;
+    const { traderId, traderName, elo } = traderData;
 
     const height = rank === 1 ? 'h-48' : rank === 2 ? 'h-40' : 'h-32';
     const color = rank === 1 ? 'text-yellow-500' : rank === 2 ? 'text-gray-400' : 'text-orange-400';
@@ -81,7 +82,7 @@ export default function Leaderboard() {
           </div>
         </div>
         <div className="mb-2 text-center">
-           <p className="font-bold text-gray-700">{traderId}</p>
+           <p className="font-bold text-gray-700">{traderName || traderId}</p>
            <div className="flex flex-col items-center">
              <div className="flex items-center gap-1">
                <Award size={16} style={{ color: getELOColor(elo.eloScore) }} />
@@ -143,7 +144,7 @@ export default function Leaderboard() {
           <div className="text-center py-10 text-gray-400">Loading leaderboard...</div>
         ) : (
           leaderboard.map((item, index) => {
-            const { traderId, elo } = item;
+            const { traderId, traderName, elo } = item;
             return (
             <NeumorphicCard
                 key={traderId}
@@ -166,7 +167,7 @@ export default function Leaderboard() {
                     <Users size={20} className="text-gray-500" />
                 </div>
                 <div>
-                    <p className="font-bold text-gray-700">{traderId}</p>
+                    <p className="font-bold text-gray-700">{traderName || traderId}</p>
                     <p className="text-xs text-gray-400 md:hidden">#{index + 1}</p>
                 </div>
               </div>
