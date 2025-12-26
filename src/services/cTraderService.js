@@ -457,8 +457,12 @@ export const startCtraderFlow = async (isDemo = false) => {
 
     ws.onmessage = async (event) => {
       try {
+        console.log('📨 WebSocket message received, data length:', event.data?.byteLength || event.data?.length || 'unknown');
+
         const arrayBuffer = await event.data.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
+
+        console.log('📨 Raw message bytes (first 20):', uint8Array.slice(0, 20));
 
         // Try to find ProtoMessage type
         let ProtoMessage;
@@ -513,24 +517,43 @@ export const startCtraderFlow = async (isDemo = false) => {
           try {
             const AuthResType = protoRoot.lookupType('ProtoOA.ProtoOAApplicationAuthRes');
             const authPayload = AuthResType.decode(message.payload);
-            console.log('🎉 ProtoOAApplicationAuthRes received - app auth success!');
+            console.log('🎉 ProtoOAApplicationAuthRes received!');
             console.log('🔍 Auth response payload:', authPayload);
 
-            // Wait a bit before sending next request to avoid overwhelming the server
-            setTimeout(() => {
-              console.log('📋 Sending account list request...');
-              // Try the simpler account list request first (without access token since we're authenticated)
-              try {
-                sendMessage(ws, 'ProtoOAGetAccountListReq', {});
-                console.log('✅ Sent ProtoOAGetAccountListReq');
-              } catch (e) {
-                console.log('⚠️ ProtoOAGetAccountListReq failed, trying with access token...');
-                sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
-                  accessToken: tokens.access_token
-                });
-                console.log('✅ Sent ProtoOAGetAccountListByAccessTokenReq with accessToken');
-              }
-            }, 100);
+            // Check if authentication was successful
+            if (authPayload.result === true) {
+              console.log('✅ Application authentication successful, proceeding to get account list...');
+
+              // CRITICAL: Wait for the WebSocket to stabilize after auth response
+              setTimeout(() => {
+                console.log('📋 Sending account list request after auth response...');
+
+                // Check if WebSocket is still open
+                if (ws.readyState !== WebSocket.OPEN) {
+                  console.error('❌ WebSocket is not open after auth response, readyState:', ws.readyState);
+                  isConnecting = false;
+                  reject(new Error('WebSocket closed after application auth'));
+                  return;
+                }
+
+                // Send ProtoOAGetAccountListByAccessTokenReq with access token
+                try {
+                  sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
+                    accessToken: tokens.access_token
+                  });
+                  console.log('✅ Sent ProtoOAGetAccountListByAccessTokenReq with accessToken');
+                } catch (e) {
+                  console.error('❌ Failed to send account list request:', e);
+                  isConnecting = false;
+                  reject(new Error('Failed to send account list request'));
+                }
+              }, 1000); // Wait 1 second for stability
+            } else {
+              console.error('❌ Application authentication failed - result is false');
+              isConnecting = false;
+              reject(new Error('Application authentication failed'));
+              ws.close();
+            }
             return;
           } catch (authError) {
             // Not an auth response, treat as heartbeat
@@ -557,12 +580,7 @@ export const startCtraderFlow = async (isDemo = false) => {
 
         console.log(`🔍 Decoded payload for ${typeName}:`, payload);
 
-        if (payloadTypeNum === 2142) { // ProtoOAApplicationAuthRes - app auth success
-          console.log('✅ Application authenticated — requesting all accounts');
-          sendMessage(ws, 'ProtoOAGetAccountListByAccessTokenReq', {
-            accessToken: tokens.access_token
-          });
-               } else if (payloadTypeNum === 2150 || payloadTypeNum === 2148) { // ProtoOAGetAccountListByAccessTokenRes or ProtoOAGetAccountListRes - accounts list
+        if (payloadTypeNum === 2150 || payloadTypeNum === 2148) { // ProtoOAGetAccountListByAccessTokenRes or ProtoOAGetAccountListRes - accounts list
                  accounts = payload.ctidTraderAccount || [];
                  if (accounts.length === 0) {
                    console.warn('⚠️ No trading accounts found');
