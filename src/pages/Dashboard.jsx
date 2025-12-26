@@ -89,6 +89,13 @@ export default function Dashboard() {
       let fetchedProfile = null;
       let fetchedTrades = [];
 
+      // Safety check - ensure localDataService is available
+      if (!localDataService || !localDataService.entities) {
+        console.error('❌ localDataService not available');
+        setLoading(false);
+        return;
+      }
+
       try {
 
         // Check if we have cTrader tokens - if yes, prioritize cTrader data
@@ -346,6 +353,12 @@ export default function Dashboard() {
             console.error('❌ Error fetching profiles:', e);
           }
 
+          // Check for available credentials first
+          const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
+          const binanceCreds = localStorage.getItem('binance_credentials');
+          const bybitCreds = localStorage.getItem('bybit_credentials');
+          const hasExchangeCreds = !!binanceCreds || !!bybitCreds;
+
           // Determine active trading mode based on loaded data
           let activeTradingMode = 'forex'; // default
 
@@ -353,18 +366,14 @@ export default function Dashboard() {
             // If we have a profile, determine mode from its source
             if (fetchedProfile.created_by === 'local@alphaedge.com') {
               activeTradingMode = 'forex'; // File import (assume forex)
-            } else if (hasExchangeCreds && shouldLoadExchangeData) {
-              activeTradingMode = 'crypto'; // Exchange data was loaded
-            } else if (hasCTraderTokens && shouldLoadCTraderData) {
-              activeTradingMode = 'forex'; // cTrader data was loaded
+            } else if (hasExchangeCreds) {
+              activeTradingMode = 'crypto'; // Exchange data available
+            } else if (hasCTraderTokens) {
+              activeTradingMode = 'forex'; // cTrader data available
             }
           } else {
             // No profile loaded yet, determine from available credentials
-            const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
-            const hasBinanceCreds = !!localStorage.getItem('binance_credentials');
-            const hasBybitCreds = !!localStorage.getItem('bybit_credentials');
-
-            if (hasBinanceCreds || hasBybitCreds) {
+            if (hasExchangeCreds) {
               activeTradingMode = 'crypto';
             } else if (hasCTraderTokens) {
               activeTradingMode = 'forex';
@@ -374,14 +383,9 @@ export default function Dashboard() {
           // Store active trading mode for UI
           localStorage.setItem('active_trading_mode', activeTradingMode);
 
-          // Check for exchange connections (Binance, Bybit) - only if no file profile exists
-          const binanceCreds = localStorage.getItem('binance_credentials');
-          const bybitCreds = localStorage.getItem('bybit_credentials');
-          const hasExchangeCreds = binanceCreds || bybitCreds;
-
           // Only load exchange data if:
           // 1. Exchange credentials exist AND no file profile was found, OR
-          // 2. Exchange credentials exist AND file profile exists (user wants to update)
+          // 2. Exchange credentials exist AND file profile exists but it's not from file import
           const shouldLoadExchangeData = hasExchangeCreds && (!fetchedProfile || (fetchedProfile && fetchedProfile.created_by !== 'local@alphaedge.com'));
 
           if (shouldLoadExchangeData) {
@@ -580,8 +584,8 @@ export default function Dashboard() {
           }
 
           // If cTrader tokens exist and no file profile was loaded, try to create profile from cTrader
-          const hasCTraderTokens = localStorage.getItem('ctrader_tokens');
-          const shouldLoadCTraderData = hasCTraderTokens && (!fetchedProfile || (fetchedProfile && fetchedProfile.created_by !== 'local@alphaedge.com'));
+          const cTraderTokens = localStorage.getItem('ctrader_tokens');
+          const shouldLoadCTraderData = cTraderTokens && (!fetchedProfile || (fetchedProfile && fetchedProfile.created_by !== 'local@alphaedge.com'));
 
           if (shouldLoadCTraderData) {
             console.log('🔄 cTrader tokens found - attempting to create/update profile from cTrader data');
@@ -821,11 +825,12 @@ export default function Dashboard() {
           setProfile(null);
           setTrades([]);
         }
-      } catch (error) {
-        console.error("Error fetching data", error);
-      } finally {
+
         console.log('🏁 Dashboard data loading completed, setting loading to false');
         console.log('📊 Final state - profile:', fetchedProfile?.id || 'none', 'trades:', fetchedTrades?.length || 0);
+        setLoading(false);
+      } catch (error) {
+        console.error('❌ Error in dashboard data loading:', error);
         setLoading(false);
       }
     };
