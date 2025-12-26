@@ -346,6 +346,22 @@ export default function Dashboard() {
             console.error('❌ Error fetching profiles:', e);
           }
 
+          // Determine active trading mode
+          const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
+          const hasBinanceCreds = !!localStorage.getItem('binance_credentials');
+          const hasBybitCreds = !!localStorage.getItem('bybit_credentials');
+
+          // Set active trading mode based on connected brokers
+          let activeTradingMode = 'forex'; // default
+          if (hasBinanceCreds || hasBybitCreds) {
+            activeTradingMode = 'crypto';
+          } else if (hasCTraderTokens) {
+            activeTradingMode = 'forex';
+          }
+
+          // Store active trading mode for UI
+          localStorage.setItem('active_trading_mode', activeTradingMode);
+
           // Check for exchange connections (Binance, Bybit) first
           const binanceCreds = localStorage.getItem('binance_credentials');
           const bybitCreds = localStorage.getItem('bybit_credentials');
@@ -2171,6 +2187,25 @@ export default function Dashboard() {
             ) : (
               <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
                 <h1 className="text-xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left">{profile.nickname}</h1>
+                <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
+                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                    localStorage.getItem('active_trading_mode') === 'crypto'
+                      ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                      : 'bg-blue-100 text-blue-800 border border-blue-200'
+                  }`}>
+                    {localStorage.getItem('active_trading_mode') === 'crypto' ? (
+                      <>
+                        <BarChart3 size={12} className="mr-1" />
+                        Crypto Trading
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp size={12} className="mr-1" />
+                        Forex Trading
+                      </>
+                    )}
+                  </div>
+                </div>
                 {isOwnProfile && (
                   <div className="flex gap-2">
                   <button

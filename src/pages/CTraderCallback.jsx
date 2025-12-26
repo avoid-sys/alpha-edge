@@ -151,6 +151,9 @@ const CTraderCallback = () => {
         localStorage.setItem('ctrader_tokens', JSON.stringify(data));
         console.log('✅ cTrader tokens stored successfully via serverless API');
 
+        // Store trading mode info
+        localStorage.setItem('ctrader_trading_mode', 'forex');
+
         // Clear state
         localStorage.removeItem('ctrader_state');
 

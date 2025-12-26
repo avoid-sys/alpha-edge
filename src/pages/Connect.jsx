@@ -52,7 +52,8 @@ export default function Connect() {
           apiKey: binanceKey,
           apiSecret: binanceSecret,
           connectedAt: Date.now(),
-          skipValidation: skipBinanceValidation
+          skipValidation: skipBinanceValidation,
+          tradingMode: 'crypto'
         }));
 
         const message = skipBinanceValidation
@@ -99,7 +100,8 @@ export default function Connect() {
           apiKey: bybitKey,
           apiSecret: bybitSecret,
           connectedAt: Date.now(),
-          skipValidation: skipBybitValidation
+          skipValidation: skipBybitValidation,
+          tradingMode: 'crypto'
         }));
 
         const message = skipBybitValidation
