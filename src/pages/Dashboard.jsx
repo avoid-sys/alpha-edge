@@ -45,6 +45,7 @@ export default function Dashboard() {
   const [trades, setTrades] = useState([]);
   const [rank, setRank] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [chartPeriod, setChartPeriod] = useState('1W'); // '1W', '1M', 'ALL'
   const [dataVersion, setDataVersion] = useState(0); // Force refresh counter
   const [helpPopup, setHelpPopup] = useState(null); // Current help popup
@@ -113,8 +114,17 @@ export default function Dashboard() {
         const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
         
         if (profileId) {
-          fetchedProfile = await localDataService.entities.TraderProfile.get(profileId);
-          fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
+          // SECURITY: Check if the requested profile belongs to the current user
+          const requestedProfile = await localDataService.entities.TraderProfile.get(profileId);
+          if (requestedProfile && requestedProfile.created_by === user.email) {
+            fetchedProfile = requestedProfile;
+            fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
+          } else {
+            console.error('🚫 Access denied: Profile does not belong to current user');
+            setError('You do not have permission to view this profile.');
+            setLoading(false);
+            return;
+          }
         } else if (hasCTraderTokens && !fetchedProfile) {
           // If we have cTrader tokens, run cTrader flow immediately
           console.log('🔄 cTrader tokens detected - running cTrader flow');
@@ -338,15 +348,10 @@ export default function Dashboard() {
             // Combine and prioritize: file imports first, then user profiles
             profiles = [...fileProfiles, ...userProfiles];
 
-            // If still no profiles, try to find any profile (fallback)
+            // SECURITY: If no profiles found for this user, don't show data from other users
             if (profiles.length === 0) {
-              console.log('No user-specific profiles found, checking for any profiles...');
-              const allProfiles = await localDataService.entities.TraderProfile.getAll();
-              console.log('📊 Total profiles in database:', allProfiles.length);
-              if (allProfiles.length > 0) {
-                profiles = [allProfiles[0]]; // Use first available profile
-                console.log('Using first available profile:', profiles[0].id, 'created by:', profiles[0].created_by);
-              }
+              console.log('No profiles found for user:', user.email, '- showing empty dashboard');
+              // Don't load any data - user will see empty dashboard
             }
 
               if (profiles.length > 0) {
@@ -2016,6 +2021,22 @@ export default function Dashboard() {
       </div>
     );
   };
+
+  // Show error state if access denied
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh]">
+        <div className="w-24 h-24 bg-red-100 rounded-full shadow-[-8px_-8px_16px_#ffffff,8px_8px_16px_#fecaca] flex items-center justify-center mb-8">
+          <Shield size={40} className="text-red-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-700 mb-2">Access Denied</h2>
+        <p className="text-gray-500 mb-8 text-center max-w-md">{error}</p>
+        <Link to={createPageUrl('Dashboard')}>
+          <NeumorphicButton>Back to My Dashboard</NeumorphicButton>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
