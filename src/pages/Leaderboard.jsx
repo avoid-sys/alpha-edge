@@ -63,6 +63,11 @@ export default function Leaderboard() {
 
   // Helper function to determine trading type
   const getTradingType = (profile) => {
+    // Check if profile already has trading_type saved
+    if (profile.trading_type) {
+      return profile.trading_type;
+    }
+
     // Check if this is a crypto exchange connection
     if (profile.broker === 'Binance' || profile.broker === 'Bybit') {
       return 'Crypto';
@@ -73,10 +78,9 @@ export default function Leaderboard() {
       return 'Forex';
     }
 
-    // For imported files, try to determine from broker field or default to Forex
+    // For imported files without explicit trading_type, default to Forex
     if (profile.broker === 'Imported') {
-      // Could be enhanced to detect from trade symbols or other data
-      return 'Forex'; // Default for imported files
+      return 'Forex';
     }
 
     // Default fallback

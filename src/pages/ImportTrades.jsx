@@ -945,9 +945,14 @@ export default function ImportTrades() {
         console.log('📂 Using existing profile:', profileId);
       } else {
         const sanitizedName = securityService.sanitizeInput(user.full_name || 'Trader', 'text');
+        // Determine trading type based on active mode
+        const activeTradingMode = localStorage.getItem('active_trading_mode') || 'forex';
+        const tradingType = activeTradingMode === 'crypto' ? 'Crypto' : 'Forex';
+
         const newProfile = await localDataService.entities.TraderProfile.create({
            nickname: sanitizedName,
            broker: 'Imported',
+           trading_type: tradingType,
            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`,
            created_by: user.email,
            is_live_account: false // File import, not live account
