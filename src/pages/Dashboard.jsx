@@ -977,7 +977,8 @@ export default function Dashboard() {
       }
 
       // Annualized Return (more precise compounded calculation)
-      const annReturn = durationDays > 0 ? Math.pow(1 + totalReturn / 100, 365 / durationDays) - 1 : 0;
+      // For very short periods (< 30 days), use simple return instead of annualized
+      const annReturn = durationDays >= 30 ? Math.pow(1 + totalReturn / 100, 365 / durationDays) - 1 : totalReturn / 100;
       const annReturnPct = annReturn * 100;
 
       // Volatility (Annualized with 252 trading days - more precise)
@@ -1454,10 +1455,9 @@ export default function Dashboard() {
         <!-- Modern Header -->
         <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-bottom: 2px solid #2563eb; padding: 25px 35px; position: relative;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <div style="display: flex; align-items: center;">
-              <div style="font-size: 28px; font-weight: 700; font-family: 'Inter', -apple-system, sans-serif; color: #1e293b; letter-spacing: -0.5px;">ALPHA EDGE</div>
-              <div style="margin-left: 18px; font-size: 13px; color: #64748b; font-family: 'Inter', sans-serif; font-weight: 500;">Institutional Analytics</div>
-            </div>
+          <div style="display: flex; align-items: center;">
+            <div style="font-size: 28px; font-weight: 700; font-family: 'Inter', -apple-system, sans-serif; color: #1e293b; letter-spacing: -0.5px;">ALPHA EDGE</div>
+          </div>
             <div style="text-align: right; font-family: 'Inter', sans-serif;">
               <div style="font-size: 11px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Generated</div>
               <div style="font-size: 15px; font-weight: 600; color: #1e293b;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
@@ -1469,198 +1469,178 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <!-- Main Report Content - Modern Compact Style -->
-        <div style="padding: 25px 30px; background: #ffffff; position: relative; font-family: 'Inter', sans-serif;">
+        <!-- Main Report Content - Modern Compact Multi-Column Style -->
+        <div style="padding: 25px 25px; background: #ffffff; position: relative; font-family: 'Inter', sans-serif;">
 
-          <!-- Account Information Table -->
-          <div style="margin-bottom: 20px;">
-            <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 10px; border-bottom: 2px solid #2563eb; padding-bottom: 6px; font-family: 'Inter', sans-serif;">ACCOUNT INFORMATION</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 15px; font-family: 'Inter', sans-serif;">
-              <thead>
-                <tr style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 600; color: #374151;">Metric</th>
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 600; color: #374151;">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Trader Name</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; color: #1f2937;">${profile.nickname}</td>
-                </tr>
-                <tr style="background: #f8fafc;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Trading Mode</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; color: #1f2937;">${tradingMode}</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Data Source</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; color: #1f2937;">${dataSource}</td>
-                </tr>
-                <tr style="background: #f8fafc;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Account Age</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; color: #1f2937;">${accountAgeDays} days</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Global Rank</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; color: #1f2937; font-weight: 600;">${rank ? '#' + rank : 'N/A'}</td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- First Row: Account Info + Performance Stats -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px;">
+
+            <!-- Account Information Table -->
+            <div>
+              <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px; border-bottom: 2px solid #2563eb; padding-bottom: 5px; font-family: 'Inter', sans-serif;">ACCOUNT INFO</h3>
+              <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 14px; font-family: 'Inter', sans-serif;">
+                <thead>
+                  <tr style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: left; font-weight: 600; color: #374151; font-size: 13px;">Metric</th>
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: left; font-weight: 600; color: #374151; font-size: 13px;">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Name</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; color: #1f2937; font-size: 13px;">${profile.nickname}</td>
+                  </tr>
+                  <tr style="background: #f8fafc;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Age</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; color: #1f2937; font-size: 13px;">${accountAgeDays} days</td>
+                  </tr>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Rank</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; color: #1f2937; font-weight: 600; font-size: 13px;">${rank ? '#' + rank : 'N/A'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Performance Statistics Table -->
+            <div>
+              <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px; border-bottom: 2px solid #2563eb; padding-bottom: 5px; font-family: 'Inter', sans-serif;">PERFORMANCE</h3>
+              <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 14px; font-family: 'Inter', sans-serif;">
+                <thead>
+                  <tr style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: left; font-weight: 600; color: #374151; font-size: 13px;">Metric</th>
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; font-weight: 600; color: #374151; font-size: 13px;">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Total Return</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: ${metrics?.totalReturn >= 0 ? '#16a34a' : '#dc2626'}; font-weight: 600; font-size: 13px;">${metrics?.totalReturn !== undefined ? (metrics.totalReturn >= 0 ? '+' : '') + metrics.totalReturn.toFixed(2) + '%' : '0.00%'}</td>
+                  </tr>
+                  <tr style="background: #f8fafc;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">${accountAgeDays >= 30 ? 'Ann. Return' : 'Period Return'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: ${metrics?.annualizedReturn >= 0 ? '#16a34a' : '#dc2626'}; font-weight: 600; font-size: 13px;">${metrics?.annualizedReturn !== undefined ? (metrics.annualizedReturn >= 0 ? '+' : '') + (metrics.annualizedReturn * 100).toFixed(2) + '%' : '0.00%'}</td>
+                  </tr>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Win Rate</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #2563eb; font-weight: 600; font-size: 13px;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</td>
+                  </tr>
+                  <tr style="background: #f8fafc;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Profit Factor</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #7c2d12; font-weight: 600; font-size: 13px;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</td>
+                  </tr>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Expectancy</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">$${metrics?.expectancy !== undefined ? metrics.expectancy.toFixed(2) : '0.00'}</td>
+                  </tr>
+                  <tr style="background: #f8fafc;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Total Trades</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <!-- Performance Statistics Table -->
-          <div style="margin-bottom: 20px;">
-            <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 10px; border-bottom: 2px solid #2563eb; padding-bottom: 6px; font-family: 'Inter', sans-serif;">PERFORMANCE STATISTICS</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 15px; font-family: 'Inter', sans-serif;">
-              <thead>
-                <tr style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 600; color: #374151;">Performance Metric</th>
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; font-weight: 600; color: #374151;">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Total Return</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: ${metrics?.totalReturn >= 0 ? '#16a34a' : '#dc2626'}; font-weight: 600;">${metrics?.totalReturn !== undefined ? (metrics.totalReturn >= 0 ? '+' : '') + metrics.totalReturn.toFixed(2) + '%' : '0.00%'}</td>
-                </tr>
-                <tr style="background: #f8fafc;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Annualized Return</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: ${metrics?.annualizedReturn >= 0 ? '#16a34a' : '#dc2626'}; font-weight: 600;">${metrics?.annualizedReturn !== undefined ? (metrics.annualizedReturn >= 0 ? '+' : '') + (metrics.annualizedReturn * 100).toFixed(2) + '%' : '0.00%'}</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Win Rate</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #2563eb; font-weight: 600;">${metrics?.winRate !== undefined ? metrics.winRate.toFixed(1) + '%' : '0.0%'}</td>
-                </tr>
-                <tr style="background: #f8fafc;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Profit Factor</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #7c2d12; font-weight: 600;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Expectancy</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">$${metrics?.expectancy !== undefined ? metrics.expectancy.toFixed(2) : '0.00'}</td>
-                </tr>
-                <tr style="background: #f8fafc;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Total Trades</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- Second Row: Risk Metrics + Trading Activity -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px;">
+
+            <!-- Risk Metrics Table -->
+            <div>
+              <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px; border-bottom: 2px solid #dc2626; padding-bottom: 5px; font-family: 'Inter', sans-serif;">RISK</h3>
+              <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 14px; font-family: 'Inter', sans-serif;">
+                <thead>
+                  <tr style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);">
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: left; font-weight: 600; color: #991b1b; font-size: 13px;">Metric</th>
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; font-weight: 600; color: #991b1b; font-size: 13px;">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Sharpe Ratio</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</td>
+                  </tr>
+                  <tr style="background: #fef2f2;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Max DD</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #dc2626; font-weight: 600; font-size: 13px;">${metrics?.maxDrawdown !== undefined ? metrics.maxDrawdown.toFixed(2) + '%' : '0.00%'}</td>
+                  </tr>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Volatility</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.volatility !== undefined ? (metrics.volatility * 100).toFixed(2) + '%' : '0.00%'}</td>
+                  </tr>
+                  <tr style="background: #fef2f2;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Recovery F.</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.recoveryFactor !== undefined ? metrics.recoveryFactor.toFixed(2) : '0.00'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Trading Activity Table -->
+            <div>
+              <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px; border-bottom: 2px solid #16a34a; padding-bottom: 5px; font-family: 'Inter', sans-serif;">ACTIVITY</h3>
+              <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 14px; font-family: 'Inter', sans-serif;">
+                <thead>
+                  <tr style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);">
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: left; font-weight: 600; color: #166534; font-size: 13px;">Metric</th>
+                    <th style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; font-weight: 600; color: #166534; font-size: 13px;">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Total Trades</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td>
+                  </tr>
+                  <tr style="background: #f0fdf4;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Win Trades</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #16a34a; font-weight: 600; font-size: 13px;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round(metrics.winRate * metrics.totalTrades / 100) : '0'}</td>
+                  </tr>
+                  <tr style="background: #ffffff;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Loss Trades</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #dc2626; font-weight: 600; font-size: 13px;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round((100 - metrics.winRate) * metrics.totalTrades / 100) : '0'}</td>
+                  </tr>
+                  <tr style="background: #f0fdf4;">
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Frequency</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.totalTrades !== undefined && accountAgeDays !== undefined ? (metrics.totalTrades / accountAgeDays).toFixed(1) + '/day' : '0.0/day'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <!-- Risk Metrics Table -->
+          <!-- Third Row: Performance Scoring (Full Width) -->
           <div style="margin-bottom: 20px;">
-            <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 10px; border-bottom: 2px solid #dc2626; padding-bottom: 6px; font-family: 'Inter', sans-serif;">RISK METRICS</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 15px; font-family: 'Inter', sans-serif;">
-              <thead>
-                <tr style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);">
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 600; color: #991b1b;">Risk Metric</th>
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; font-weight: 600; color: #991b1b;">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Sharpe Ratio</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.sharpeRatio !== undefined ? metrics.sharpeRatio.toFixed(2) : '0.00'}</td>
-                </tr>
-                <tr style="background: #fef2f2;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Sortino Ratio</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.sortinoRatio !== undefined ? metrics.sortinoRatio.toFixed(2) : '0.00'}</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Max Drawdown</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #dc2626; font-weight: 600;">${metrics?.maxDrawdown !== undefined ? metrics.maxDrawdown.toFixed(2) + '%' : '0.00%'}</td>
-                </tr>
-                <tr style="background: #fef2f2;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Average Drawdown</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.avgDrawdown !== undefined ? metrics.avgDrawdown.toFixed(2) + '%' : '0.00%'}</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Volatility</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.volatility !== undefined ? (metrics.volatility * 100).toFixed(2) + '%' : '0.00%'}</td>
-                </tr>
-                <tr style="background: #fef2f2;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Recovery Factor</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.recoveryFactor !== undefined ? metrics.recoveryFactor.toFixed(2) : '0.00'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
 
-          <!-- Trading Activity Table -->
-          <div style="margin-bottom: 20px;">
-            <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 10px; border-bottom: 2px solid #16a34a; padding-bottom: 6px; font-family: 'Inter', sans-serif;">TRADING ACTIVITY</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 15px; font-family: 'Inter', sans-serif;">
-              <thead>
-                <tr style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);">
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 600; color: #166534;">Activity Metric</th>
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; font-weight: 600; color: #166534;">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Total Trades</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td>
-                </tr>
-                <tr style="background: #f0fdf4;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Winning Trades</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #16a34a; font-weight: 600;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round(metrics.winRate * metrics.totalTrades / 100) : '0'}</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Losing Trades</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #dc2626; font-weight: 600;">${metrics?.winRate !== undefined && metrics?.totalTrades !== undefined ? Math.round((100 - metrics.winRate) * metrics.totalTrades / 100) : '0'}</td>
-                </tr>
-                <tr style="background: #f0fdf4;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Trade Frequency</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600;">${metrics?.totalTrades !== undefined && accountAgeDays !== undefined ? (metrics.totalTrades / accountAgeDays).toFixed(1) + ' trades/day' : '0.0 trades/day'}</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Max Win Streak</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #16a34a; font-weight: 600;">${metrics?.maxWinStreak || 0} trades</td>
-                </tr>
-                <tr style="background: #f0fdf4;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Max Loss Streak</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #dc2626; font-weight: 600;">${metrics?.maxLoseStreak || 0} trades</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Performance Scoring Table -->
-          <div style="margin-bottom: 20px;">
-            <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 10px; border-bottom: 2px solid #7c3aed; padding-bottom: 6px; font-family: 'Inter', sans-serif;">PERFORMANCE SCORING</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 15px; font-family: 'Inter', sans-serif;">
-              <thead>
-                <tr style="background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);">
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 600; color: #7c2d12;">Score Category</th>
-                  <th style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; font-weight: 600; color: #7c2d12;">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Alpha Edge ELO Rating</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #7c2d12; font-weight: 700; font-size: 16px;">${eloScores?.elo_score || 1000}</td>
-                </tr>
-                <tr style="background: #faf5ff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Performance Score</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #16a34a; font-weight: 600;">${eloScores?.performance_score || 0}/100</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Risk Score</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #dc2626; font-weight: 600;">${eloScores?.risk_score || 0}/100</td>
-                </tr>
-                <tr style="background: #faf5ff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Consistency Score</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #f59e0b; font-weight: 600;">${eloScores?.consistency_score || 0}/100</td>
-                </tr>
-                <tr style="background: #ffffff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Account Health Score</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #0891b2; font-weight: 600;">${eloScores?.account_health_score || 0}/100</td>
-                </tr>
-                <tr style="background: #faf5ff;">
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500; color: #1f2937;">Global Rank</td>
-                  <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1e293b; font-weight: 700;">${rank ? '#' + rank : 'N/A'}</td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- Performance Scoring Table -->
+            <div>
+              <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 12px; border-bottom: 2px solid #7c3aed; padding-bottom: 8px; font-family: 'Inter', sans-serif; text-align: center;">PERFORMANCE SCORING</h3>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px;">
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%); border: 2px solid #d1d5db; border-radius: 8px; padding: 15px; text-align: center;">
+                  <div style="font-size: 14px; color: #7c2d12; font-weight: 600; margin-bottom: 8px; font-family: 'Inter', sans-serif;">ELO RATING</div>
+                  <div style="font-size: 24px; font-weight: 700; color: #7c2d12; font-family: 'Inter', sans-serif;">${eloScores?.elo_score || 1000}</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%); border: 2px solid #d1d5db; border-radius: 8px; padding: 15px; text-align: center;">
+                  <div style="font-size: 14px; color: #166534; font-weight: 600; margin-bottom: 8px; font-family: 'Inter', sans-serif;">PERFORMANCE</div>
+                  <div style="font-size: 24px; font-weight: 700; color: #166534; font-family: 'Inter', sans-serif;">${eloScores?.performance_score || 0}</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%); border: 2px solid #d1d5db; border-radius: 8px; padding: 15px; text-align: center;">
+                  <div style="font-size: 14px; color: #dc2626; font-weight: 600; margin-bottom: 8px; font-family: 'Inter', sans-serif;">RISK</div>
+                  <div style="font-size: 24px; font-weight: 700; color: #dc2626; font-family: 'Inter', sans-serif;">${eloScores?.risk_score || 0}</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #fefce8 100%); border: 2px solid #d1d5db; border-radius: 8px; padding: 15px; text-align: center;">
+                  <div style="font-size: 14px; color: #d97706; font-weight: 600; margin-bottom: 8px; font-family: 'Inter', sans-serif;">CONSISTENCY</div>
+                  <div style="font-size: 24px; font-weight: 700; color: #d97706; font-family: 'Inter', sans-serif;">${eloScores?.consistency_score || 0}</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border: 2px solid #d1d5db; border-radius: 8px; padding: 15px; text-align: center;">
+                  <div style="font-size: 14px; color: #0891b2; font-weight: 600; margin-bottom: 8px; font-family: 'Inter', sans-serif;">HEALTH</div>
+                  <div style="font-size: 24px; font-weight: 700; color: #0891b2; font-family: 'Inter', sans-serif;">${eloScores?.account_health_score || 0}</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 2px solid #d1d5db; border-radius: 8px; padding: 15px; text-align: center;">
+                  <div style="font-size: 14px; color: #1e293b; font-weight: 600; margin-bottom: 8px; font-family: 'Inter', sans-serif;">RANK</div>
+                  <div style="font-size: 24px; font-weight: 700; color: #1e293b; font-family: 'Inter', sans-serif;">${rank ? '#' + rank : 'N/A'}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
