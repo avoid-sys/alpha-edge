@@ -38,7 +38,7 @@ const normalizeScore = (value, minThresh, excellentThresh, isPositive = true, ca
 };
 
 const calculateELOScores = (metrics) => {
-  if (!metrics || !metrics.totalTrades || metrics.totalTrades === 0) {
+  if (!metrics || !metrics.total_trades || metrics.total_trades === 0) {
     return {
       performance_score: 0,
       risk_score: 0,
@@ -51,7 +51,7 @@ const calculateELOScores = (metrics) => {
   // Get account context for scaling and dynamic benchmarks
   const startEquity = 10000; // Default, should come from profile or trades
   const durationDays = metrics.accountAge || 30; // Use account age as proxy for duration
-  const totalTrades = metrics.totalTrades;
+  const totalTrades = metrics.total_trades;
 
   // Scale dollar metrics to percentages relative to start equity
   const expectancyPct = metrics.expectancy ? (metrics.expectancy / startEquity) * 100 : 0;
