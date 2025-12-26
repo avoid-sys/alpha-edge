@@ -275,7 +275,10 @@ const sendMessage = (ws, messageTypeName, payloadObj) => {
     // Find and encode the message type
     const fullMessageType = messageTypeName.startsWith('ProtoOA.') ? messageTypeName : 'ProtoOA.' + messageTypeName;
     const MessageType = protoRoot.lookupType(fullMessageType);
+
+    console.log(`🔧 Encoding ${fullMessageType} with payload:`, payloadObj);
     const encodedPayload = MessageType.encode(payloadObj).finish();
+    console.log(`📦 Encoded payload size: ${encodedPayload.length} bytes`);
 
     console.log(`📦 Encoded payload size: ${encodedPayload.length} bytes`);
 
@@ -477,9 +480,24 @@ export const startCtraderFlow = async (isDemo = false) => {
           }
         }
 
-        const message = ProtoMessage.decode(uint8Array);
-        const payloadTypeNum = message.payloadType;
-        console.log('📨 Received payloadType:', payloadTypeNum, 'payload length:', message.payload?.length || 0);
+               const message = ProtoMessage.decode(uint8Array);
+               const payloadTypeNum = message.payloadType;
+               console.log('📨 Received payloadType:', payloadTypeNum, 'WebSocket state:', ws.readyState, 'payload length:', message.payload?.length || 0);
+
+               // Try to decode as error response first
+               if (payloadTypeNum === 50) { // ProtoOAErrorRes
+                 try {
+                   const ErrorType = protoRoot.lookupType('ProtoOA.ProtoOAErrorRes');
+                   const errorPayload = ErrorType.decode(message.payload);
+                   console.error('❌ cTrader error response:', errorPayload.description, 'errorCode:', errorPayload.errorCode);
+                   isConnecting = false;
+                   reject(new Error(errorPayload.description || 'cTrader API error'));
+                   ws.close();
+                   return;
+                 } catch (e) {
+                   console.log('Not an error response, continuing...');
+                 }
+               }
 
         // Log raw payload for debugging
         if (message.payload && message.payload.length > 0) {
@@ -549,9 +567,15 @@ export const startCtraderFlow = async (isDemo = false) => {
                 }
               }, 1000); // Wait 1 second for stability
             } else {
-              console.error('❌ Application authentication failed - result is false');
+              console.error('❌ Application authentication failed!');
+              console.error('🔍 Full error response:', authPayload);
+              console.error('🔍 Error details - result:', authPayload.result, 'description:', authPayload.description);
+
+              // Log the raw payload for debugging
+              console.error('🔍 Raw error payload bytes:', uint8Array.slice(0, 100));
+
               isConnecting = false;
-              reject(new Error('Application authentication failed'));
+              reject(new Error(`Application authentication failed: ${authPayload.description || 'Unknown error'}`));
               ws.close();
             }
             return;
