@@ -10,6 +10,9 @@ export default function Connect() {
   const [selectedScope, setSelectedScope] = useState('accounts');
   const [accountType, setAccountType] = useState('live'); // 'live' or 'demo' - live recommended
 
+  // Trading mode selector
+  const [tradingMode, setTradingMode] = useState('forex'); // 'forex' or 'crypto'
+
   // Binance state
   const [binanceKey, setBinanceKey] = useState('');
   const [binanceSecret, setBinanceSecret] = useState('');
@@ -197,11 +200,53 @@ export default function Connect() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
       <div className="text-center mb-6 sm:mb-10">
-        <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 mb-3">Upload Trading Files</h1>
-        <p className="text-gray-500 text-sm sm:text-base">Upload your trading statements to start tracking your performance.</p>
+        <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 mb-3">Connect Your Broker</h1>
+        <p className="text-gray-500 text-sm sm:text-base">Choose your trading platform and import your data</p>
       </div>
 
       <div className="w-full max-w-md space-y-6">
+
+        {/* Trading Mode Selector */}
+        <div className="bg-white rounded-2xl p-6 shadow-[8px_8px_16px_#d1d9e6,-8px_-8px_16px_#ffffff]">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">Select Trading Type</h3>
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => setTradingMode('forex')}
+              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
+                tradingMode === 'forex'
+                  ? 'bg-blue-500 text-white shadow-[inset_4px_4px_8px_#3b82f6,inset_-4px_-4px_8px_#1e40af]'
+                  : 'bg-[#e0e5ec] text-gray-700 shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d9e6,inset_-2px_-2px_4px_#ffffff]'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <TrendingUp size={20} />
+                Forex Trading
+              </div>
+            </button>
+
+            <button
+              onClick={() => setTradingMode('crypto')}
+              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
+                tradingMode === 'crypto'
+                  ? 'bg-orange-500 text-white shadow-[inset_4px_4px_8px_#f97316,inset_-4px_-4px_8px_#ea580c]'
+                  : 'bg-[#e0e5ec] text-gray-700 shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d9e6,inset_-2px_-2px_4px_#ffffff]'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <BarChart3 size={20} />
+                Crypto Trading
+              </div>
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-500 mt-3 text-center">
+            {tradingMode === 'forex'
+              ? 'Connect to cTrader for forex trading data and analysis'
+              : 'Connect to Binance or Bybit for cryptocurrency trading data'
+            }
+          </p>
+        </div>
         <div>
           <Link to={createPageUrl('ImportTrades')}>
             <NeumorphicButton className="w-full flex items-center justify-center bg-white">
@@ -221,48 +266,182 @@ export default function Connect() {
           </div>
         </div>
 
-        {/* Account Type Selector */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Account Type:
-          </label>
-          <div className="flex gap-4">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="live"
-                checked={accountType === 'live'}
-                onChange={(e) => setAccountType(e.target.value)}
-                className="mr-2"
-              />
-              <span className="text-sm">Live Account</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="demo"
-                checked={accountType === 'demo'}
-                onChange={(e) => setAccountType(e.target.value)}
-                className="mr-2"
-              />
-              <span className="text-sm">Demo Account</span>
-            </label>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            {accountType === 'live'
-              ? 'Connect to your real trading account with live funds'
-              : 'Connect to demo account for testing and practice'
-            }
-          </p>
-        </div>
+        {/* Forex Trading Options */}
+        {tradingMode === 'forex' && (
+          <>
+            {/* Account Type Selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Account Type:
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="live"
+                    checked={accountType === 'live'}
+                    onChange={(e) => setAccountType(e.target.value)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Live Account</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="demo"
+                    checked={accountType === 'demo'}
+                    onChange={(e) => setAccountType(e.target.value)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Demo Account</span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {accountType === 'live'
+                  ? 'Connect to your real trading account with live funds'
+                  : 'Connect to demo account for testing and practice'
+                }
+              </p>
+            </div>
 
-        <div>
-          <NeumorphicButton onClick={handleConnectCTrader} className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0">
-            <Zap size={20} className="mr-2" />
-            Connect cTrader {accountType === 'live' ? 'Live' : 'Demo'}
-          </NeumorphicButton>
-          <p className="text-xs text-gray-500 mt-1 text-center">Connect directly to your cTrader account</p>
-        </div>
+            <div>
+              <NeumorphicButton onClick={handleConnectCTrader} className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0">
+                <Zap size={20} className="mr-2" />
+                Connect cTrader {accountType === 'live' ? 'Live' : 'Demo'}
+              </NeumorphicButton>
+              <p className="text-xs text-gray-500 mt-1 text-center">Connect directly to your cTrader account</p>
+            </div>
+          </>
+        )}
+
+        {/* Crypto Trading Options */}
+        {tradingMode === 'crypto' && (
+          <>
+            {/* Binance Connection */}
+            <div className="bg-white rounded-2xl p-6 shadow-[8px_8px_16px_#d1d9e6,-8px_-8px_16px_#ffffff]">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <BarChart3 size={24} className="mr-2 text-orange-500" />
+                Connect Binance
+              </h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={binanceKey}
+                    onChange={(e) => setBinanceKey(e.target.value)}
+                    placeholder="Enter your Binance API Key"
+                    className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-orange-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    API Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={binanceSecret}
+                    onChange={(e) => setBinanceSecret(e.target.value)}
+                    placeholder="Enter your Binance API Secret"
+                    className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-orange-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="skip-binance-validation"
+                    checked={skipBinanceValidation}
+                    onChange={(e) => setSkipBinanceValidation(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <label htmlFor="skip-binance-validation" className="text-sm text-gray-600">
+                    Skip API validation (use demo data)
+                  </label>
+                </div>
+
+                <NeumorphicButton
+                  onClick={handleBinanceConnect}
+                  disabled={binanceLoading}
+                  className="w-full flex items-center justify-center bg-gradient-to-r from-orange-500 to-yellow-600 text-white border-0 disabled:opacity-50"
+                >
+                  <BarChart3 size={20} className="mr-2" />
+                  {binanceLoading ? 'Connecting...' : 'Connect Binance'}
+                </NeumorphicButton>
+
+                <p className="text-xs text-gray-500 mt-1 text-center">
+                  Connect to your Binance Futures account for live trading data
+                </p>
+              </div>
+            </div>
+
+            {/* Bybit Connection */}
+            <div className="bg-white rounded-2xl p-6 shadow-[8px_8px_16px_#d1d9e6,-8px_-8px_16px_#ffffff]">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <TrendingUp size={24} className="mr-2 text-blue-500" />
+                Connect Bybit
+              </h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={bybitKey}
+                    onChange={(e) => setBybitKey(e.target.value)}
+                    placeholder="Enter your Bybit API Key"
+                    className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    API Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={bybitSecret}
+                    onChange={(e) => setBybitSecret(e.target.value)}
+                    placeholder="Enter your Bybit API Secret"
+                    className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="skip-bybit-validation"
+                    checked={skipBybitValidation}
+                    onChange={(e) => setSkipBybitValidation(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <label htmlFor="skip-bybit-validation" className="text-sm text-gray-600">
+                    Skip API validation (use demo data)
+                  </label>
+                </div>
+
+                <NeumorphicButton
+                  onClick={handleBybitConnect}
+                  disabled={bybitLoading}
+                  className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 disabled:opacity-50"
+                >
+                  <TrendingUp size={20} className="mr-2" />
+                  {bybitLoading ? 'Connecting...' : 'Connect Bybit'}
+                </NeumorphicButton>
+
+                <p className="text-xs text-gray-500 mt-1 text-center">
+                  Connect to your Bybit account for live trading data
+                </p>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Scope selector for testing different permissions */}
         {import.meta.env.DEV && (
@@ -307,130 +486,6 @@ export default function Connect() {
             Reset cTrader Connection
           </NeumorphicButton>
           <p className="text-xs text-gray-500 mt-1 text-center">Clear stored tokens and try again</p>
-        </div>
-      </div>
-
-      {/* Binance Connection */}
-      <div className="bg-white rounded-2xl p-6 shadow-[8px_8px_16px_#d1d9e6,-8px_-8px_16px_#ffffff]">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-          <BarChart3 size={24} className="mr-2 text-orange-500" />
-          Connect Binance
-        </h3>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              API Key
-            </label>
-            <input
-              type="password"
-              value={binanceKey}
-              onChange={(e) => setBinanceKey(e.target.value)}
-              placeholder="Enter your Binance API Key"
-              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-orange-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              API Secret
-            </label>
-            <input
-              type="password"
-              value={binanceSecret}
-              onChange={(e) => setBinanceSecret(e.target.value)}
-              placeholder="Enter your Binance API Secret"
-              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-orange-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="skip-binance-validation"
-              checked={skipBinanceValidation}
-              onChange={(e) => setSkipBinanceValidation(e.target.checked)}
-              className="mr-2"
-            />
-            <label htmlFor="skip-binance-validation" className="text-sm text-gray-600">
-              Skip API validation (use demo data)
-            </label>
-          </div>
-
-          <NeumorphicButton
-            onClick={handleBinanceConnect}
-            disabled={binanceLoading}
-            className="w-full flex items-center justify-center bg-gradient-to-r from-orange-500 to-yellow-600 text-white border-0 disabled:opacity-50"
-          >
-            <BarChart3 size={20} className="mr-2" />
-            {binanceLoading ? 'Connecting...' : 'Connect Binance'}
-          </NeumorphicButton>
-
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            Connect to your Binance Futures account for live trading data
-          </p>
-        </div>
-      </div>
-
-      {/* Bybit Connection */}
-      <div className="bg-white rounded-2xl p-6 shadow-[8px_8px_16px_#d1d9e6,-8px_-8px_16px_#ffffff]">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-          <TrendingUp size={24} className="mr-2 text-blue-500" />
-          Connect Bybit
-        </h3>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              API Key
-            </label>
-            <input
-              type="password"
-              value={bybitKey}
-              onChange={(e) => setBybitKey(e.target.value)}
-              placeholder="Enter your Bybit API Key"
-              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              API Secret
-            </label>
-            <input
-              type="password"
-              value={bybitSecret}
-              onChange={(e) => setBybitSecret(e.target.value)}
-              placeholder="Enter your Bybit API Secret"
-              className="w-full px-3 py-2 bg-[#e0e5ec] border-2 border-transparent rounded-xl focus:border-blue-500 focus:outline-none shadow-[inset_4px_4px_8px_#d1d9e6,inset_-4px_-4px_8px_#ffffff] transition-all duration-200"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="skip-bybit-validation"
-              checked={skipBybitValidation}
-              onChange={(e) => setSkipBybitValidation(e.target.checked)}
-              className="mr-2"
-            />
-            <label htmlFor="skip-bybit-validation" className="text-sm text-gray-600">
-              Skip API validation (use demo data)
-            </label>
-          </div>
-
-          <NeumorphicButton
-            onClick={handleBybitConnect}
-            disabled={bybitLoading}
-            className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 disabled:opacity-50"
-          >
-            <TrendingUp size={20} className="mr-2" />
-            {bybitLoading ? 'Connecting...' : 'Connect Bybit'}
-          </NeumorphicButton>
-
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            Connect to your Bybit account for live trading data
-          </p>
         </div>
       </div>
 
