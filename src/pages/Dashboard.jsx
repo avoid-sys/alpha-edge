@@ -979,7 +979,7 @@ export default function Dashboard() {
       // Annualized Return (more precise compounded calculation)
       // For very short periods (< 30 days), use simple return instead of annualized
       const annReturn = durationDays >= 30 ? Math.pow(1 + totalReturn / 100, 365 / durationDays) - 1 : totalReturn / 100;
-      const annReturnPct = annReturn * 100;
+      const annReturnPct = annReturn; // Already in decimal form for short periods
 
       // Volatility (Annualized with 252 trading days - more precise)
       const avgReturn = dailyReturns.length > 0 ? dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length : 0;
@@ -1448,7 +1448,8 @@ export default function Dashboard() {
       const sortedTradesForAge = [...trades].sort((a, b) =>
         new Date(a.close_time || a.time || 0) - new Date(b.close_time || b.time || 0)
       );
-      const accountAgeDays = Math.max(1, Math.ceil((Date.now() - (sortedTradesForAge[0]?.close_time || sortedTradesForAge[0]?.time || Date.now())) / (1000 * 60 * 60 * 24)));
+      const firstTradeTime = sortedTradesForAge[0]?.close_time || sortedTradesForAge[0]?.time || Date.now();
+      const accountAgeDays = Math.max(1, Math.ceil((Date.now() - firstTradeTime) / (1000 * 60 * 60 * 24)));
 
       // Modern compact institutional report header
       shareDiv.innerHTML = `
@@ -1456,6 +1457,7 @@ export default function Dashboard() {
         <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-bottom: 2px solid #2563eb; padding: 25px 35px; position: relative;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
           <div style="display: flex; align-items: center;">
+            <img src="/logo.png" style="width: 40px; height: 40px; margin-right: 15px; border-radius: 8px;" />
             <div style="font-size: 28px; font-weight: 700; font-family: 'Inter', -apple-system, sans-serif; color: #1e293b; letter-spacing: -0.5px;">ALPHA EDGE</div>
           </div>
             <div style="text-align: right; font-family: 'Inter', sans-serif;">
@@ -1519,7 +1521,7 @@ export default function Dashboard() {
                   </tr>
                   <tr style="background: #f8fafc;">
                     <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">${accountAgeDays >= 30 ? 'Ann. Return' : 'Period Return'}</td>
-                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: ${metrics?.annualizedReturn >= 0 ? '#16a34a' : '#dc2626'}; font-weight: 600; font-size: 13px;">${metrics?.annualizedReturn !== undefined ? (metrics.annualizedReturn >= 0 ? '+' : '') + (metrics.annualizedReturn * 100).toFixed(2) + '%' : '0.00%'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: ${(accountAgeDays >= 30 ? metrics?.annualizedReturn : metrics?.totalReturn) >= 0 ? '#16a34a' : '#dc2626'}; font-weight: 600; font-size: 13px;">${(accountAgeDays >= 30 ? metrics?.annualizedReturn : metrics?.totalReturn) !== undefined ? ((accountAgeDays >= 30 ? metrics.annualizedReturn : metrics.totalReturn) >= 0 ? '+' : '') + (accountAgeDays >= 30 ? (metrics.annualizedReturn * 100).toFixed(2) : metrics.totalReturn.toFixed(2)) + '%' : '0.00%'}</td>
                   </tr>
                   <tr style="background: #ffffff;">
                     <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Win Rate</td>
@@ -1530,12 +1532,12 @@ export default function Dashboard() {
                     <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #7c2d12; font-weight: 600; font-size: 13px;">${metrics?.profitFactor !== undefined ? metrics.profitFactor.toFixed(2) : '0.00'}</td>
                   </tr>
                   <tr style="background: #ffffff;">
-                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Expectancy</td>
-                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">$${metrics?.expectancy !== undefined ? metrics.expectancy.toFixed(2) : '0.00'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Risk/Trade</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.avgRiskTrade !== undefined ? metrics.avgRiskTrade.toFixed(2) + '%' : '0.00%'}</td>
                   </tr>
                   <tr style="background: #f8fafc;">
                     <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Total Trades</td>
-                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.totalTrades !== undefined ? metrics.totalTrades : '0'}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1566,7 +1568,7 @@ export default function Dashboard() {
                   </tr>
                   <tr style="background: #ffffff;">
                     <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Volatility</td>
-                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.volatility !== undefined ? (metrics.volatility * 100).toFixed(2) + '%' : '0.00%'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.volatility !== undefined ? metrics.volatility.toFixed(2) + '%' : '0.00%'}</td>
                   </tr>
                   <tr style="background: #fef2f2;">
                     <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Recovery F.</td>
