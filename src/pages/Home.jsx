@@ -99,12 +99,12 @@ export default function Home() {
               <ArrowRight className="ml-2" size={20} />
             </button>
             {!user && (
-              <button
+            <button
                 onClick={() => window.location.href = '/login'}
                 className="inline-flex items-center justify-center px-8 py-4 bg-[#e0e5ec] text-gray-700 font-semibold rounded-xl shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] hover:shadow-[6px_6px_12px_#d1d9e6,-6px_-6px_12px_#ffffff] hover:bg-white transition-all duration-200 text-lg"
-              >
+            >
                 Sign In
-              </button>
+            </button>
             )}
             {user && (
               <div className="inline-flex items-center justify-center px-8 py-4 bg-green-100 text-green-700 font-semibold rounded-xl shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] text-lg">
@@ -242,7 +242,7 @@ export default function Home() {
                 <span className="font-semibold text-gray-800">Alpha Edge</span>
                 <p className="text-xs text-gray-600">The Global Leaderboard for Elite Traders</p>
               </div>
-            </div>
+                </div>
 
             <div className="flex flex-wrap gap-4 text-sm">
               <Link
@@ -264,7 +264,7 @@ export default function Home() {
                 Support
               </Link>
             </div>
-          </div>
+        </div>
 
           <div className="mt-4 pt-4 border-t border-gray-200/50 text-center text-xs text-gray-500">
             © 2024 Alpha Edge. All rights reserved. Identifying the world's best traders through verified performance.

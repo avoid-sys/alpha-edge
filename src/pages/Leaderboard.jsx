@@ -32,9 +32,9 @@ export default function Leaderboard() {
 
     const height = rank === 1 ? 'h-48' : rank === 2 ? 'h-40' : 'h-32';
     const color = rank === 1 ? 'text-yellow-500' : rank === 2 ? 'text-gray-400' : 'text-orange-400';
-
+    
     return (
-      <div
+      <div 
         className="flex flex-col items-center justify-end cursor-pointer transition-transform hover:-translate-y-2 duration-300"
         onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`))}
       >
@@ -102,60 +102,60 @@ export default function Leaderboard() {
           leaderboard.map((item, index) => {
             const { traderId, elo } = item;
             return (
-              <NeumorphicCard
+            <NeumorphicCard 
                 key={traderId}
-                className="grid grid-cols-2 md:grid-cols-12 gap-4 px-6 py-4 items-center hover:scale-[1.01] transition-transform cursor-pointer"
+              className="grid grid-cols-2 md:grid-cols-12 gap-4 px-6 py-4 items-center hover:scale-[1.01] transition-transform cursor-pointer"
                 onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`))}
-              >
-                {/* Rank */}
-                <div className="col-span-1 hidden md:block">
-                  <span className={`
-                    font-bold text-lg
-                    ${index < 3 ? 'text-gray-800' : 'text-gray-500'}
-                  `}>
-                    #{index + 1}
-                  </span>
-                </div>
+            >
+              {/* Rank */}
+              <div className="col-span-1 hidden md:block">
+                <span className={`
+                  font-bold text-lg
+                  ${index < 3 ? 'text-gray-800' : 'text-gray-500'}
+                `}>
+                  #{index + 1}
+                </span>
+              </div>
 
-                {/* Trader Info */}
-                <div className="col-span-2 md:col-span-3 flex items-center gap-3">
+              {/* Trader Info */}
+              <div className="col-span-2 md:col-span-3 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shadow-inner flex-shrink-0 flex items-center justify-center">
                     <Users size={20} className="text-gray-500" />
-                  </div>
-                  <div>
+                </div>
+                <div>
                     <p className="font-bold text-gray-700">{traderId}</p>
                     <p className="text-xs text-gray-400 md:hidden">#{index + 1}</p>
-                  </div>
                 </div>
+              </div>
 
                 {/* ELO Score */}
-                <div className="col-span-1 md:col-span-2 text-right">
-                   <div className="flex flex-col items-end">
+              <div className="col-span-1 md:col-span-2 text-right">
+                 <div className="flex flex-col items-end">
                       <div className="flex items-center gap-1">
                         <Award size={14} style={{ color: eloApi.getELOColor(elo.eloScore) }} />
                         <span className="font-bold text-lg" style={{ color: eloApi.getELOColor(elo.eloScore) }}>
                           {eloApi.formatELOScore(elo.eloScore)}
-                        </span>
+                    </span>
                       </div>
                       <span className="text-xs text-gray-400 block md:hidden">ELO</span>
-                   </div>
-                </div>
+                 </div>
+              </div>
 
                 {/* Category */}
-                <div className="hidden md:block col-span-2 text-right">
+              <div className="hidden md:block col-span-2 text-right">
                    <span className="font-medium text-gray-600">{elo.category}</span>
-                </div>
+              </div>
 
                 {/* Confidence */}
-                <div className="hidden md:block col-span-2 text-right">
+              <div className="hidden md:block col-span-2 text-right">
                   <span className="font-medium text-gray-600">{eloApi.formatConfidence(elo.reliability.confidenceCoefficient)}</span>
-                </div>
+              </div>
 
-                {/* Total Trades */}
-                <div className="hidden md:block col-span-2 text-right">
+              {/* Total Trades */}
+              <div className="hidden md:block col-span-2 text-right">
                   <span className="font-medium text-gray-600">{elo.reliability.totalTrades}</span>
-                </div>
-              </NeumorphicCard>
+              </div> 
+            </NeumorphicCard>
             );
           })
         )}

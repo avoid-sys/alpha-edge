@@ -1455,15 +1455,16 @@ export default function Dashboard() {
       shareDiv.innerHTML = `
         <!-- Modern Header -->
         <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-bottom: 2px solid #2563eb; padding: 25px 35px; position: relative;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-          <div style="display: flex; align-items: center; justify-content: center;">
-            <img src="/logo.png" style="width: 50px; height: 50px; margin-right: 20px; border-radius: 10px;" />
-            <div style="font-size: 32px; font-weight: 800; font-family: 'Inter', -apple-system, sans-serif; color: #1e293b; letter-spacing: -0.8px;">ALPHA EDGE</div>
+          <!-- Date in top right corner -->
+          <div style="position: absolute; top: 25px; right: 35px; text-align: right; font-family: 'Inter', sans-serif;">
+            <div style="font-size: 11px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Generated</div>
+            <div style="font-size: 15px; font-weight: 600; color: #1e293b;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
           </div>
-            <div style="text-align: right; font-family: 'Inter', sans-serif;">
-              <div style="font-size: 11px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Generated</div>
-              <div style="font-size: 15px; font-weight: 600; color: #1e293b;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
-            </div>
+
+          <!-- Centered logo and title -->
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 20px;">
+            <img src="/logo.png" style="width: 60px; height: 60px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+            <div style="font-size: 36px; font-weight: 800; font-family: 'Inter', -apple-system, sans-serif; color: #1e293b; letter-spacing: -1px; text-align: center;">ALPHA EDGE</div>
           </div>
           <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 12px;">
             <h1 style="font-size: 22px; font-weight: 700; margin: 0; font-family: 'Inter', sans-serif; color: #1e293b; letter-spacing: -0.3px;">TRADER PERFORMANCE REPORT</h1>
@@ -1595,7 +1596,7 @@ export default function Dashboard() {
                   </tr>
                   <tr style="background: #f0fdf4;">
                     <td style="border: 1px solid #d1d5db; padding: 5px 6px; font-weight: 500; color: #1f2937; font-size: 13px;">Frequency</td>
-                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.totalTrades !== undefined && accountAgeDays !== undefined ? (metrics.totalTrades / accountAgeDays).toFixed(1) + '/day' : '0.0/day'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 5px 6px; text-align: right; color: #1f2937; font-weight: 600; font-size: 13px;">${metrics?.totalTrades !== undefined && accountAgeDays !== undefined && metrics.totalTrades > 0 && accountAgeDays > 0 ? (metrics.totalTrades / accountAgeDays).toFixed(1) + '/day' : '0.0/day'}</td>
                   </tr>
                 </tbody>
               </table>
