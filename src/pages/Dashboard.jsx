@@ -1387,26 +1387,29 @@ export default function Dashboard() {
     return calculateELOScores(metrics);
   }, [metrics]);
 
-  // Update profile with latest ELO scores for leaderboard synchronization
+  // Update profile with latest metrics and ELO scores for leaderboard synchronization
   React.useEffect(() => {
-    const updateProfileELO = async () => {
-      if (profile && eloScores && eloScores.elo_score && eloScores.elo_score > 1000) {
+    const updateProfileData = async () => {
+      if (profile && metrics && eloScores && eloScores.elo_score && eloScores.elo_score > 1000) {
         try {
-          console.log('🔄 Updating profile ELO for leaderboard sync:', profile.id, eloScores.elo_score);
+          console.log('🔄 Updating profile data for leaderboard sync:', profile.id, 'ELO:', eloScores.elo_score);
           await localDataService.entities.TraderProfile.update(profile.id, {
+            // Base metrics
+            ...metrics,
+            // ELO scores
             ...eloScores,
             trader_score: eloScores.elo_score, // For leaderboard sorting
             updated_at: new Date()
           });
-          console.log('✅ Profile ELO updated successfully');
+          console.log('✅ Profile data updated successfully for leaderboard');
         } catch (error) {
-          console.error('❌ Failed to update profile ELO:', error);
+          console.error('❌ Failed to update profile data:', error);
         }
       }
     };
 
-    updateProfileELO();
-  }, [profile?.id, eloScores]);
+    updateProfileData();
+  }, [profile?.id, metrics, eloScores]);
 
   // Get ELO color based on generalized score ranges
   const getELOColor = (eloScore) => {

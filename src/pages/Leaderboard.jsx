@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { NeumorphicCard } from '@/components/NeumorphicUI';
-import { Trophy, TrendingUp, Users, Award } from 'lucide-react';
+import { Trophy, TrendingUp, Users, Award, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { localDataService } from '@/services/localDataService';
@@ -8,48 +8,64 @@ import { localDataService } from '@/services/localDataService';
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        // Get all trader profiles sorted by elo_score (ELO rating)
-        const allProfiles = await localDataService.entities.TraderProfile.list('-elo_score');
+  const fetchLeaderboard = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      setRefreshing(true);
 
-        // Transform to leaderboard format
-        const leaderboardData = allProfiles
-          .filter(profile => profile.trader_score || profile.elo_score) // Accept either field
-          .map((profile, index) => ({
-            traderId: profile.id,
-            traderName: profile.nickname || profile.id,
+      // Get all trader profiles sorted by elo_score (ELO rating)
+      const allProfiles = await localDataService.entities.TraderProfile.list('-elo_score');
+
+      // Transform to leaderboard format
+      const leaderboardData = allProfiles
+        .filter(profile => profile.trader_score || profile.elo_score) // Accept either field
+        .map((profile, index) => ({
+          traderId: profile.id,
+          traderName: profile.nickname || profile.id,
+          tradingType: getTradingType(profile),
+          winRate: profile.win_rate || 0,
+          elo: {
+            eloScore: profile.elo_score || profile.trader_score || 1000,
+            rawScore: profile.elo_score || profile.trader_score || 1000,
+            reliability: {
+              totalTrades: profile.total_trades || profile.totalTrades || 0,
+              confidenceCoefficient: 0.8,
+              dataCoverage: 0.9,
+              reliabilityMultiplier: 1.0
+            },
+            category: getELOCategory(profile.elo_score || profile.trader_score || 1000),
             tradingType: getTradingType(profile),
-            winRate: profile.win_rate || 0,
-            elo: {
-              eloScore: profile.elo_score || profile.trader_score || 1000,
-              rawScore: profile.elo_score || profile.trader_score || 1000,
-              reliability: {
-                totalTrades: profile.total_trades || profile.totalTrades || 0,
-                confidenceCoefficient: 0.8,
-                dataCoverage: 0.9,
-                reliabilityMultiplier: 1.0
-              },
-              category: getELOCategory(profile.elo_score || profile.trader_score || 1000),
-              tradingType: getTradingType(profile),
-              calculatedAt: profile.updated_at || new Date()
-            }
-          }));
+            calculatedAt: profile.updated_at || new Date()
+          }
+        }));
 
-        setLeaderboard(leaderboardData);
-      } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-        // Fallback to empty leaderboard
-        setLeaderboard([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLeaderboard();
+      setLeaderboard(leaderboardData);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      // Fallback to empty leaderboard
+      setLeaderboard([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  // Initial load and auto-refresh every 30 seconds
+  useEffect(() => {
+    fetchLeaderboard();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchLeaderboard(false); // Don't show loading for auto-refresh
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchLeaderboard]);
 
   // Helper function to determine ELO category
   const getELOCategory = (eloScore) => {
@@ -144,8 +160,23 @@ export default function Leaderboard() {
     <div className="max-w-6xl mx-auto pb-20">
       
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-800 mb-2">Global ELO Leaderboard</h1>
-        <p className="text-gray-500">Top performing traders ranked by Trader ELO score</p>
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <h1 className="text-4xl font-bold text-gray-800">Global ELO Leaderboard</h1>
+          <button
+            onClick={() => fetchLeaderboard()}
+            disabled={refreshing}
+            className="p-2 rounded-full bg-[#e0e5ec] shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#a3b1c6] hover:shadow-[-1px_-1px_2px_#ffffff,1px_1px_2px_#a3b1c6] transition-all disabled:opacity-50"
+            title="Refresh Leaderboard"
+          >
+            <RefreshCw size={20} className={`text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <p className="text-gray-500 mb-2">Top performing traders ranked by Trader ELO score</p>
+        {lastUpdated && (
+          <p className="text-xs text-gray-400">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </p>
+        )}
       </div>
 
       {/* Podium for Top 3 */}
