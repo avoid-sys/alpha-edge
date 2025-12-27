@@ -116,7 +116,7 @@ export default function Leaderboard() {
     return (
       <div
         className="flex flex-col items-center justify-end cursor-pointer transition-transform hover:-translate-y-2 duration-300"
-        onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`))}
+        onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`), { replace: true })}
       >
         <div className="mb-4 relative">
           <div className={`w-20 h-20 rounded-full p-1 bg-[#e0e5ec] shadow-[-5px_-5px_10px_#ffffff,5px_5px_10px_#a3b1c6] z-10 relative`}>
@@ -211,7 +211,7 @@ export default function Leaderboard() {
             <NeumorphicCard
                 key={traderId}
               className="grid grid-cols-2 md:grid-cols-12 gap-4 px-6 py-4 items-center hover:scale-[1.01] transition-transform cursor-pointer"
-                onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`))}
+                onClick={() => navigate(createPageUrl(`Dashboard?profileId=${traderId}`), { replace: true })}
             >
               {/* Rank */}
               <div className="col-span-1 hidden md:block">

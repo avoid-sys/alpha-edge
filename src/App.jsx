@@ -41,7 +41,7 @@ function AppContent() {
       ) : (
         <Layout>
           <Routes>
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard key={location.search} /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard key={new URLSearchParams(location.search).get('profileId') || 'own'} /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
             <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
             <Route path="/importtrades" element={<ProtectedRoute><ImportTrades /></ProtectedRoute>} />

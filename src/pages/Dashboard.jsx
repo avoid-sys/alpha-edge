@@ -68,6 +68,19 @@ export default function Dashboard() {
       window.history.replaceState({}, '', newUrl);
     }
   }, [refreshParam, profileId]);
+
+  // Force component remount when profileId changes
+  React.useEffect(() => {
+    console.log('🔄 Profile ID changed:', profileId, '- forcing component refresh');
+    // Reset all state when profileId changes
+    setProfile(null);
+    setTrades([]);
+    setRank(null);
+    setIsPublicView(false);
+    setError(null);
+    setDataVersion(prev => prev + 1);
+  }, [profileId]);
+
   const ctraderStartedRef = useRef(false);
 
   // Check if user is viewing their own profile or someone else's
