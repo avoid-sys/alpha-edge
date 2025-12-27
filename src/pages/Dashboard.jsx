@@ -23,7 +23,8 @@ import {
   Check,
   Zap,
   Trash2,
-  Share2
+  Share2,
+  Eye
 } from 'lucide-react';
 import { NeumorphicCard, StatBox, NeumorphicButton } from '@/components/NeumorphicUI';
 import {
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const [rank, setRank] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isPublicView, setIsPublicView] = useState(false);
   const [chartPeriod, setChartPeriod] = useState('1W'); // '1W', '1M', 'ALL'
   const [dataVersion, setDataVersion] = useState(0); // Force refresh counter
   const [helpPopup, setHelpPopup] = useState(null); // Current help popup
@@ -114,14 +116,20 @@ export default function Dashboard() {
         const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
         
         if (profileId) {
-          // SECURITY: Check if the requested profile belongs to the current user
+          // Load requested profile (can be public view)
           const requestedProfile = await localDataService.entities.TraderProfile.get(profileId);
-          if (requestedProfile && requestedProfile.created_by === user.email) {
+          if (requestedProfile) {
             fetchedProfile = requestedProfile;
             fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
+
+            // Check if this is the owner's profile or public view
+            const isOwner = requestedProfile.created_by === user.email;
+            setIsPublicView(!isOwner);
+
+            console.log(`📋 Loading profile ${profileId}: ${isOwner ? 'owner view' : 'public view'}`);
           } else {
-            console.error('🚫 Access denied: Profile does not belong to current user');
-            setError('You do not have permission to view this profile.');
+            console.error('🚫 Profile not found');
+            setError('Profile not found.');
             setLoading(false);
             return;
           }
@@ -2067,6 +2075,12 @@ export default function Dashboard() {
             ) : (
               <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
                 <h1 className="text-xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left">{profile.nickname}</h1>
+                {isPublicView && (
+                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 ml-2">
+                    <Eye size={12} className="mr-1" />
+                    Public View
+                  </div>
+                )}
                 <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
                   <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                     localStorage.getItem('active_trading_mode') === 'crypto'
@@ -2086,7 +2100,7 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
-                {isOwnProfile && (
+                {!isPublicView && (
                   <div className="flex gap-2">
                   <button
                     onClick={handleEditName}
@@ -2159,7 +2173,7 @@ export default function Dashboard() {
              </div>
           </NeumorphicCard>
 
-          {isOwnProfile && (
+          {!isPublicView && (
             <NeumorphicCard className="px-6 py-3 flex items-center gap-3">
                <div className="p-2 bg-green-100 rounded-lg text-green-700">
                   <TrendingUp size={20} />
@@ -2232,8 +2246,9 @@ export default function Dashboard() {
 
         {/* Left Column: Chart & Detailed Stats */}
         <div className="lg:col-span-3 space-y-4 lg:space-y-8">
-          {/* Chart Section */}
-          <NeumorphicCard className="p-6 min-h-[350px]">
+          {/* Chart Section - Hide in public view as it shows financial data */}
+          {!isPublicView && (
+            <NeumorphicCard className="p-6 min-h-[350px]">
              <div className="flex justify-between items-center mb-8">
                 <h3 className="text-xl font-bold text-gray-700">Equity Curve</h3>
                 <div className="flex gap-2">
@@ -2296,9 +2311,22 @@ export default function Dashboard() {
                       fill="url(#colorValue)" 
                     />
                   </AreaChart>
-                </ResponsiveContainer>
-             </div>
+              </ResponsiveContainer>
+            </div>
           </NeumorphicCard>
+          )}
+
+          {/* Public View Message */}
+          {isPublicView && (
+            <NeumorphicCard className="p-6 min-h-[350px] flex items-center justify-center">
+              <div className="text-center">
+                <Eye size={48} className="text-purple-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-gray-700 mb-2">Public Profile View</h3>
+                <p className="text-gray-500 mb-4">You are viewing this trader's public statistics and performance metrics.</p>
+                <p className="text-sm text-gray-400">Financial data and balance information are not displayed in public view.</p>
+              </div>
+            </NeumorphicCard>
+          )}
 
           {/* Detailed Streaks */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
