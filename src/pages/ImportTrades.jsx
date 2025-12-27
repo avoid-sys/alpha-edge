@@ -37,7 +37,7 @@ const normalizeScore = (value, minThresh, excellentThresh, isPositive = true, ca
   return Math.max(0, Math.min(100, score));
 };
 
-const calculateELOScores = (metrics) => {
+const calculateELOScores = (metrics, trades = null) => {
   if (!metrics || !metrics.total_trades || metrics.total_trades === 0) {
     return {
       performance_score: 0,
@@ -978,7 +978,7 @@ export default function ImportTrades() {
 
       if (metrics) {
         // Calculate ELO scores for leaderboard ranking
-        const eloScores = calculateELOScores(metrics);
+        const eloScores = calculateELOScores(metrics, allTrades);
 
         // Update profile with both metrics and ELO scores
         await localDataService.entities.TraderProfile.update(profileId, {

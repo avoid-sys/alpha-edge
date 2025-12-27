@@ -27,7 +27,7 @@ export default function Leaderboard() {
           traderId: profile.id,
           traderName: profile.nickname || profile.id,
           tradingType: getTradingType(profile),
-          winRate: profile.win_rate || 0,
+          winRate: profile.win_rate || profile.winRate || 0,
           elo: {
             eloScore: profile.elo_score || profile.trader_score || 1000,
             rawScore: profile.elo_score || profile.trader_score || 1000,
