@@ -56,6 +56,8 @@ export default function Dashboard() {
 
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
+
+  console.log('🎯 Dashboard component - profileId from URL:', profileId, 'search:', searchParams.toString());
   const refreshParam = searchParams.get('refresh');
 
   // Handle refresh parameter to force data reload after file import
@@ -112,6 +114,7 @@ export default function Dashboard() {
       }
 
       console.log('✅ User authenticated:', user.email, 'loading dashboard data...');
+      console.log('🎯 Final profileId check:', profileId, 'type:', typeof profileId);
 
         // Reset state for new profile load
         setProfile(null);
