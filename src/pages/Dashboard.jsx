@@ -83,7 +83,7 @@ export default function Dashboard() {
   }, [refreshParam]);
 
   useEffect(() => {
-    console.log('🔄 Dashboard useEffect triggered, dataVersion:', dataVersion, 'profileId:', profileId);
+    console.log('🔄 Dashboard useEffect triggered, dataVersion:', dataVersion, 'profileId:', profileId, 'user:', user?.email);
     const fetchData = async () => {
       // Wait for auth to load
       if (authLoading) {
@@ -99,6 +99,14 @@ export default function Dashboard() {
       }
 
       console.log('✅ User authenticated:', user.email, 'loading dashboard data...');
+      console.log('🎯 profileId from URL:', profileId);
+
+        // Reset state for new profile load
+        setProfile(null);
+        setTrades([]);
+        setRank(null);
+        setIsPublicView(false);
+        setError(null);
 
         let fetchedProfile = null;
         let fetchedTrades = [];
@@ -116,6 +124,7 @@ export default function Dashboard() {
         const hasCTraderTokens = !!localStorage.getItem('ctrader_tokens');
         
         if (profileId) {
+          console.log('📋 Loading profile by ID:', profileId);
           // Load requested profile (can be public view)
           const requestedProfile = await localDataService.entities.TraderProfile.get(profileId);
           if (requestedProfile) {
@@ -336,6 +345,7 @@ export default function Dashboard() {
             }
           }
         } else {
+          console.log('🏠 Loading user\'s own dashboard (no profileId)');
           try {
             // SECURITY: Only load profiles created by the current user
             console.log('🔍 Searching for profiles for user:', user.email);
