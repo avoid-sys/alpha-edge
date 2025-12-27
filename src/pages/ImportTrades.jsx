@@ -6,6 +6,7 @@ import { Upload, FileText, CheckCircle, AlertCircle, Shield, ShieldCheck } from 
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { calculateTradeMetrics } from '@/components/TradeLogic';
+import { useAuth } from '@/components/AuthProvider';
 
 // ELO scoring functions (copied from Dashboard.jsx)
 const normalizeScore = (value, minThresh, excellentThresh, isPositive = true, capValue = null) => {
@@ -145,6 +146,7 @@ const calculateELOScores = (metrics, trades = null) => {
 
 export default function ImportTrades() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -846,8 +848,14 @@ export default function ImportTrades() {
   const handleUpload = async () => {
     if (!file) return;
 
+    // Check authentication
+    if (!user) {
+      setError('You must be logged in to import files.');
+      return;
+    }
+
     // Rate limiting check
-    const userId = 'anonymous'; // In a real app, use actual user ID
+    const userId = user.email; // Use actual user email for rate limiting
     if (!securityService.checkRateLimit('file_upload', userId, 5, 60000)) {
       setError('Too many upload attempts. Please wait before trying again.');
       return;
@@ -922,18 +930,14 @@ export default function ImportTrades() {
         filteredOut: validationErrors.length
       });
 
-      // For local storage, use a mock user or create one if doesn't exist
-      let user = await localDataService.getCurrentUser();
+      // SECURITY: Use authenticated user for file imports
       if (!user) {
-        user = {
-          email: securityService.sanitizeInput('local@alphaedge.com', 'email'),
-          full_name: securityService.sanitizeInput('Local Trader', 'text')
-        };
-        await localDataService.setCurrentUser(user);
-        console.log('📝 Created local user for file import:', user.email);
-      } else {
-        console.log('👤 Using existing local user:', user.email);
+        setError('You must be logged in to import files.');
+        setLoading(false);
+        return;
       }
+
+      console.log('👤 Using authenticated user for file import:', user.email);
 
       // Get or Create Profile
       let profileId;

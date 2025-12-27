@@ -4,6 +4,7 @@ import { Trophy, TrendingUp, Users, Award, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { localDataService } from '@/services/localDataService';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -11,6 +12,7 @@ export default function Leaderboard() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const fetchLeaderboard = useCallback(async (showLoading = true) => {
     try {

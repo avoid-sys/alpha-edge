@@ -329,35 +329,23 @@ export default function Dashboard() {
           }
         } else {
           try {
-            // Priority: File imports first, then user-specific profiles
+            // SECURITY: Only load profiles created by the current user
             console.log('🔍 Searching for profiles for user:', user.email);
-            let profiles = [];
 
-            // First, try to find file-imported profiles (they take priority)
-            const fileProfiles = await localDataService.entities.TraderProfile.filter({
-              created_by: 'local@alphaedge.com'
-            });
-            console.log('📊 Found file-imported profiles:', fileProfiles.length);
-
-            // Then, try to find user-specific profiles
+            // Find user-specific profiles only
             const userProfiles = await localDataService.entities.TraderProfile.filter({
               created_by: user.email
             });
-            console.log('📊 Found user-specific profiles:', userProfiles.length);
-
-            // Combine and prioritize: file imports first, then user profiles
-            profiles = [...fileProfiles, ...userProfiles];
+            console.log('📊 Found user profiles:', userProfiles.length);
 
             // SECURITY: If no profiles found for this user, don't show data from other users
-            if (profiles.length === 0) {
+            if (userProfiles.length === 0) {
               console.log('No profiles found for user:', user.email, '- showing empty dashboard');
               // Don't load any data - user will see empty dashboard
-            }
-
-              if (profiles.length > 0) {
-                fetchedProfile = profiles[0];
+            } else {
+              fetchedProfile = userProfiles[0];
               console.log('📋 Loading trades for profile:', fetchedProfile.id);
-                fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
+              fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
               console.log('✅ Found profile:', fetchedProfile.id, 'with', fetchedTrades.length, 'trades');
               console.log('📊 Profile details:', {
                 nickname: fetchedProfile.nickname,
@@ -365,8 +353,6 @@ export default function Dashboard() {
                 created_by: fetchedProfile.created_by,
                 is_live_account: fetchedProfile.is_live_account
               });
-            } else {
-              console.log('⚠️ No profiles found for dashboard');
             }
           } catch (e) {
             console.error('❌ Error fetching profiles:', e);
