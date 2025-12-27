@@ -117,7 +117,6 @@ export default function Leaderboard() {
       <div
         className="flex flex-col items-center justify-end cursor-pointer transition-transform hover:-translate-y-2 duration-300"
         onClick={() => {
-          console.log('🏆 Leaderboard podium click - navigating to profile:', traderId);
           // Force page reload to ensure component remount
           window.location.href = createPageUrl(`Dashboard?profileId=${traderId}`);
         }}
@@ -216,7 +215,6 @@ export default function Leaderboard() {
                 key={traderId}
               className="grid grid-cols-2 md:grid-cols-12 gap-4 px-6 py-4 items-center hover:scale-[1.01] transition-transform cursor-pointer"
                 onClick={() => {
-                  console.log('🏆 Leaderboard list click - navigating to profile:', traderId);
                   // Force page reload to ensure component remount
                   window.location.href = createPageUrl(`Dashboard?profileId=${traderId}`);
                 }}

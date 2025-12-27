@@ -56,8 +56,6 @@ export default function Dashboard() {
 
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profileId');
-
-  console.log('🎯 Dashboard component - profileId from URL:', profileId, 'search:', searchParams.toString());
   const refreshParam = searchParams.get('refresh');
 
   // Handle refresh parameter to force data reload after file import
@@ -73,7 +71,6 @@ export default function Dashboard() {
 
   // Force component remount when profileId changes
   React.useEffect(() => {
-    console.log('🔄 Profile ID changed:', profileId, '- forcing component refresh');
     // Reset all state when profileId changes
     setProfile(null);
     setTrades([]);
@@ -114,7 +111,6 @@ export default function Dashboard() {
       }
 
       console.log('✅ User authenticated:', user.email, 'loading dashboard data...');
-      console.log('🎯 Final profileId check:', profileId, 'type:', typeof profileId);
 
         // Reset state for new profile load
         setProfile(null);
@@ -143,14 +139,14 @@ export default function Dashboard() {
           const requestedProfile = await localDataService.entities.TraderProfile.get(profileId);
           if (requestedProfile) {
             fetchedProfile = requestedProfile;
-            fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
+          fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: profileId });
 
             // Check if this is the owner's profile or public view
             const isOwner = requestedProfile.created_by === user.email;
             setIsPublicView(!isOwner);
 
             console.log(`📋 Loading profile ${profileId}: ${isOwner ? 'owner view' : 'public view'}`);
-          } else {
+        } else {
             console.error('🚫 Profile not found');
             setError('Profile not found.');
             setLoading(false);
@@ -365,8 +361,8 @@ export default function Dashboard() {
 
             // Find user-specific profiles only
             const userProfiles = await localDataService.entities.TraderProfile.filter({
-              created_by: user.email
-            });
+                created_by: user.email
+              });
             console.log('📊 Found user profiles:', userProfiles.length);
 
             // SECURITY: If no profiles found for this user, don't show data from other users
@@ -376,7 +372,7 @@ export default function Dashboard() {
             } else {
               fetchedProfile = userProfiles[0];
               console.log('📋 Loading trades for profile:', fetchedProfile.id);
-              fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
+                fetchedTrades = await localDataService.entities.Trade.filter({ trader_profile_id: fetchedProfile.id });
               console.log('✅ Found profile:', fetchedProfile.id, 'with', fetchedTrades.length, 'trades');
               console.log('📊 Profile details:', {
                 nickname: fetchedProfile.nickname,
@@ -2271,7 +2267,7 @@ export default function Dashboard() {
         <div className="lg:col-span-3 space-y-4 lg:space-y-8">
           {/* Chart Section - Hide in public view as it shows financial data */}
           {!isPublicView && (
-            <NeumorphicCard className="p-6 min-h-[350px]">
+          <NeumorphicCard className="p-6 min-h-[350px]">
              <div className="flex justify-between items-center mb-8">
                 <h3 className="text-xl font-bold text-gray-700">Equity Curve</h3>
                 <div className="flex gap-2">
@@ -2334,8 +2330,8 @@ export default function Dashboard() {
                       fill="url(#colorValue)" 
                     />
                   </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                </ResponsiveContainer>
+             </div>
           </NeumorphicCard>
           )}
 
