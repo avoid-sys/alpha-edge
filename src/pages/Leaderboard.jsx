@@ -354,12 +354,12 @@ export default function Leaderboard() {
 
       setLeaderboard(leaderboardData);
       setLastUpdated(new Date());
-    } catch (error) {
+      } catch (error) {
       console.error('Error fetching leaderboard:', error);
       // Fallback to empty leaderboard
       setLeaderboard([]);
-    } finally {
-      setLoading(false);
+      } finally {
+        setLoading(false);
       setRefreshing(false);
     }
   }, []);
@@ -440,15 +440,13 @@ export default function Leaderboard() {
         const metrics = {
           win_rate: freshProfile.win_rate || 0,
           total_trades: freshProfile.total_trades || 0,
-          profit_percentage: freshProfile.profit_percentage || freshProfile.totalReturn || 0,
-          annualized_return: freshProfile.annualized_return || 0,
+          profit_percentage: freshProfile.profit_percentage || 0,
           max_drawdown: freshProfile.max_drawdown || 0,
           sharpe_ratio: freshProfile.sharpe_ratio || 0,
-          trading_days: freshProfile.trading_days || 0,
-          performance_score: freshProfile.performance_score || 0,
-          risk_score: freshProfile.risk_score || 0,
-          consistency_score: freshProfile.consistency_score || 0,
-          account_health_score: freshProfile.account_health_score || 0
+          trading_days: freshProfile.trading_days || freshProfile.days_active || 0,
+          profit_factor: freshProfile.profit_factor || 0,
+          expectancy: freshProfile.expectancy || 0,
+          risk_per_trade: freshProfile.risk_per_trade || 0
         };
 
         console.log('🧮 Using pre-calculated metrics from profile:', metrics);
@@ -498,9 +496,9 @@ export default function Leaderboard() {
 
     const height = rank === 1 ? 'h-48' : rank === 2 ? 'h-40' : 'h-32';
     const color = rank === 1 ? 'text-yellow-500' : rank === 2 ? 'text-gray-400' : 'text-orange-400';
-
+    
     return (
-      <div
+      <div 
         className="flex flex-col items-center justify-end cursor-pointer transition-transform hover:-translate-y-2 duration-300"
         onClick={() => openProfileModal(traderId)}
       >
@@ -594,7 +592,7 @@ export default function Leaderboard() {
           leaderboard.map((item, index) => {
             const { traderId, traderName, elo, tradingType } = item;
             return (
-            <NeumorphicCard
+            <NeumorphicCard 
                 key={traderId}
               className="grid grid-cols-2 md:grid-cols-12 gap-4 px-6 py-4 items-center hover:scale-[1.01] transition-transform cursor-pointer"
                 onClick={() => openProfileModal(traderId)}
@@ -639,7 +637,7 @@ export default function Leaderboard() {
                      color: tradingType === 'Crypto' ? '#f97316' : '#3b82f6'
                    }}>
                      {tradingType}
-                   </span>
+                 </span>
               </div>
 
                 {/* WinRate */}
@@ -751,8 +749,8 @@ export default function Leaderboard() {
                   <div className="text-sm text-gray-600">Total Return</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
-                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.annualized_return ? selectedProfile.metrics.annualized_return.toFixed(2) + '%' : '0.00%'}</div>
-                  <div className="text-sm text-gray-600">Annual Return</div>
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.expectancy ? selectedProfile.metrics.expectancy.toFixed(2) : '0.00'}</div>
+                  <div className="text-sm text-gray-600">Expectancy</div>
                 </div>
               </div>
 
