@@ -344,16 +344,29 @@ export default function Leaderboard() {
     }
   }, []);
 
-  // Initial load and auto-refresh every 30 seconds
+  // Initial load and auto-refresh
   useEffect(() => {
     fetchLeaderboard();
 
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 10 seconds for more responsive data
     const interval = setInterval(() => {
       fetchLeaderboard(false); // Don't show loading for auto-refresh
-    }, 30000);
+    }, 10000);
 
-    return () => clearInterval(interval);
+    // Refresh when page becomes visible (user returns to tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Page became visible, refreshing leaderboard');
+        fetchLeaderboard(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchLeaderboard]);
 
   // Helper function to determine ELO category
@@ -396,23 +409,30 @@ export default function Leaderboard() {
   // Function to open profile modal
   const openProfileModal = async (traderId) => {
     try {
-      // Find the profile in leaderboard data
-      const profile = leaderboard.find(p => p.traderId === traderId);
-      if (profile) {
+      console.log('🔍 Opening profile modal for trader:', traderId);
+
+      // Always load fresh profile data from database, not from leaderboard cache
+      const freshProfile = await localDataService.entities.TraderProfile.get(traderId);
+      console.log('📋 Fresh profile data:', freshProfile);
+
+      if (freshProfile) {
         // Load trades for this profile to calculate full metrics
         const trades = await localDataService.entities.Trade.filter({ trader_profile_id: traderId });
+        console.log('📊 Loaded trades for profile:', trades.length);
 
         // Calculate metrics from trades
-        const metrics = calculateMetricsFromData(trades, profile);
+        const metrics = calculateMetricsFromData(trades, freshProfile);
+        console.log('🧮 Calculated metrics:', metrics);
 
         // Calculate ELO scores from metrics
         const eloScores = calculateELOScores(metrics);
+        console.log('🎯 Calculated ELO scores:', eloScores);
 
         // Get ELO category
         const category = getELOCategory(eloScores.elo_score);
 
         setSelectedProfile({
-          ...profile,
+          ...freshProfile,
           trades,
           metrics,
           eloScores,
@@ -421,7 +441,7 @@ export default function Leaderboard() {
         setProfileModalOpen(true);
       }
     } catch (error) {
-      console.error('Error loading profile for modal:', error);
+      console.error('❌ Error loading profile for modal:', error);
     }
   };
 
