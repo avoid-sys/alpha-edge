@@ -431,38 +431,38 @@ export default function Leaderboard() {
     try {
       console.log('🔍 Opening profile modal for trader:', traderId);
 
-      // Always load fresh profile data from database, not from leaderboard cache
+      // Load fresh profile data from database with pre-calculated metrics
       const freshProfile = await localDataService.entities.TraderProfile.get(traderId);
       console.log('📋 Fresh profile data:', freshProfile);
 
       if (freshProfile) {
-        // Load trades for this profile to calculate full metrics
-        const trades = await localDataService.entities.Trade.filter({ trader_profile_id: traderId });
-        console.log('📊 Loaded trades for profile:', trades.length);
-        if (trades.length > 0) {
-          console.log('📊 First trade sample:', trades[0]);
-          console.log('📊 Last trade sample:', trades[trades.length - 1]);
-        }
+        // Use pre-calculated metrics from profile (saved by Dashboard.jsx)
+        const metrics = {
+          win_rate: freshProfile.win_rate || 0,
+          total_trades: freshProfile.total_trades || 0,
+          profit_percentage: freshProfile.profit_percentage || freshProfile.totalReturn || 0,
+          annualized_return: freshProfile.annualized_return || 0,
+          max_drawdown: freshProfile.max_drawdown || 0,
+          sharpe_ratio: freshProfile.sharpe_ratio || 0,
+          trading_days: freshProfile.trading_days || 0,
+          performance_score: freshProfile.performance_score || 0,
+          risk_score: freshProfile.risk_score || 0,
+          consistency_score: freshProfile.consistency_score || 0,
+          account_health_score: freshProfile.account_health_score || 0
+        };
 
-        // Calculate metrics from trades
-        const metrics = calculateMetricsFromData(trades, freshProfile);
-        console.log('🧮 Calculated metrics:', {
-          win_rate: metrics?.win_rate,
-          total_trades: metrics?.total_trades,
-          profit_percentage: metrics?.profit_percentage,
-          annualized_return: metrics?.annualized_return,
-          max_drawdown: metrics?.max_drawdown,
-          sharpe_ratio: metrics?.sharpe_ratio,
-          trading_days: metrics?.trading_days,
-          performance_score: metrics?.performance_score,
-          risk_score: metrics?.risk_score,
-          consistency_score: metrics?.consistency_score,
-          account_health_score: metrics?.account_health_score
-        });
+        console.log('🧮 Using pre-calculated metrics from profile:', metrics);
 
-        // Calculate ELO scores from metrics
-        const eloScores = calculateELOScores(metrics);
-        console.log('🎯 Calculated ELO scores:', eloScores);
+        // Use pre-calculated ELO scores from profile
+        const eloScores = {
+          performance_score: freshProfile.performance_score || 0,
+          risk_score: freshProfile.risk_score || 0,
+          consistency_score: freshProfile.consistency_score || 0,
+          account_health_score: freshProfile.account_health_score || 0,
+          elo_score: freshProfile.elo_score || freshProfile.trader_score || 1000
+        };
+
+        console.log('🎯 Using pre-calculated ELO scores from profile:', eloScores);
 
         // Calculate global rank by comparing with all profiles
         const allProfiles = await localDataService.entities.TraderProfile.list('-elo_score');
@@ -474,7 +474,6 @@ export default function Leaderboard() {
 
         setSelectedProfile({
           ...freshProfile,
-          trades,
           metrics,
           eloScores,
           category,
