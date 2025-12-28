@@ -111,7 +111,10 @@ const calculateMetricsFromData = (trades, profile) => {
   const endDate = new Date(sortedTrades[sortedTrades.length - 1].close_time || sortedTrades[sortedTrades.length - 1].time);
   const daysDiff = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
   const yearsDiff = daysDiff / 365;
-  const annualizedReturn = yearsDiff > 0 ? (Math.pow(1 + totalReturn / 100, 1 / yearsDiff) - 1) * 100 : 0;
+  let annualizedReturn = yearsDiff > 0 ? (Math.pow(1 + totalReturn / 100, 1 / yearsDiff) - 1) * 100 : 0;
+
+  // Cap annualized return at 500% to prevent unrealistic values for short periods
+  annualizedReturn = Math.min(annualizedReturn, 500);
 
   // Calculate expectancy
   const avgWin = profitableTradesCount > 0 ? grossProfit / profitableTradesCount : 0;
@@ -123,11 +126,11 @@ const calculateMetricsFromData = (trades, profile) => {
   const variance = tradeReturns.reduce((sum, ret) => sum + Math.pow(ret - meanReturn, 2), 0) / tradeReturns.length;
   const volatility = Math.sqrt(variance) * 100; // As percentage
 
-  // Calculate Sharpe ratio
+  // Calculate Sharpe ratio (annualized)
   const riskFreeRate = 0.02; // 2% annual risk-free rate
   const excessReturns = tradeReturns.map(ret => ret - riskFreeRate / 365);
   const avgExcessReturn = excessReturns.reduce((a, b) => a + b, 0) / excessReturns.length;
-  const sharpeRatio = volatility > 0 ? avgExcessReturn / (Math.sqrt(variance) * Math.sqrt(365)) : 0;
+  const sharpeRatio = volatility > 0 ? (avgExcessReturn / (volatility / 100)) * Math.sqrt(365) : 0;
 
   // Calculate Sortino ratio
   const downsideReturns = tradeReturns.filter(ret => ret < 0);
@@ -191,6 +194,7 @@ const calculateMetricsFromData = (trades, profile) => {
   };
 };
 
+// Calculate ELO scores based on generalized benchmark normalization (same as Dashboard.jsx)
 const calculateELOScores = (metrics) => {
   if (!metrics || !metrics.total_trades || metrics.total_trades === 0) {
     return {
@@ -202,86 +206,99 @@ const calculateELOScores = (metrics) => {
     };
   }
 
-  // Use the same logic as Dashboard.jsx
-  const startEquity = 10000;
-  const durationDays = metrics.accountAge || 30;
+  // Get account context for scaling and dynamic benchmarks
+  const startEquity = 10000; // Default, should come from profile or trades
+  const durationDays = metrics.accountAge || 30; // Use account age as proxy for duration
   const totalTrades = metrics.total_trades;
 
+  // Detect asset type (crypto vs other) - simplified detection
+  // In real implementation, this should come from trade symbols
+  const isCrypto = false; // Placeholder - would detect from symbols like BTC, ETH, etc.
+
+  // Scale dollar metrics to percentages relative to start equity
+  const expectancyPct = metrics.expectancy ? (metrics.expectancy / startEquity) * 100 : 0;
   const bestTradePct = metrics.bestTrade ? (metrics.bestTrade / startEquity) * 100 : 0;
   const worstTradePct = metrics.worstTrade ? Math.abs(metrics.worstTrade / startEquity) * 100 : 0;
 
+  // PERFORMANCE SCORE (0-100) with corrected benchmarks for strong profitability
   const perfSubs = {
-    totalReturn: normalizeScore(metrics.profit_percentage, 0, 50, true),
-    annReturn: normalizeScore(metrics.annualized_return, 10, 100, true, 500),
-    winRate: normalizeScore(metrics.win_rate, 50, 80, true),
-    profitFactor: normalizeScore(metrics.profit_factor, 1.0, 3.0, true, 10),
-    expectancy: normalizeScore(metrics.expectancy ? (metrics.expectancy / startEquity) * 100 : 0, 0, 0.5, true),
-    bestTrade: normalizeScore(bestTradePct, 0, 5, true, 10)
+    totalReturn: normalizeScore(metrics.profit_percentage, 0, 50, true), // 0% poor, 50% excellent
+    annReturn: normalizeScore(metrics.annualized_return, 10, 100, true, 500), // 10% poor, 100% excellent, cap at 500%
+    winRate: normalizeScore(metrics.win_rate, 50, 80, true), // 50% poor, 80% excellent
+    profitFactor: normalizeScore(metrics.profit_factor, 1.0, 3.0, true, 10), // 1.0 poor, 3.0 excellent, cap at 10
+    expectancy: normalizeScore(expectancyPct, 0, 0.5, true), // 0% poor, 0.5% excellent (scaled)
+    bestTrade: normalizeScore(bestTradePct, 0, 5, true, 10) // 0% poor, 5% excellent, cap at 10%
   };
   const perfWeights = [0.15, 0.25, 0.20, 0.20, 0.10, 0.10];
   let performanceScore = perfWeights.reduce((sum, weight, i) =>
     sum + Object.values(perfSubs)[i] * weight, 0);
 
+  // Penalize insufficient data
   if (totalTrades < 10) {
     performanceScore = Math.min(performanceScore, 70);
   }
 
+  // RISK CONTROL SCORE (0-100) - corrected benchmarks for low DD/risk scenario
   const riskSubs = {
-    maxDrawdown: normalizeScore(metrics.max_drawdown, 30, 5, false),
-    avgDrawdown: normalizeScore(metrics.avgDrawdown || 0, 10, 1, false),
-    recoveryFactor: normalizeScore(metrics.recovery_factor, 1, 10, true),
-    volatility: normalizeScore(metrics.volatility, 50, 20, false),
-    sharpeRatio: normalizeScore(metrics.sharpe_ratio, 0.5, 2.0, true, 5),
-    avgRiskTrade: normalizeScore(metrics.risk_per_trade, 5, 1, false)
+    maxDrawdown: normalizeScore(metrics.max_drawdown, 30, 5, false), // 30% poor, 5% excellent (negative)
+    avgDrawdown: normalizeScore(metrics.avgDrawdown || 0, 10, 1, false), // 10% poor, 1% excellent (negative)
+    recoveryFactor: normalizeScore(metrics.recovery_factor, 1, 10, true), // 1 poor, 10 excellent
+    volatility: normalizeScore(metrics.volatility, 50, 20, false), // 50% poor, 20% excellent (negative)
+    sharpeRatio: normalizeScore(metrics.sharpe_ratio, 0.5, 2.0, true, 5), // 0.5 poor, 2.0 excellent, cap at 5
+    avgRiskTrade: normalizeScore(metrics.risk_per_trade, 5, 1, false) // 5% poor, 1% excellent (negative)
   };
+
   const riskWeights = [0.25, 0.15, 0.15, 0.15, 0.20, 0.10];
   const riskScore = riskWeights.reduce((sum, weight, i) =>
     sum + Object.values(riskSubs)[i] * weight, 0);
 
+  // CONSISTENCY SCORE (0-100) with data sufficiency penalties
   const totalMonths = Math.max(1, Math.ceil(durationDays / 30));
+  const positiveMonthsExcellent = totalMonths; // All months positive
 
   const consistencySubs = {
-    roughness: normalizeScore(metrics.roughness, 5, 0.5, false),
-    positiveMonths: normalizeScore(metrics.positiveMonths || 0, 3, 6, true),
-    freqStd: normalizeScore(metrics.freqStd || 0, 2.0, 0.5, false),
-    sortinoRatio: normalizeScore(metrics.sortino_ratio, 1.0, 4.0, true, 10),
-    calmarRatio: normalizeScore(metrics.calmarRatio || 0, 1.0, 5.0, true),
-    sqn: normalizeScore(metrics.sqn || 0, 1.6, 3.0, true, 5)
+    roughness: normalizeScore(metrics.roughness, 5, 0.5, false), // 5% poor, 0.5% excellent
+    positiveMonths: normalizeScore(metrics.positiveMonths, 3, 6, true), // 3 min, 6 excellent (fixed)
+    freqStd: normalizeScore(metrics.freqStd, 2.0, 0.5, false), // 2.0 poor, 0.5 excellent
+    sortinoRatio: normalizeScore(metrics.sortino_ratio, 1.0, 4.0, true, 10), // 1.0 min, 4.0 excellent, cap at 10
+    calmarRatio: normalizeScore(metrics.calmarRatio, 1.0, 5.0, true), // 1.0 min, 5.0 excellent
+    sqn: normalizeScore(metrics.sqn, 1.6, 3.0, true, 5) // 1.6 min, 3.0 excellent, cap at 5
   };
   const consistencyWeights = [0.10, 0.15, 0.10, 0.20, 0.20, 0.25];
   let consistencyScore = consistencyWeights.reduce((sum, weight, i) =>
     sum + Object.values(consistencySubs)[i] * weight, 0);
 
+  // Penalize insufficient data
   if (totalTrades < 50) {
     consistencyScore *= Math.min(1, totalTrades / 50);
   }
 
-  const currentDate = new Date();
+  // ACCOUNT HEALTH SCORE (0-100) with maturity considerations
+  const currentDate = new Date(2025, 11, 23); // Dec 23, 2025
   const firstTradeDate = new Date(Math.min(...(metrics.trades || []).map(t => new Date(t.close_time || t.time))));
   const actualAccountAge = Math.max(1, Math.ceil((currentDate - firstTradeDate) / (1000 * 60 * 60 * 24)));
 
-  const exposureTime = metrics.exposureTime || 50;
+  // Handle missing exposure time
+  const exposureTime = metrics.exposureTime || 50; // Default to 50% if missing
+
+  // Cap activity rate to prevent overtrading penalty
   const activityRate = Math.min(metrics.activityRate || 0, 100);
 
   const healthSubs = {
     accountAge: normalizeScore(actualAccountAge, 90, 365, true),
     tradingDays: normalizeScore(metrics.trading_days, 20, 100, true),
-    activityRate: normalizeScore(activityRate, 10, 50, true),
+    activityRate: normalizeScore(activityRate, 10, 50, true), // Cap at 100
     exposureTime: normalizeScore(exposureTime, 100, 50, false),
     totalTrades: normalizeScore(totalTrades, 30, 200, true),
-    worstTrade: normalizeScore(worstTradePct, 10, 1, false)
+    worstTrade: normalizeScore(worstTradePct, 10, 1, false) // 10% poor, 1% excellent (scaled)
   };
 
-  const healthWeights = [0.20, 0.20, 0.15, 0.15, 0.15, 0.15];
+  const healthWeights = [0.20, 0.15, 0.15, 0.15, 0.20, 0.10];
   const accountHealthScore = healthWeights.reduce((sum, weight, i) =>
     sum + Object.values(healthSubs)[i] * weight, 0);
 
-  const performance = 0.40 * (performanceScore / 100);
-  const riskControl = 0.30 * (riskScore / 100);
-  const consistency = 0.15 * (consistencyScore / 100);
-  const longevity = 0.05 * (Math.min(1, actualAccountAge / 365) + Math.min(1, totalTrades / 300)) / 2;
-  const accountHealth = 0.10 * (accountHealthScore / 100);
-
+  // TRADER ELO CALCULATION (Generalized formula)
+  // ELO = 1000 + (Performance * 4 + Risk * 3 + Consistency * 2 + Health * 1) * 3
   let eloScore = 1000 + (performanceScore * 4 + riskScore * 3 + consistencyScore * 2 + accountHealthScore * 1) * 3;
 
   return {
@@ -289,7 +306,7 @@ const calculateELOScores = (metrics) => {
     risk_score: Math.round(Math.max(0, Math.min(100, riskScore))),
     consistency_score: Math.round(Math.max(0, Math.min(100, consistencyScore))),
     account_health_score: Math.round(Math.max(0, Math.min(100, accountHealthScore))),
-    elo_score: Math.round(Math.max(1000, Math.min(4000, eloScore)))
+    elo_score: Math.round(Math.max(1000, Math.min(4000, eloScore))) // Cap between 1000-4000
   };
 };
 
@@ -447,6 +464,11 @@ export default function Leaderboard() {
         const eloScores = calculateELOScores(metrics);
         console.log('🎯 Calculated ELO scores:', eloScores);
 
+        // Calculate global rank by comparing with all profiles
+        const allProfiles = await localDataService.entities.TraderProfile.list('-elo_score');
+        const userRank = allProfiles.findIndex(p => p.id === traderId) + 1;
+        console.log('🏆 User rank calculation:', { traderId, allProfilesCount: allProfiles.length, userRank });
+
         // Get ELO category
         const category = getELOCategory(eloScores.elo_score);
 
@@ -455,7 +477,8 @@ export default function Leaderboard() {
           trades,
           metrics,
           eloScores,
-          category
+          category,
+          rank: userRank
         });
         setProfileModalOpen(true);
       }
