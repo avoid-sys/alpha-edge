@@ -1,10 +1,295 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import _ from 'lodash';
 import { NeumorphicCard } from '@/components/NeumorphicUI';
 import { Trophy, TrendingUp, Users, Award, RefreshCw, X, Eye, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { localDataService } from '@/services/localDataService';
 import { useAuth } from '@/components/AuthProvider';
+
+// Import metric calculation functions
+const normalizeScore = (value, minThresh, excellentThresh, isPositive = true, capValue = null) => {
+  if (value === null || value === undefined || isNaN(value)) return 50.0;
+
+  if (capValue !== null) {
+    if (isPositive) {
+      value = Math.min(value, capValue);
+    } else {
+      value = Math.max(value, capValue);
+    }
+  }
+
+  const range = excellentThresh - minThresh;
+  let score;
+
+  if (isPositive) {
+    if (value <= minThresh) return 0.0;
+    if (value >= excellentThresh) return 100.0;
+    score = ((value - minThresh) / range) * 100;
+  } else {
+    if (value >= minThresh) return 0.0;
+    if (value <= excellentThresh) return 100.0;
+    score = 100 - ((value - excellentThresh) / range) * 100;
+  }
+
+  return Math.max(0, Math.min(100, score));
+};
+
+const calculateELOScores = (metrics) => {
+  if (!metrics || !metrics.total_trades || metrics.total_trades === 0) {
+    return {
+      performance_score: 0,
+      risk_score: 0,
+      consistency_score: 0,
+      account_health_score: 0,
+      elo_score: 1000
+    };
+  }
+
+  const startEquity = 10000;
+  const durationDays = metrics.accountAge || 30;
+  const totalTrades = metrics.total_trades;
+
+  const bestTradePct = metrics.bestTrade ? (metrics.bestTrade / startEquity) * 100 : 0;
+  const worstTradePct = metrics.worstTrade ? Math.abs(metrics.worstTrade / startEquity) * 100 : 0;
+
+  const perfSubs = {
+    totalReturn: normalizeScore(metrics.totalReturn, 0, 50, true),
+    annReturn: normalizeScore(metrics.annualizedReturn, 10, 100, true, 500),
+    winRate: normalizeScore(metrics.winRate, 50, 80, true),
+    profitFactor: normalizeScore(metrics.profitFactor, 1.0, 3.0, true, 10),
+    expectancy: normalizeScore(metrics.expectancy ? (metrics.expectancy / startEquity) * 100 : 0, 0, 0.5, true),
+    bestTrade: normalizeScore(bestTradePct, 0, 5, true, 10)
+  };
+  const perfWeights = [0.15, 0.25, 0.20, 0.20, 0.10, 0.10];
+  let performanceScore = perfWeights.reduce((sum, weight, i) =>
+    sum + Object.values(perfSubs)[i] * weight, 0);
+
+  if (totalTrades < 10) {
+    performanceScore = Math.min(performanceScore, 70);
+  }
+
+  const riskSubs = {
+    maxDrawdown: normalizeScore(metrics.maxDrawdown, 30, 5, false),
+    avgDrawdown: normalizeScore(metrics.avgDrawdown || 0, 10, 1, false),
+    recoveryFactor: normalizeScore(metrics.recoveryFactor, 1, 10, true),
+    volatility: normalizeScore(metrics.volatility, 50, 20, false),
+    sharpeRatio: normalizeScore(metrics.sharpeRatio, 0.5, 2.0, true, 5),
+    avgRiskTrade: normalizeScore(metrics.avgRiskTrade, 5, 1, false)
+  };
+  const riskWeights = [0.25, 0.15, 0.15, 0.15, 0.20, 0.10];
+  const riskScore = riskWeights.reduce((sum, weight, i) =>
+    sum + Object.values(riskSubs)[i] * weight, 0);
+
+  const totalMonths = Math.max(1, Math.ceil(durationDays / 30));
+  const consistencySubs = {
+    roughness: normalizeScore(metrics.roughness, 5, 0.5, false),
+    positiveMonths: normalizeScore(metrics.positiveMonths, 3, 6, true),
+    freqStd: normalizeScore(metrics.freqStd, 2.0, 0.5, false),
+    sortinoRatio: normalizeScore(metrics.sortinoRatio, 1.0, 4.0, true, 10),
+    calmarRatio: normalizeScore(metrics.calmarRatio, 1.0, 5.0, true),
+    sqn: normalizeScore(metrics.sqn, 1.6, 3.0, true, 5)
+  };
+  const consistencyWeights = [0.10, 0.15, 0.10, 0.20, 0.20, 0.25];
+  let consistencyScore = consistencyWeights.reduce((sum, weight, i) =>
+    sum + Object.values(consistencySubs)[i] * weight, 0);
+
+  if (totalTrades < 50) {
+    consistencyScore *= Math.min(1, totalTrades / 50);
+  }
+
+  const currentDate = new Date();
+  const firstTradeDate = new Date(Math.min(...(metrics.trades || []).map(t => new Date(t.close_time || t.time))));
+  const actualAccountAge = Math.max(1, Math.ceil((currentDate - firstTradeDate) / (1000 * 60 * 60 * 24)));
+
+  const exposureTime = metrics.exposureTime || 50;
+  const activityRate = Math.min(metrics.activityRate || 0, 100);
+
+  const healthSubs = {
+    accountAge: normalizeScore(actualAccountAge, 90, 365, true),
+    tradingDays: normalizeScore(metrics.tradingDays, 20, 100, true),
+    activityRate: normalizeScore(activityRate, 10, 50, true),
+    exposureTime: normalizeScore(exposureTime, 100, 50, false),
+    totalTrades: normalizeScore(totalTrades, 30, 200, true),
+    worstTrade: normalizeScore(worstTradePct, 10, 1, false)
+  };
+
+  const healthWeights = [0.20, 0.20, 0.15, 0.15, 0.15, 0.15];
+  const accountHealthScore = healthWeights.reduce((sum, weight, i) =>
+    sum + Object.values(healthSubs)[i] * weight, 0);
+
+  const performance = 0.40 * (performanceScore / 100);
+  const riskControl = 0.30 * (riskScore / 100);
+  const consistency = 0.15 * (consistencyScore / 100);
+  const longevity = 0.05 * (Math.min(1, actualAccountAge / 365) + Math.min(1, totalTrades / 300)) / 2;
+  const accountHealth = 0.10 * (accountHealthScore / 100);
+
+  let eloScore = 1000 + (performanceScore * 4 + riskScore * 3 + consistencyScore * 2 + accountHealthScore * 1) * 3;
+
+  return {
+    performance_score: Math.round(Math.max(0, Math.min(100, performanceScore))),
+    risk_score: Math.round(Math.max(0, Math.min(100, riskScore))),
+    consistency_score: Math.round(Math.max(0, Math.min(100, consistencyScore))),
+    account_health_score: Math.round(Math.max(0, Math.min(100, accountHealthScore))),
+    elo_score: Math.round(Math.max(1000, Math.min(4000, eloScore)))
+  };
+};
+
+// Calculate comprehensive trading metrics
+const calculateMetricsFromData = (trades, profile) => {
+  if (!trades || trades.length === 0) return null;
+
+  // Sort trades by close time ascending
+  const sortedTrades = [...trades].sort((a, b) => new Date(a.close_time) - new Date(b.close_time));
+
+  const totalTrades = sortedTrades.length;
+  const profitableTrades = sortedTrades.filter(t => t.net_profit > 0);
+  const losingTrades = sortedTrades.filter(t => t.net_profit <= 0);
+
+  const profitableTradesCount = profitableTrades.length;
+  const losingTradesCount = losingTrades.length;
+
+  const winRate = totalTrades > 0 ? (profitableTradesCount / totalTrades) * 100 : 0;
+
+  const totalProfit = _.sumBy(sortedTrades, 'net_profit');
+  const grossProfit = _.sumBy(profitableTrades, 'net_profit');
+  const grossLoss = Math.abs(_.sumBy(losingTrades, 'net_profit'));
+
+  let profitFactor = 0;
+  if (grossLoss > 0) {
+    profitFactor = grossProfit / grossLoss;
+  } else if (grossProfit > 0) {
+    profitFactor = grossProfit > 0 ? 999 : 0;
+  }
+
+  if (!isFinite(profitFactor) || isNaN(profitFactor)) {
+    profitFactor = 0;
+  }
+
+  let startBalance = 10000;
+  const validBalances = sortedTrades.filter(t => t.balance != null && t.balance > 0);
+  if (validBalances.length > 0) {
+    const firstTrade = sortedTrades[0];
+    startBalance = parseFloat(firstTrade.balance) - parseFloat(firstTrade.net_profit || firstTrade.profit_loss || 0);
+    if (isNaN(startBalance) || startBalance <= 0) startBalance = 10000;
+  }
+
+  // Calculate equity progression
+  let currentBalance = startBalance;
+  const balanceSeries = [];
+  const tradeReturns = [];
+
+  sortedTrades.forEach(trade => {
+    const pnl = parseFloat(trade.net_profit || trade.profit_loss || 0);
+    const prevBalance = currentBalance;
+    const tradeReturn = prevBalance > 0 ? pnl / prevBalance : 0;
+    currentBalance = prevBalance * (1 + tradeReturn);
+
+    balanceSeries.push(currentBalance);
+    tradeReturns.push(tradeReturn);
+  });
+
+  const equityFinal = balanceSeries[balanceSeries.length - 1];
+  const equityPeak = Math.max(...balanceSeries);
+
+  const totalReturn = startBalance > 0 ? ((equityFinal - startBalance) / startBalance) * 100 : 0;
+
+  // Calculate max drawdown
+  let runningMax = startBalance;
+  let maxDrawdown = 0;
+
+  balanceSeries.forEach(balance => {
+    if (balance > runningMax) {
+      runningMax = balance;
+    }
+    const drawdown = ((runningMax - balance) / runningMax) * 100;
+    maxDrawdown = Math.max(maxDrawdown, drawdown);
+  });
+
+  // Calculate annualized return
+  const startDate = new Date(sortedTrades[0].close_time || sortedTrades[0].time);
+  const endDate = new Date(sortedTrades[sortedTrades.length - 1].close_time || sortedTrades[sortedTrades.length - 1].time);
+  const daysDiff = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+  const yearsDiff = daysDiff / 365;
+  const annualizedReturn = yearsDiff > 0 ? (Math.pow(1 + totalReturn / 100, 1 / yearsDiff) - 1) * 100 : 0;
+
+  // Calculate expectancy
+  const avgWin = profitableTradesCount > 0 ? grossProfit / profitableTradesCount : 0;
+  const avgLoss = losingTradesCount > 0 ? grossLoss / losingTradesCount : 0;
+  const expectancy = winRate * avgWin - (100 - winRate) * avgLoss;
+
+  // Calculate volatility (standard deviation of returns)
+  const meanReturn = tradeReturns.reduce((a, b) => a + b, 0) / tradeReturns.length;
+  const variance = tradeReturns.reduce((sum, ret) => sum + Math.pow(ret - meanReturn, 2), 0) / tradeReturns.length;
+  const volatility = Math.sqrt(variance) * 100; // As percentage
+
+  // Calculate Sharpe ratio
+  const riskFreeRate = 0.02; // 2% annual risk-free rate
+  const excessReturns = tradeReturns.map(ret => ret - riskFreeRate / 365);
+  const avgExcessReturn = excessReturns.reduce((a, b) => a + b, 0) / excessReturns.length;
+  const sharpeRatio = volatility > 0 ? avgExcessReturn / (Math.sqrt(variance) * Math.sqrt(365)) : 0;
+
+  // Calculate Sortino ratio
+  const downsideReturns = tradeReturns.filter(ret => ret < 0);
+  const downsideDeviation = downsideReturns.length > 0
+    ? Math.sqrt(downsideReturns.reduce((sum, ret) => sum + ret * ret, 0) / downsideReturns.length)
+    : 0.0001;
+  const sortinoRatio = downsideDeviation > 0 ? meanReturn / downsideDeviation : 0;
+
+  // Risk per trade
+  const riskPerTrade = tradeReturns.length > 0
+    ? (tradeReturns.reduce((sum, ret) => sum + Math.abs(ret), 0) / tradeReturns.length) * 100
+    : 0;
+
+  // Recovery factor
+  const recoveryFactor = maxDrawdown > 0 ? totalReturn / maxDrawdown : 0;
+
+  // Calculate scores
+  const performanceScore = normalizeScore(totalReturn, 0, 50, true) * 0.4 +
+                          normalizeScore(annualizedReturn, 10, 100, true, 500) * 0.3 +
+                          normalizeScore(winRate, 50, 80, true) * 0.3;
+
+  const riskScore = normalizeScore(maxDrawdown, 30, 5, false) * 0.5 +
+                   normalizeScore(volatility, 50, 20, false) * 0.3 +
+                   normalizeScore(riskPerTrade, 5, 1, false) * 0.2;
+
+  const consistencyScore = normalizeScore(volatility, 50, 10, false) * 0.5 +
+                          (profitableTradesCount / Math.max(1, losingTradesCount + profitableTradesCount)) * 50;
+
+  const accountHealthScore = normalizeScore(daysDiff, 30, 365, true) * 0.4 +
+                           normalizeScore(totalTrades, 10, 100, true) * 0.3 +
+                           normalizeScore(recoveryFactor, 1, 5, true) * 0.3;
+
+  return {
+    profit_percentage: parseFloat(totalReturn.toFixed(2)),
+    win_rate: parseFloat(winRate.toFixed(2)),
+    profit_factor: parseFloat(profitFactor.toFixed(2)),
+    trading_days: Math.floor(daysDiff),
+    current_win_streak: 0, // Simplified
+    current_loss_streak: 0, // Simplified
+    max_win_streak: 0, // Simplified
+    max_loss_streak: 0, // Simplified
+    total_trades: totalTrades,
+    profitable_trades_count: profitableTradesCount,
+    losing_trades_count: losingTradesCount,
+    sharpe_ratio: parseFloat(sharpeRatio.toFixed(2)),
+    sortino_ratio: parseFloat(sortinoRatio.toFixed(2)),
+    max_drawdown: parseFloat(maxDrawdown.toFixed(2)),
+    annualized_return: parseFloat(annualizedReturn.toFixed(2)),
+    expectancy: parseFloat(expectancy.toFixed(2)),
+    volatility: parseFloat(volatility.toFixed(2)),
+    risk_per_trade: parseFloat(riskPerTrade.toFixed(2)),
+    recovery_factor: parseFloat(recoveryFactor.toFixed(2)),
+    totalReturn: parseFloat(totalReturn.toFixed(2)),
+    accountAge: Math.floor(daysDiff),
+    trades: sortedTrades, // Include trades for account age calculation
+    // Scores
+    performance_score: Math.round(performanceScore),
+    risk_score: Math.round(riskScore),
+    consistency_score: Math.round(consistencyScore),
+    account_health_score: Math.round(accountHealthScore)
+  };
+};
 
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -114,9 +399,25 @@ export default function Leaderboard() {
       // Find the profile in leaderboard data
       const profile = leaderboard.find(p => p.traderId === traderId);
       if (profile) {
-        // Load trades for this profile to get full metrics
+        // Load trades for this profile to calculate full metrics
         const trades = await localDataService.entities.Trade.filter({ trader_profile_id: traderId });
-        setSelectedProfile({ ...profile, trades });
+
+        // Calculate metrics from trades
+        const metrics = calculateMetricsFromData(trades, profile);
+
+        // Calculate ELO scores from metrics
+        const eloScores = calculateELOScores(metrics);
+
+        // Get ELO category
+        const category = getELOCategory(eloScores.elo_score);
+
+        setSelectedProfile({
+          ...profile,
+          trades,
+          metrics,
+          eloScores,
+          category
+        });
         setProfileModalOpen(true);
       }
     } catch (error) {
@@ -345,31 +646,31 @@ export default function Leaderboard() {
               {/* ELO Score */}
               <div className="text-center">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
-                  <Award size={20} style={{ color: getELOColor(selectedProfile.elo.eloScore) }} />
-                  <span className="text-2xl font-bold" style={{ color: getELOColor(selectedProfile.elo.eloScore) }}>
-                    {selectedProfile.elo.eloScore.toFixed(1)}
+                  <Award size={20} style={{ color: getELOColor(selectedProfile.eloScores?.elo_score || selectedProfile.elo.eloScore) }} />
+                  <span className="text-2xl font-bold" style={{ color: getELOColor(selectedProfile.eloScores?.elo_score || selectedProfile.elo.eloScore) }}>
+                    {(selectedProfile.eloScores?.elo_score || selectedProfile.elo.eloScore || 1000).toFixed(1)}
                   </span>
                   <span className="text-gray-600">ELO</span>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">{selectedProfile.elo.category}</p>
+                <p className="text-sm text-gray-500 mt-1">{selectedProfile.category || selectedProfile.elo.category}</p>
               </div>
 
               {/* Performance Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl text-center">
-                  <div className="text-2xl font-bold text-blue-700">{selectedProfile.elo.performance_score || 0}</div>
+                  <div className="text-2xl font-bold text-blue-700">{selectedProfile.eloScores?.performance_score || selectedProfile.elo.performance_score || 0}</div>
                   <div className="text-sm text-blue-600">Performance</div>
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl text-center">
-                  <div className="text-2xl font-bold text-green-700">{selectedProfile.elo.risk_score || 0}</div>
+                  <div className="text-2xl font-bold text-green-700">{selectedProfile.eloScores?.risk_score || selectedProfile.elo.risk_score || 0}</div>
                   <div className="text-sm text-green-600">Risk Control</div>
                 </div>
                 <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl text-center">
-                  <div className="text-2xl font-bold text-yellow-700">{selectedProfile.elo.consistency_score || 0}</div>
+                  <div className="text-2xl font-bold text-yellow-700">{selectedProfile.eloScores?.consistency_score || selectedProfile.elo.consistency_score || 0}</div>
                   <div className="text-sm text-yellow-600">Consistency</div>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl text-center">
-                  <div className="text-2xl font-bold text-purple-700">{selectedProfile.elo.account_health_score || 0}</div>
+                  <div className="text-2xl font-bold text-purple-700">{selectedProfile.eloScores?.account_health_score || selectedProfile.elo.account_health_score || 0}</div>
                   <div className="text-sm text-purple-600">Health</div>
                 </div>
               </div>
@@ -377,20 +678,40 @@ export default function Leaderboard() {
               {/* Trading Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
-                  <div className="text-xl font-bold text-gray-800">{selectedProfile.winRate ? selectedProfile.winRate.toFixed(1) + '%' : '0.0%'}</div>
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.win_rate ? selectedProfile.metrics.win_rate.toFixed(1) + '%' : '0.0%'}</div>
                   <div className="text-sm text-gray-600">Win Rate</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
-                  <div className="text-xl font-bold text-gray-800">{selectedProfile.elo.totalTrades || 0}</div>
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.total_trades || 0}</div>
                   <div className="text-sm text-gray-600">Total Trades</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
-                  <div className="text-xl font-bold text-gray-800">{selectedProfile.profit_percentage ? selectedProfile.profit_percentage.toFixed(2) + '%' : '0.00%'}</div>
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.profit_percentage ? selectedProfile.metrics.profit_percentage.toFixed(2) + '%' : '0.00%'}</div>
                   <div className="text-sm text-gray-600">Total Return</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
-                  <div className="text-xl font-bold text-gray-800">{selectedProfile.annualized_return ? selectedProfile.annualized_return.toFixed(2) + '%' : '0.00%'}</div>
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.annualized_return ? selectedProfile.metrics.annualized_return.toFixed(2) + '%' : '0.00%'}</div>
                   <div className="text-sm text-gray-600">Annual Return</div>
+                </div>
+              </div>
+
+              {/* Additional Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.max_drawdown ? selectedProfile.metrics.max_drawdown.toFixed(2) + '%' : '0.00%'}</div>
+                  <div className="text-sm text-gray-600">Max DD</div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.profit_factor ? selectedProfile.metrics.profit_factor.toFixed(2) : '0.00'}</div>
+                  <div className="text-sm text-gray-600">Profit Factor</div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.sharpe_ratio ? selectedProfile.metrics.sharpe_ratio.toFixed(2) : '0.00'}</div>
+                  <div className="text-sm text-gray-600">Sharpe Ratio</div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 text-center">
+                  <div className="text-xl font-bold text-gray-800">{selectedProfile.metrics?.trading_days || 0}</div>
+                  <div className="text-sm text-gray-600">Trading Days</div>
                 </div>
               </div>
 
